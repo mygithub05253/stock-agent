@@ -1,0 +1,39 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["app"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://stock_agent:stock_agent@db:5432/stock_agent
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: ["python", "scripts/check_db.py"]
+
+  db:
+    image: postgres:16-alpine
+    container_name: stock-agent-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-stock_agent}
+      POSTGRES_USER: ${POSTGRES_USER:-stock_agent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock_agent}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-stock_agent} -d ${POSTGRES_DB:-stock_agent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
