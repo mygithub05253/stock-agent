@@ -12,4 +12,6 @@ RUN pip install --no-cache-dir -e .
 
 COPY . .
 
-CMD ["python", "scripts/check_db.py"]
+EXPOSE 8501
+
+CMD ["streamlit", "run", "streamlit_app.py"]
