@@ -177,7 +177,7 @@
 
 ### 처리 흐름
 1. Postgres에서 종목 메타·재무·시세 조회
-2. Chroma에서 최근 7일 뉴스 헤드라인 검색
+2. Postgres `rag_documents`/`rag_chunks`에서 최근 7일 뉴스 헤드라인 검색
 3. 1년 차트 데이터 가공 (matplotlib·plotly)
 4. PER/PBR/ROE/배당수익률 계산 (Python)
 5. 기관·외국인 매매 동향 (pykrx)
@@ -196,7 +196,7 @@
 ### 담당
 - UI: `streamlit_app.py` 내 모달 또는 `pages/0_종목_상세.py`
 - 에이전트: Quant Worker (재무·시세) + Qual Worker (뉴스 캐시)
-- DB: `company`, `financial_data`, `stock_price`, Chroma `news_chunks`
+- DB: `company`, `financial_data`, `stock_price`, `rag_documents`, `rag_chunks`
 
 ---
 
@@ -300,7 +300,7 @@
 
 ### 전제조건
 - 데이터팀 뉴스 수집 완료 (네이버·한경·매경)
-- Sanitizer 통과한 본문이 Chroma에 적재
+- Sanitizer 통과한 본문이 Postgres `rag_documents`와 `rag_chunks`에 적재
 
 ### 입력
 | 필드 | 타입 | 비고 |
@@ -310,13 +310,13 @@
 
 ### 처리 흐름
 1. **뉴스 RAG** (LLM 호출 1회 — Qual Worker)
-   - Chroma에서 stock_code 필터로 Hybrid Search (BM25 + 벡터)
+   - Postgres `rag_chunks`에서 stock_code 필터로 Hybrid Search (keyword + pgvector)
    - Reranker로 상위 30개 청크 정렬
 2. **호재/악재 분류** (LLM 호출 1회)
    - 9 이벤트 유형으로 분류 (실적·수주·신사업·규제·소송·M&A·경영진·산업·증권사 리포트)
    - 감성 라벨 (positive/negative/neutral)
 3. **DART 사업보고서 RAG** (LLM 호출 1회)
-   - Chroma `disclosure_chunks` 에서 검색
+   - Postgres `rag_chunks`에서 공시 청크 검색
    - 사업의 내용·MD&A·중대공시 추출
 4. **출처 부착 검증** (Source Tracker — 자동)
    - 모든 주장에 [출처: URL + 크롤링시각] 강제
@@ -340,7 +340,7 @@
 ### 담당
 - 에이전트: **Qual Worker ⭐ (W1+W3 핵심)**
 - Tool: `news_tool.py`, `dart_tool.py`
-- DB: Chroma `news_chunks`, `disclosure_chunks`, Postgres `disclosure`
+- DB: Postgres `rag_documents`, `rag_chunks`, `disclosure`
 - 출력: HTML 다운로드
 
 ---
@@ -541,10 +541,10 @@
 | B1 회원가입 | — | Guardrail (PII) | `users` | 0 |
 | B2 보유종목 | — | — | `holdings`, `company` | 0 |
 | B3 검색 | Quant (단순 조회) | — | `company`, `stock_price` | 0 |
-| B4 기본정보 | Quant + Qual (캐시) | — | `company`, `financial_data`, `stock_price`, Chroma | 0 (캐시) |
+| B4 기본정보 | Quant + Qual (캐시) | — | `company`, `financial_data`, `stock_price`, `rag_chunks` | 0 (캐시) |
 | B5 포트 일괄 | Quant (집계) | — | `holdings`, `stock_price` | 0 |
 | A1 5y 밸류 | **Quant ⭐** | — | `financial_data`, `stock_price` | 1 |
-| A2 정성 분석 | **Qual ★** | — | Chroma, `disclosure` | 3 |
+| A2 정성 분석 | **Qual ★** | — | `rag_chunks`, `disclosure` | 3 |
 | A3 Peer | Competitor | Quant | `company`, `financial_data` | 2 |
 | A4 BUY/HOLD/SELL | **Strategist ⭐** | Curator (입력 파싱) | `users`, `holdings`, `analysis_history` | 3 |
 | A5 종목 추천 | Curator | — | `company`, `stock_price` | 2 |

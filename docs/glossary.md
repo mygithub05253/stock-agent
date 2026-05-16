@@ -40,8 +40,8 @@
 |------|-----------|
 | **RAG** | Retrieval-Augmented Generation. "검색해서 그 결과를 바탕으로 답변" |
 | **Embedding (임베딩)** | 텍스트를 숫자 벡터로 변환한 것. 벡터끼리 거리가 가까우면 의미가 비슷 |
-| **Vector DB (벡터 DB)** | 임베딩을 저장하고 유사도 검색해주는 DB. 우리는 Chroma 사용 |
-| **Chroma** | 가벼운 오픈소스 벡터 DB. 파일/Docker 둘 다 가능 |
+| **Vector DB (벡터 DB)** | 임베딩을 저장하고 유사도 검색해주는 저장소. 우리는 Postgres + pgvector를 기본 사용 |
+| **Chroma** | 가벼운 오픈소스 벡터 DB. 향후 optional RAG backend 후보 |
 | **BM25** | 키워드 기반 검색 알고리즘. 전통적 검색 엔진의 기본 |
 | **Hybrid Search** | BM25 + 벡터 검색을 같이 쓰는 방식. W1 학습 핵심 |
 | **Reranker** | 검색 결과를 다시 정렬해서 상위 N개 품질을 높이는 모듈 |
@@ -136,7 +136,7 @@
 | **Streamlit** | 파이썬으로 웹 화면 만드는 프레임워크 |
 | **Streamlit Cloud** | Streamlit 무료 배포 서비스 |
 | **Postgres** | 오픈소스 관계형 DB |
-| **pgvector** | Postgres 벡터 검색 확장 (우리는 안 씀) |
+| **pgvector** | Postgres 안에서 임베딩 벡터를 저장하고 유사도 검색하는 확장 |
 | **Docker** | 애플리케이션을 컨테이너로 실행하는 도구 |
 | **docker-compose** | 여러 컨테이너를 한 번에 띄우는 도구 |
 | **Dockerfile** | Docker 이미지 빌드 정의 파일 |
@@ -146,7 +146,7 @@
 | **pytest** | Python 테스트 프레임워크 |
 | **ruff** | Python 코드 린터 (자동 정리) |
 | **CI** | Continuous Integration. PR마다 자동 테스트 |
-| **langfuse** | LLM 호출 트레이싱·디버깅 도구 |
+| **LangSmith** | LLM·LangGraph 호출 트레이싱·디버깅 도구 |
 | **REST API** | HTTP로 데이터 주고받는 표준 |
 
 ---

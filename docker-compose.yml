@@ -9,6 +9,12 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql://stock_agent:stock_agent@db:5432/stock_agent
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-stock-agent-local}
       STREAMLIT_SERVER_ADDRESS: 0.0.0.0
       STREAMLIT_SERVER_PORT: 8501
     depends_on:
@@ -21,7 +27,7 @@ services:
     command: ["streamlit", "run", "streamlit_app.py"]
 
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: stock-agent-db
     restart: unless-stopped
     environment:

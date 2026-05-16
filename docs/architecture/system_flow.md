@@ -38,7 +38,7 @@ sequenceDiagram
     participant R as pages/2_추천_결과
     participant D as pages/3_상세_산출물
     participant LG as LangGraph 파이프라인 (Streamlit 프로세스 내)
-    participant DB as Postgres + Chroma
+    participant DB as Postgres + pgvector
 
     U->>H: 로그인 (이메일/비밀번호)
     H->>DB: 사용자 조회
@@ -144,13 +144,13 @@ flowchart LR
 
     subgraph "저장소"
         PG[(🗄 Postgres<br/>정형 데이터<br/>company / financial_data /<br/>disclosure / stock_price /<br/>users / holdings)]
-        CH[(🔍 Chroma<br/>비정형 데이터<br/>뉴스·공시 본문<br/>+ 임베딩 벡터)]
+        VEC[(🔍 pgvector tables<br/>rag_documents / rag_chunks<br/>뉴스·공시 본문<br/>+ 임베딩 벡터)]
     end
 
     DC -->|재무·공시 메타| PG
     PC -->|기사 메타| PG
-    PC -->|기사 본문 + 임베딩| CH
-    DC -->|공시 본문 + 임베딩| CH
+    PC -->|기사 본문 + 임베딩| VEC
+    DC -->|공시 본문 + 임베딩| VEC
     MC -->|매크로 시계열| PG
 
     subgraph "AI 에이전트 (src/stock_agent/)"
@@ -165,9 +165,9 @@ flowchart LR
     PG -.조회.-> CUR
     PG -.재무 조회.-> QNT
     PG -.뉴스 메타.-> QAL
-    CH -.RAG 검색.-> QAL
+    VEC -.RAG 검색.-> QAL
     PG -.Peer 조회.-> CMP
-    CH -.공시 RAG.-> CMP
+    VEC -.공시 RAG.-> CMP
     PG -.매크로 조회.-> STR
     PG -.포트 조회.-> STR
 
@@ -193,14 +193,14 @@ flowchart LR
     style STR fill:#ef4444,color:#fff
     style GRD fill:#6b7280,color:#fff
     style PG fill:#336791,color:#fff
-    style CH fill:#ff6b35,color:#fff
+    style VEC fill:#ff6b35,color:#fff
 ```
 
 **핵심 설명 (비전공자용):**
 - **외부 → 데이터팀 → 저장소** 경로: 매일 한 번 (또는 사용자 요청 시) 데이터 수집 → 깨끗하게 정리 → DB에 적재
-- **저장소가 두 개인 이유**:
+- **Postgres 안에서 역할을 나눈 이유**:
   - **Postgres (왼쪽 파란색)** = 표 형태로 잘 정리된 데이터 (회원·재무·시세·매크로)
-  - **Chroma (오른쪽 주황)** = 긴 텍스트 + 그 의미를 숫자(벡터)로 변환한 것 → "비슷한 뉴스 찾아줘" 가능
+  - **pgvector tables (오른쪽 주황)** = 긴 텍스트 + 의미 벡터를 Postgres 안에 저장 → "비슷한 뉴스 찾아줘" 가능
 - **에이전트 → 저장소** 경로: 분석 요청이 오면 에이전트들이 필요한 데이터를 조회 → 결과를 만들어서 → 사용자에게 4가지 형태로 제공
 
 ---
@@ -223,7 +223,7 @@ gantt
 
     section 7주차
     Postgres 스키마 적용       :db, 2026-05-15, 2d
-    Chroma 인덱싱             :chroma, 2026-05-16, 2d
+    pgvector 인덱싱           :pgvector, 2026-05-16, 2d
     Quant Worker 첫 호출       :quant1, 2026-05-17, 3d
     Hello E2E 1종목           :e2e, 2026-05-19, 2d
 
@@ -231,7 +231,7 @@ gantt
     회원가입·로그인            :auth, 2026-05-22, 2d
     종목 검색·기본정보         :search, 2026-05-23, 2d
     포트폴리오 일괄 안내        :port, 2026-05-25, 2d
-    langfuse 연동             :lang, 2026-05-26, 2d
+    LangSmith 연동            :lang, 2026-05-26, 2d
 
     section 9주차
     중간 시연 준비             :demo, 2026-05-29, 2d

@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     news_api_key: str | None = None
     fred_api_key: str | None = None
     dart_api_key: str | None = None
+    embedding_model: str = "bge-m3"
+    embedding_dimensions: int = 1024
+    langsmith_tracing: bool = False
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_api_key: str | None = None
+    langsmith_project: str = "stock-agent-local"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
