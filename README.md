@@ -142,8 +142,10 @@ docker compose up -d db
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -r requirements-dev.txt
 ```
+
+의존성의 기준 파일은 `pyproject.toml`입니다. `requirements.txt`와 `requirements-dev.txt`는 팀원이 익숙한 명령으로 설치할 수 있게 둔 얇은 진입점입니다.
 
 ### 4. DB 연결 확인
 
