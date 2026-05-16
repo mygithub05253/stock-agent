@@ -24,10 +24,10 @@
 | **LangGraph** | 여러 에이전트를 그래프로 연결해 동작시키는 파이썬 라이브러리 |
 | **Streamlit** | 파이썬으로 웹 화면을 만드는 도구. 우리 UI |
 | **Postgres** | DB. 회원·종목·재무·시세 등 정형 데이터 저장 |
-| **Chroma** | 벡터 DB. 뉴스·공시 본문의 임베딩 저장 + 유사도 검색 |
+| **pgvector** | Postgres 안에서 뉴스·공시 임베딩을 저장하고 유사도 검색하는 확장 |
 | **DART** | 금융감독원 전자공시. 한국 상장사 재무·공시 공식 데이터 출처 |
 | **pykrx** | KOSPI/KOSDAQ 시세를 무료로 가져오는 파이썬 라이브러리 |
-| **langfuse** | LLM 호출을 추적·디버깅하는 도구 (8주차 도입) |
+| **LangSmith** | LLM·LangGraph 호출을 추적·디버깅하는 도구 (추후 도입) |
 | **PR** | Pull Request. "내 작업을 메인 코드에 합쳐달라" 요청 |
 | **PM** | Project Manager. 본 레포는 PM 2명이 PR 검수·Merge 담당 |
 
@@ -94,7 +94,7 @@ stock-agent/
 │   ├── prompts/                   LLM 프롬프트 (코드와 분리 보관)
 │   ├── harness/                   횡단 컴포넌트 (가드레일·출처추적·용어풀이)
 │   ├── llm/                       LLM 추상화 + 비용 라우팅
-│   ├── rag/                       Chroma + Hybrid Search + Reranker
+│   ├── rag/                       Postgres pgvector + Hybrid Search + Reranker
 │   ├── schemas/                   Pydantic 모델
 │   ├── tools/                     외부 데이터 Tool (DART·pykrx·News)
 │   ├── config.py                  공통 설정
@@ -136,6 +136,13 @@ docker compose up -d db
 기본 접속 정보:
 - Host: `localhost` / Port: `5432`
 - Database: `stock_agent` / User: `stock_agent` / Password: `stock_agent`
+- Docker에서는 `pgvector/pgvector:pg16` 이미지를 사용합니다.
+
+기존 로컬 Docker 볼륨을 이미 만든 팀원은 새 스키마가 자동 적용되지 않을 수 있습니다. 이때는 DB를 띄운 뒤 아래 명령을 실행합니다.
+
+```bash
+python scripts/apply_db_schema.py
+```
 
 ### 3. Python 개발 환경
 
@@ -192,7 +199,7 @@ docker compose --profile app up --build
 - `feature/p2-crawling-naver` (P2가 네이버 크롤링 기능 추가)
 - `feature/p3-quant-agent` (P3가 Quant Agent 구현)
 - `docs/pm-prd-v06` (PM이 PRD v0.6 작성)
-- `fix/p4-langfuse-trace` (P4가 langfuse 트레이싱 버그 수정)
+- `fix/p4-langsmith-trace` (P4가 LangSmith 트레이싱 버그 수정)
 
 ### 2. 커밋 메시지 규칙 (저장할 때 남기는 메모)
 
@@ -234,7 +241,7 @@ docker compose --profile app up --build
 | `src/stock_agent/agents/` | 에이전트 담당 | 6개 에이전트 구현 |
 | `src/stock_agent/graph/` | 에이전트 담당 | LangGraph 오케스트레이션 |
 | `src/stock_agent/prompts/` | 에이전트 + PM | LLM 프롬프트 (코드와 분리) |
-| `src/stock_agent/rag/` | 에이전트 (RAG) | Chroma + Reranker |
+| `src/stock_agent/rag/` | 에이전트 (RAG) | Postgres pgvector + Reranker |
 | `src/stock_agent/tools/` | 에이전트 (Tool) | 외부 데이터 Tool 함수 |
 | `ui/` | UI 담당 | Streamlit 페이지·컴포넌트 |
 | `eval/` | 평가 담당 + PM | 골든셋·평가 스크립트 |
@@ -271,11 +278,13 @@ pip install <package>
 | 데이터 종류 | 저장소 | 이유 |
 |-------------|--------|------|
 | 회원·포트·재무·시세 (정형) | **Postgres** | JOIN·트랜잭션 필요 |
-| 뉴스·공시 본문 + 임베딩 (비정형) | **Chroma** | 벡터 유사도 검색 필요 |
+| 뉴스·공시 본문 + 임베딩 (비정형) | **Postgres + pgvector** | DB 1개로 벡터 유사도 검색 |
 | 산출 파일 (Excel·PDF·DOCX) | 컨테이너 임시 + 사용자 다운로드 | DB BLOB 저장 금지 (Streamlit Cloud 1GB 제한) |
 | 원본 PDF/HTML | 로컬 캐시 (재기동 시 재다운로드) | MVP는 단순화 |
 
-자세한 내용: `docs/decisions/ADR-001-data-arch-postgres-chroma.md`
+Chroma는 삭제하지 않고 향후 optional RAG backend 후보로 남깁니다. MVP 기본 경로는 Postgres 단일 DB입니다.
+
+자세한 내용: `docs/decisions/ADR-001-data-arch-postgres-pgvector.md`
 
 ---
 

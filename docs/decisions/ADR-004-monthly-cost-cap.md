@@ -39,7 +39,7 @@
 
 ### 2.3 비용 추적
 
-- **langfuse** 대시보드에서 실시간 모니터링 (8주차 도입)
+- **LangSmith** 대시보드에서 실시간 모니터링 (추후 도입)
 - Postgres `llm_cost_log` 테이블에 모든 호출 비용 기록
 - PM이 매주 월요일 회고 미팅에서 점검
 
@@ -92,7 +92,7 @@
 
 - [ ] `src/stock_agent/llm/tracker.py` 구현 — 호출마다 비용 계산 + DB 적재 (7주차)
 - [ ] Slack 웹훅 셋업 (8주차)
-- [ ] langfuse 대시보드 통합 (8주차)
+- [ ] LangSmith 대시보드 통합 (8주차)
 - [ ] 캐시 강제 토글 구현 — `.env` `FORCE_CACHE_MODE=true` (7주차)
 - [ ] 매주 월요일 회고 미팅에 비용 점검 안건 추가 (PM)
 

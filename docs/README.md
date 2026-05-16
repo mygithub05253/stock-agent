@@ -18,7 +18,7 @@ docs/
 │   ├── llm_cost_guide.md                   ← LLM 비용 절감 가이드
 │   └── deployment.md                       ← Streamlit Cloud 배포 가이드
 ├── decisions/                              ← ADR (Architecture Decision Records)
-│   ├── ADR-001-data-arch-postgres-chroma.md
+│   ├── ADR-001-data-arch-postgres-pgvector.md
 │   ├── ADR-002-six-agent-structure.md
 │   └── ADR-003-cost-cap-50k-monthly.md
 ├── glossary.md                             ← 용어집 (비전공자용)

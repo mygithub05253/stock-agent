@@ -27,7 +27,7 @@
 | 2 | 종목 기본 정보 | DART + pykrx + FinanceDataReader | Postgres (`company`) | Curator·Quant |
 | 3 | 가격/거래 | pykrx | Postgres (`stock_price`) | Quant·Strategist |
 | 4 | DART 재무 | OpenDART API | Postgres (`financial_data`) | **Quant ⭐** |
-| 5 | 뉴스 | 네이버금융·한경·매경 크롤링 | Postgres (메타) + Chroma (본문+임베딩) | **Qual ⭐** |
+| 5 | 뉴스 | 네이버금융·한경·매경 크롤링 | Postgres + pgvector (본문+임베딩) | **Qual ⭐** |
 | 6 | 매크로 | ECOS (한은) + FRED | Postgres (시계열) | Strategist·Quant |
 
 ### 1.2 후순위 3개 (Phase 3 / v2)
@@ -133,30 +133,30 @@ erDiagram
 > 📌 **데이터팀 확정 4 테이블** = `company`, `financial_data`, `disclosure`, `stock_price`
 > 📌 **PM 추가 제안 3 테이블** = `users`, `holdings`, `analysis_history` (회원·포트·분석 이력 — 데이터팀 협의 후 확정)
 
-### 2.2 Chroma (벡터 DB) 컬렉션
+### 2.2 RAG 문서/청크 (Postgres + pgvector)
 
 ```
-chroma/
-├── news_chunks/                ← 뉴스 본문 청크
-│   ├── id (UUID)
-│   ├── stock_code              (필터링용 메타)
-│   ├── source_url
-│   ├── crawled_at
-│   ├── title
-│   ├── body                    (원본 텍스트)
-│   ├── event_type              (실적/수주/규제 등 9분류)
-│   └── embedding (vector 1024) ← BGE-m3 또는 Solar Embedding
-│
-└── disclosure_chunks/          ← DART 공시 본문 청크
-    ├── id
-    ├── rcept_no                (Postgres FK)
-    ├── corp_code
-    ├── page
-    ├── body
-    └── embedding (vector 1024)
+rag_documents
+├── id (UUID)
+├── source_type                 ← news / disclosure / report
+├── source
+├── external_id
+├── corp_code / stock_code
+├── title / url / published_at
+├── content                     ← 정제된 원문
+└── metadata (JSONB)
+
+rag_chunks
+├── id (UUID)
+├── document_id                 ← rag_documents FK
+├── chunk_index
+├── content                     ← 청크 텍스트
+├── embedding vector(1024)      ← BGE-m3 또는 Solar Embedding
+├── embedding_model
+└── metadata (JSONB)
 ```
 
-> Chroma는 *비정형 텍스트와 그 의미 벡터* 만 저장. 정형 메타데이터(언론사·날짜 등)는 Postgres의 `disclosure` 테이블에. → **B안 (Postgres + Chroma 분리)** 결정 (`docs/decisions/ADR-001-data-arch.md`)
+> MVP 기본 경로는 Postgres 단일 DB입니다. Chroma는 향후 optional RAG backend로 남깁니다. 자세한 결정은 `docs/decisions/ADR-001-data-arch-postgres-pgvector.md`를 참고하세요.
 
 ---
 
@@ -225,7 +225,7 @@ CREATE TABLE financial_data (
 
 ### 3.3 `disclosure` — DART 공시·뉴스
 
-Qual Worker가 RAG로 분석할 텍스트 메타. 본문은 Chroma에.
+Qual Worker가 RAG로 분석할 공시 메타입니다. RAG 원문과 청크는 `rag_documents`, `rag_chunks`에 저장합니다.
 
 | 컬럼명 | 데이터 타입 | 제약 | 설명 |
 |--------|-------------|------|------|
@@ -294,7 +294,7 @@ CREATE TABLE stock_price (
 | 시가총액 | `stock_price.market_cap` | 작은 종목 제외 (시총 ≥1조) |
 | 거래대금 | `stock_price.volume × close_price` | 유동성 필터 (20거래일 평균) |
 | 섹터 | `company.sector` | 사용자 관심 섹터 매칭 |
-| 최근 뉴스 수 | `disclosure` 또는 Chroma 카운트 | 이슈성 판단 |
+| 최근 뉴스 수 | `rag_documents` 카운트 | 이슈성 판단 |
 | 회원 관심 섹터 | `users.interest_sectors` | 우선 노출 |
 
 **MVP 필터:** 반도체·금융·소비재 시총 상위 9 종목 (PRD §3.5)
@@ -303,9 +303,9 @@ CREATE TABLE stock_price (
 
 | 필요 데이터 | 출처 | 사용 |
 |-------------|------|------|
-| 뉴스 본문 | Chroma `news_chunks` (Hybrid Search) | RAG 검색 → 호재/악재 추출 |
-| 뉴스 메타 | `disclosure` 또는 Postgres 뉴스 테이블 (TBD) | 출처·날짜 인용 |
-| 공시 본문 | Chroma `disclosure_chunks` | DART 사업보고서 RAG |
+| 뉴스 본문 | `rag_chunks` + pgvector | RAG 검색 → 호재/악재 추출 |
+| 뉴스 메타 | `rag_documents` | 출처·날짜 인용 |
+| 공시 본문 | `rag_chunks` + pgvector | DART 사업보고서 RAG |
 | 공시 메타 | `disclosure` | 보고서명·접수일 인용 |
 
 **저장 예시 (뉴스):**
@@ -402,7 +402,7 @@ CREATE TABLE stock_price (
 
 1. **`users`, `holdings`, `analysis_history` 3 테이블 추가 필요** — 회원가입·포트·분석 이력 저장용. 데이터팀이 추가 작성? 아니면 백엔드 담당? **답변 요청**
 2. **뉴스 메타 테이블** — 데이터팀 자료에는 뉴스 저장 예시(JSON)만 있고 SQL 스키마가 없음. `disclosure` 와 별개의 `news` 테이블이 필요한지? **답변 요청**
-3. **Chroma 컬렉션 이름·임베딩 모델** — 본 문서는 `news_chunks` / `disclosure_chunks` + BGE-m3로 가정. 데이터팀 결정 사항 알려주세요 **답변 요청**
+3. **임베딩 모델과 차원** — 현재 스키마는 `bge-m3`, `vector(1024)` 기준. 모델 변경 시 데이터팀·에이전트팀 합의 필요 **답변 요청**
 4. **5개년 vs 3개년** — 데이터팀 자료는 "MVP는 3개년" 이라고 했는데 PRD/교수 피드백은 "5개년 밸류에이션" 요구. Phase 1=3년, Phase 2=5년 확장으로 단계화 어떨지? **답변 요청**
 
 ---

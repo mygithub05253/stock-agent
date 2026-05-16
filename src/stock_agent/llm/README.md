@@ -6,7 +6,7 @@
 
 이유는 두 가지:
 1. **모델 라우팅** — 작업 난이도에 따라 작은/큰 모델 자동 선택 → 비용 절감
-2. **비용 추적** — 모든 호출의 입출력 토큰·비용을 langfuse + DB에 기록
+2. **비용 추적** — 모든 호출의 입출력 토큰·비용을 LangSmith + DB에 기록
 
 ## 파일
 
@@ -14,7 +14,7 @@
 |------|------|
 | `factory.py` | `get_llm(task_type)` 팩토리 함수. task_type 으로 모델 자동 선택 |
 | `routing.py` | task_type → 모델 매핑 정책 (예: parsing → gpt-4o-mini, decision → solar) |
-| `tracker.py` | langfuse 트레이싱 + 비용 추적 |
+| `tracker.py` | LangSmith 트레이싱 + 비용 추적 |
 
 ## 모델 정책 (자세히는 `docs/operations/llm_cost_guide.md`)
 
