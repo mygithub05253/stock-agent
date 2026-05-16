@@ -1,7 +1,7 @@
 # stock-agent — BDAI 12기 팀 프로젝트
 
 > **한국 주식 투자자 의사결정 지원 멀티에이전트 시스템**
-> 회원의 포트폴리오·투자성향에 맞춰 5개년 밸류에이션과 BUY/HOLD/SELL 권유를 *근거와 함께* 제공합니다.
+> 회원의 포트폴리오·투자성향에 맞춰 정량·정성·Peer·매크로 데이터를 종합하고 BUY/HOLD/SELL 성격의 **분석 신호**를 근거와 함께 제공합니다.
 
 ---
 
@@ -37,18 +37,28 @@
 
 ## 🎯 시스템 한눈에
 
+### 현재 구현 상태
+
+| 영역 | 상태 | 비고 |
+|------|------|------|
+| Phase 1 E2E | 구현됨 | 삼성전자 1종목 mock 기준 `Curator → Quant/Qual/Competitor → Strategist → Guardrail` |
+| UI | 구현됨 | `streamlit_app.py`에서 Tier 1/Tier 2 결과 카드 확인 |
+| 공통 개발환경 | 구현됨 | Docker Compose로 `Streamlit app + Postgres pgvector` 실행 |
+| RAG 저장소 | 방향 확정 | MVP 기본은 Postgres + pgvector, Chroma는 optional backend 후보 |
+| LangSmith | 준비 중 | 환경변수 placeholder만 반영, 실제 tracing 모듈은 후속 작업 |
+
 ### 6 에이전트
 1. **Curator Agent** — 사용자 자연어 → 의도·종목 파싱 / 종목 미지정 시 후보 추천
 2. **Qual Worker Agent ★** — 뉴스·공시 RAG로 호재/악재 분석 (W1+W3 핵심)
 3. **Quant Worker Agent** — DART 재무 + pykrx 시세로 5y 밸류에이션 계산
 4. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교
-5. **Strategist & Synthesizer Agent** — 4 워커 종합 → BUY/HOLD/SELL + PB 리포트
+5. **Strategist & Synthesizer Agent** — 4 워커 종합 → BUY/HOLD/SELL 성격의 분석 신호 + PB 리포트
 6. **Guardrail & Evaluator Agent** — 위험 표현 차단 + RAGAS 자동 채점
 
 ### 11 사용자 기능
 
 **기본 기능 (Phase 1, 7~8주차)**: 회원가입 / 보유 종목 등록 / 종목 검색 / 종목 기본 정보 / 포트폴리오 일괄 안내
-**고급 기능 (Phase 2, 9~11주차)**: 5개년 밸류에이션 / 산업·정성 분석 / 동종업계 횡비교 / BUY·HOLD·SELL 권유 / 종목 추천 (Curator) / PB 리포트 다운로드
+**고급 기능 (Phase 2, 9~11주차)**: 5개년 밸류에이션 / 산업·정성 분석 / 동종업계 횡비교 / BUY·HOLD·SELL 분석 신호 / 종목 추천 (Curator) / PB 리포트 다운로드
 
 자세한 내용은 `docs/prd/PRD_v0.6.md` 참조.
 
@@ -86,7 +96,7 @@ stock-agent/
 │   └── dart/                      DART 재무·공시
 │
 ├── db/                            🗄 DB 스키마
-│   └── init/                      Postgres 초기화 SQL
+│   └── init/                      Postgres + pgvector 초기화 SQL
 │
 ├── src/stock_agent/               🤖 애플리케이션 코드 (Streamlit이 import)
 │   ├── agents/                    6개 에이전트 구현
@@ -106,10 +116,14 @@ stock-agent/
 │   └── run_benchmark.py           평가 실행 스크립트
 │
 ├── scripts/                       🛠 운영 스크립트 (cron·배치 분석 등)
+│   ├── apply_db_schema.py         기존 Docker 볼륨에 최신 DB 스키마 적용
+│   └── check_db.py                DB 연결 + pgvector/RAG 테이블 확인
 ├── tests/                         ✅ 단위·통합 테스트
 │
 ├── Dockerfile, docker-compose.yml
 ├── pyproject.toml                 Python 의존성
+├── requirements.txt               운영/기본 설치 진입점
+├── requirements-dev.txt           개발 설치 진입점
 └── .env.example                   환경 변수 예시
 ```
 
@@ -119,6 +133,26 @@ stock-agent/
 
 ## 🚀 빠른 시작
 
+### Docker 권장 실행
+
+팀원이 같은 환경에서 바로 확인하려면 Docker 실행을 우선 권장합니다.
+
+```bash
+cp .env.example .env
+docker compose --profile app up --build
+```
+
+브라우저에서 `http://localhost:8501`을 엽니다.
+
+기존에 `stock-agent_postgres_data` Docker 볼륨을 이미 만든 팀원은 컨테이너가 떠 있는 상태에서 한 번만 아래 명령을 실행합니다.
+
+```bash
+docker compose --profile app run --rm app python scripts/apply_db_schema.py
+docker compose --profile app run --rm app python scripts/check_db.py
+```
+
+`check_db.py` 출력에서 `pgvector=True`, `rag_documents=True`, `rag_chunks=True`가 보이면 정상입니다.
+
 ### 1. 환경 변수 준비
 
 ```bash
@@ -127,7 +161,7 @@ cp .env.example .env
 
 필요한 값(API 키 등)은 `.env`에 채워 넣습니다. **`.env`는 절대 커밋하지 마세요.**
 
-### 2. PostgreSQL 실행
+### 2. PostgreSQL만 실행
 
 ```bash
 docker compose up -d db
@@ -141,7 +175,7 @@ docker compose up -d db
 기존 로컬 Docker 볼륨을 이미 만든 팀원은 새 스키마가 자동 적용되지 않을 수 있습니다. 이때는 DB를 띄운 뒤 아래 명령을 실행합니다.
 
 ```bash
-python scripts/apply_db_schema.py
+docker compose --profile app run --rm app python scripts/apply_db_schema.py
 ```
 
 ### 3. Python 개발 환경
@@ -247,7 +281,27 @@ docker compose --profile app up --build
 | `eval/` | 평가 담당 + PM | 골든셋·평가 스크립트 |
 | `docs/` | **PM** | 모든 기획·설계·운영 문서 |
 
-### 5. 코드 작성 규칙
+### 5. 에이전트 작업 분리 기준
+
+에이전트 담당자는 먼저 `schemas/`의 입출력 계약을 맞추고, 각자 `agents/`와 `tools/`를 분리해서 작업합니다.
+
+| 담당 | 주 작업 위치 | 책임 |
+|------|--------------|------|
+| Curator | `src/stock_agent/agents/curator.py` | 질문에서 의도·종목·후보 추출 |
+| Quant | `src/stock_agent/agents/quant.py`, `src/stock_agent/tools/` | 재무·주가 조회와 지표 계산 |
+| Qual | `src/stock_agent/agents/qual.py`, `src/stock_agent/rag/` | 뉴스·공시 RAG와 이벤트 유형 분류 |
+| Competitor | `src/stock_agent/agents/competitor.py` | 같은 섹터 Peer 추출과 비교 |
+| Strategist | `src/stock_agent/agents/strategist.py` | 결과 종합과 분석 신호 생성 |
+| Guardrail | `src/stock_agent/agents/guardrail.py`, `src/stock_agent/harness/` | 투자권유 표현 완화와 근거 부족 경고 |
+| Graph | `src/stock_agent/graph/` | LangGraph 연결과 병렬 fan-out |
+
+원칙:
+- `agents/`에는 판단 흐름을 둡니다.
+- DB 조회, API 호출, 계산식은 `tools/` 또는 `rag/`로 분리합니다.
+- 프롬프트는 `.py`에 직접 쓰지 말고 `prompts/*.md`에 둡니다.
+- Chroma는 삭제하지 않지만 MVP 기본 구현은 `rag/pgvector_store.py`와 Postgres 테이블을 사용합니다.
+
+### 6. 코드 작성 규칙
 
 #### 주석은 필수, **Why**를 적기
 
@@ -285,6 +339,18 @@ pip install <package>
 Chroma는 삭제하지 않고 향후 optional RAG backend 후보로 남깁니다. MVP 기본 경로는 Postgres 단일 DB입니다.
 
 자세한 내용: `docs/decisions/ADR-001-data-arch-postgres-pgvector.md`
+
+### 핵심 DB 테이블
+
+| 테이블 | 역할 |
+|--------|------|
+| `company` | 종목명, 종목코드, 섹터 등 기업 마스터 |
+| `stock_price` | 일별 종가, 시가총액, 거래량 |
+| `financial_statement` | DART 재무제표 계정별 수치 |
+| `disclosure_report` / `disclosure_content` | DART 공시 메타와 원문 |
+| `raw_news` / `raw_macro` | 수집 원천 데이터 |
+| `rag_documents` | 뉴스·공시·리포트 원문 단위 |
+| `rag_chunks` | RAG 청크와 `vector(1024)` 임베딩 |
 
 ---
 
@@ -325,6 +391,12 @@ PM이 주로 관리하는 문서들:
 # DB만 띄우기
 docker compose up -d db
 
+# 기존 볼륨에 최신 스키마 적용
+docker compose --profile app run --rm app python scripts/apply_db_schema.py
+
+# DB, pgvector, RAG 테이블 확인
+docker compose --profile app run --rm app python scripts/check_db.py
+
 # DB 로그 보기
 docker compose logs -f db
 
@@ -355,6 +427,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-05-16 | v1.2 | Phase 1 E2E, Docker 앱 실행, Postgres pgvector RAG 저장소 기준 반영 |
 | 2026-05-10 | v1.0 | 협업 가이드 + 새 폴더 구조 + 6 에이전트 + 비전공자 용어풀이 추가 |
 | (이전) | v0.1 | 데이터팀 초기 셋업 (Postgres + Docker + datas/news/macro/dart) |
 
