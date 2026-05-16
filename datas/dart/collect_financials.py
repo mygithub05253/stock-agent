@@ -10,10 +10,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 DART_API_KEY = os.getenv("DART_API_KEY")
 
 def collect_financial_statements():
-    print("🚀 3탄: 핵심 재무제표 수치 데이터 수집 시작...")
+    print("핵심 재무제표 수치 데이터 수집 시작...")
     
     if not DART_API_KEY:
-        print("❌ 에러: .env 파일에 DART_API_KEY가 설정되지 않았습니다.")
+        print("에러: .env 파일에 DART_API_KEY가 설정되지 않았습니다.")
         return
 
     # 1. DB에서 재무제표를 수집할 대상 기업(corp_code) 조회
@@ -25,13 +25,13 @@ def collect_financial_statements():
         companies = cursor.fetchall()
         
         if not companies:
-            print("⚠️ DB에 등록된 기업이 없습니다. DART 수집을 먼저 완료해주세요.")
+            print("DB에 등록된 기업이 없습니다. DART 수집을 먼저 완료해주세요.")
             return
             
-        print(f"🔎 재무제표 수집 대상 기업: {len(companies)}곳")
+        print(f"재무제표 수집 대상 기업: {len(companies)}곳")
         
     except Exception as e:
-        print(f"❌ DB 조회 실패: {e}")
+        print(f"DB 조회 실패: {e}")
         return
 
     # 2. 수집할 연도 및 리포트 코드 설정 (11011 = 사업보고서/연간)
@@ -105,11 +105,11 @@ def collect_financial_statements():
                 # 연도별로 즉시 커밋
                 conn.commit()
                 
-        print(f"✅ 성공: 총 {total_inserted}건의 재무제표 계정 데이터가 financial_statement 테이블에 저장되었습니다.")
+        print(f"성공: 총 {total_inserted}건의 재무제표 계정 데이터가 financial_statement 테이블에 저장되었습니다.")
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ 재무 데이터 처리 중 전체 에러 발생: {e}")
+        print(f"재무 데이터 처리 중 전체 에러 발생: {e}")
         
     finally:
         cursor.close()

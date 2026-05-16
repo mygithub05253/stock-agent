@@ -10,7 +10,7 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def enrich_company_master():
-    print("🚀 1탄: 기업 마스터 정보(업종, 상장일) 보완 시작...")
+    print("기업 마스터 정보(업종, 상장일) 보완 시작...")
     
     # 1. Supabase에서 stock_code가 있지만 sector 정보가 없는 기업 목록 조회
     try:
@@ -24,17 +24,17 @@ def enrich_company_master():
         target_companies = [row[0] for row in cursor.fetchall()]
         
         if not target_companies:
-            print("✨ 이미 모든 상장사의 업종 정보가 채워져 있습니다!")
+            print("이미 모든 상장사의 업종 정보가 채워져 있습니다!")
             return
             
-        print(f"🔎 정보 업데이트가 필요한 상장사: {len(target_companies)}곳")
+        print(f"정보 업데이트가 필요한 상장사: {len(target_companies)}곳")
         
     except Exception as e:
-        print(f"❌ DB 조회 실패: {e}")
+        print(f"DB 조회 실패: {e}")
         return
 
     # 2. KRX KIND 공식 상장법인 채널에서 직접 데이터 다운로드 (FDR 컬럼 유실 우회)
-    print("📡 KRX KIND 공식 상장법인 상세 정보 로드 중...")
+    print("KRX KIND 공식 상장법인 상세 정보 로드 중...")
     try:
         url = 'http://kind.krx.co.kr/corpgeneral/corpList.do'
         params = {
@@ -47,7 +47,7 @@ def enrich_company_master():
         # HTML 테이블 읽기 (KIND 엑셀 다운로드는 실제 내부는 HTML 구조입니다)
         dfs = pd.read_html(io.BytesIO(response.content))
         if not dfs:
-            print("❌ KRX 데이터를 테이블로 변환할 수 없습니다.")
+            print("KRX 데이터를 테이블로 변환할 수 없습니다.")
             return
             
         df_krx = dfs[0]
@@ -57,8 +57,8 @@ def enrich_company_master():
         df_krx.set_index('종목코드', inplace=True)
         
     except Exception as e:
-        print(f"❌ KRX 공식 데이터 로드 또는 파싱 실패: {e}")
-        print("💡 팁: lxml 모듈이 없을 경우 발생할 수 있으니 에러 지속 시 'pip install lxml'을 실행하세요.")
+        print(f"KRX 공식 데이터 로드 또는 파싱 실패: {e}")
+        print("팁: lxml 모듈이 없을 경우 발생할 수 있으니 에러 지속 시 'pip install lxml'을 실행하세요.")
         return
 
     # 3. DB 데이터 업데이트 진행 (KIND 데이터셋은 한글 컬럼명 '업종', '상장일'을 사용합니다)
@@ -94,11 +94,11 @@ def enrich_company_master():
                 updated_count += 1
         
         conn.commit()
-        print(f"✅ 총 {updated_count}개 기업의 업종 및 상장일 정보가 Supabase에 동기화되었습니다.")
+        print(f"총 {updated_count}개 기업의 업종 및 상장일 정보가 Supabase에 동기화되었습니다.")
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ DB 업데이트 중 오류 발생: {e}")
+        print(f"DB 업데이트 중 오류 발생: {e}")
         
     finally:
         cursor.close()
