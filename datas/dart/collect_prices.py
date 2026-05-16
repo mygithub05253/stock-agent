@@ -5,14 +5,14 @@ load_dotenv()
 
 import psycopg2
 from datetime import datetime, timedelta
-from pykrx import stock  # 이제 정상적으로 ID/PW를 채워서 출발합니다.
+from pykrx import stock
 import pandas as pd
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def collect_stock_prices():
-    print("🚀 2탄: 일별 주가 및 시가총액 시계열 데이터 수집 시작...")
+    print("일별 주가 및 시가총액 시계열 데이터 수집 시작...")
 
     # 1. DB에서 주가를 수집할 상장사 stock_code 목록 조회
     try:
@@ -23,13 +23,13 @@ def collect_stock_prices():
         companies = cursor.fetchall()
         
         if not companies:
-            print("⚠️ DB에 등록된 상장사가 없습니다. DART 수집(100건)을 먼저 완료해주세요.")
+            print("DB에 등록된 상장사가 없습니다. DART 수집(100건)을 먼저 완료해주세요.")
             return
             
-        print(f"🔎 주가 수집 대상 기업: {len(companies)}곳")
+        print(f"주가 수집 대상 기업: {len(companies)}곳")
         
     except Exception as e:
-        print(f"❌ DB 조회 실패: {e}")
+        print(f"DB 조회 실패: {e}")
         return
 
     # 2. 수집 기간 설정 (DART 공시 수집 기간과 맞추기 위해 최근 90일로 설정)
@@ -39,7 +39,7 @@ def collect_stock_prices():
     start_str = begin_date.strftime("%Y%m%d")
     end_str = end_date.strftime("%Y%m%d")
     
-    print(f"📡 시계열 수집 기간: {begin_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
+    print(f"시계열 수집 기간: {begin_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
 
     # 3. 주가 적재를 위한 쿼리 (중복 날짜 데이터는 최신으로 업데이트)
     insert_query = """
@@ -56,14 +56,14 @@ def collect_stock_prices():
 
     try:
         for stock_code, corp_name in companies:
-            print(f"📈 [{corp_name} ({stock_code})] 데이터 다운로드 중...")
+            print(f"[{corp_name} ({stock_code})] 데이터 다운로드 중...")
             
             # pykrx를 이용해 해당 기간의 일별 가격 정보(OHLCV) 및 시가총액 조회
             df_ohlcv = stock.get_market_ohlcv_by_date(start_str, end_str, stock_code)
             df_cap = stock.get_market_cap_by_date(start_str, end_str, stock_code)
             
             if df_ohlcv.empty or df_cap.empty:
-                print(f"⚠️ [{corp_name}] 해당 기간의 거래 데이터가 존재하지 않습니다. (비상장사 등)")
+                print(f"[{corp_name}] 해당 기간의 거래 데이터가 존재하지 않습니다. (비상장사 등)")
                 continue
             
             # 날짜(Index)를 기준으로 종가, 거래량, 시가총액 데이터 병합
@@ -80,11 +80,11 @@ def collect_stock_prices():
                 total_inserted += 1
                 
         conn.commit()
-        print(f"✅ 성공: 총 {total_inserted}건의 일별 시세 데이터가 stock_price 테이블에 누적되었습니다.")
+        print(f"성공: 총 {total_inserted}건의 일별 시세 데이터가 stock_price 테이블에 누적되었습니다.")
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ 주가 데이터 처리 중 에러 발생: {e}")
+        print(f"주가 데이터 처리 중 에러 발생: {e}")
         
     finally:
         cursor.close()

@@ -13,7 +13,7 @@ DART_API_KEY = os.getenv("DART_API_KEY")
 def collect_dart() -> None:
     """DART API 데이터를 가져와 고유 관계를 고려하여 Core 테이블에 다이렉트로 적재합니다."""
     if not DART_API_KEY:
-        print("❌ 에러: .env 파일에 DART_API_KEY가 설정되지 않았습니다.")
+        print("에러: .env 파일에 DART_API_KEY가 설정되지 않았습니다.")
         return
 
     # [Step 1] 날짜 범위 설정 (최근 3개월)
@@ -23,7 +23,7 @@ def collect_dart() -> None:
     bgn_de = begin_date.strftime("%Y%m%d")
     end_de = end_date.strftime("%Y%m%d")
     
-    print(f"📡 OpenDART 실시간 파싱 및 적재 시작: {begin_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
+    print(f"OpenDART 실시간 파싱 및 적재 시작: {begin_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
 
     # [Step 2] OpenDART API 호출
     url = "https://opendart.fss.or.kr/api/list.json"
@@ -40,15 +40,15 @@ def collect_dart() -> None:
         response.raise_for_status()
         data = response.json()
     except Exception as e:
-        print(f"❌ API 요청 중 오류 발생: {e}")
+        print(f"API 요청 중 오류 발생: {e}")
         return
         
     if data.get("status") != "000":
-        print(f"❌ DART API 에러 메시지: {data.get('message')}")
+        print(f"DART API 에러 메시지: {data.get('message')}")
         return
 
     report_list = data.get("list", [])
-    print(f"📦 분석할 공시 내역 목록: {len(report_list)}건")
+    print(f"분석할 공시 내역 목록: {len(report_list)}건")
 
     # [Step 3] Supabase 연결 및 트랜잭션 처리
     try:
@@ -104,11 +104,11 @@ def collect_dart() -> None:
             success_count += 1
             
         conn.commit()
-        print(f"✅ {success_count}건의 공시 마스터 및 레포트 정보가 Supabase에 다이렉트로 완벽하게 저장되었습니다.")
+        print(f"{success_count}건의 공시 마스터 및 레포트 정보가 Supabase에 다이렉트로 완벽하게 저장되었습니다.")
         
     except Exception as e:
         conn.rollback()
-        print(f"❌ 데이터베이스 파싱 처리 중 에러 발생: {e}")
+        print(f"데이터베이스 파싱 처리 중 에러 발생: {e}")
         
     finally:
         cursor.close()
