@@ -1,6 +1,9 @@
 .DS_Store
 .env
+.claude/
 .venv/
+venv/
+semiconductor_agent/.env
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -10,3 +13,5 @@ build/
 *.egg-info/
 data/
 logs/
+scripts/switch-model.sh
+scripts/switchmodel.sh

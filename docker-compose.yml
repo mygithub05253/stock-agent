@@ -9,12 +9,16 @@ services:
         required: false
     environment:
       DATABASE_URL: postgresql://stock_agent:stock_agent@db:5432/stock_agent
+      STREAMLIT_SERVER_ADDRESS: 0.0.0.0
+      STREAMLIT_SERVER_PORT: 8501
     depends_on:
       db:
         condition: service_healthy
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
     volumes:
       - .:/app
-    command: ["python", "scripts/check_db.py"]
+    command: ["streamlit", "run", "streamlit_app.py"]
 
   db:
     image: postgres:16-alpine
