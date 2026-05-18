@@ -4,116 +4,104 @@ import requests
 import psycopg2
 from dotenv import load_dotenv
 
-# 환경변수 로드
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 DART_API_KEY = os.getenv("DART_API_KEY")
 
 def collect_financial_statements():
-    print("핵심 재무제표 수치 데이터 수집 시작...")
+    print("전체 재무제표 수집 및 파생 비율 연산 파이프라인 시작...")
     
     if not DART_API_KEY:
-        print("에러: .env 파일에 DART_API_KEY가 설정되지 않았습니다.")
+        print("DART_API_KEY 누락")
         return
 
-    # 1. DB에서 재무제표를 수집할 대상 기업(corp_code) 조회
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
         cursor.execute("SELECT corp_code, corp_name FROM company;")
         companies = cursor.fetchall()
-        
-        if not companies:
-            print("DB에 등록된 기업이 없습니다. DART 수집을 먼저 완료해주세요.")
-            return
-            
-        print(f"재무제표 수집 대상 기업: {len(companies)}곳")
-        
     except Exception as e:
-        print(f"DB 조회 실패: {e}")
+        print(f"DB 연결 및 조회 실패: {e}")
         return
 
-    # 2. 수집할 연도 및 리포트 코드 설정 (11011 = 사업보고서/연간)
-    # 현재가 2026년이므로, 확정된 2024년과 2025년 연간 보고서를 타겟팅합니다.
-    target_years = [2024, 2025]
-    report_code = "11011" 
-    
-    url = "https://opendart.fss.or.kr/api/fnlttSinglAcnt.json"
-    insert_query = """
+    target_years = [2023, 2024, 2025]
+    report_code = "11011" #사업보고서(1년 결산 보고서)고유코드. 1분기 보고서는 11013, 반기보고서는 11012, 3분기 보고서는 11014
+    url = "https://opendart.fss.or.kr/api/fnlttAcntAll.json" # 재무제표 전체 행 조회 API
+
+    fs_insert = """
         INSERT INTO financial_statement (corp_code, bsns_year, reprt_code, fs_div, account_nm, amount)
         VALUES (%s, %s, %s, %s, %s, %s);
     """
+    ratio_upsert = """
+        INSERT INTO financial_ratio (corp_code, bsns_year, reprt_code, fs_div, debt_ratio, roe)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (corp_code, bsns_year, reprt_code, fs_div)
+        DO UPDATE SET debt_ratio = EXCLUDED.debt_ratio, roe = EXCLUDED.roe;
+    """
 
-    total_inserted = 0
-
-    try:
-        for corp_code, corp_name in companies:
-            for year in target_years:
-                print(f"📊 [{corp_name}] {year}년 사업보고서 재무 데이터 요청 중...")
-                
-                params = {
-                    "crtfc_key": DART_API_KEY,
-                    "corp_code": corp_code,
-                    "bsns_year": str(year),
-                    "reprt_code": report_code
-                }
-                
-                # OpenDART API 트래픽 제한 우회 (0.5초 대기)
-                time.sleep(0.5)
-                
-                try:
-                    response = requests.get(url, params=params)
-                    response.raise_for_status()
-                    data = response.json()
-                except Exception as e:
-                    print(f"⚠️ [{corp_name}] API 요청 실패: {e}")
-                    continue
-
-                # 데이터가 없는 경우 (status가 "000"이 아니면 데이터 없음)
+    for corp_code, corp_name in companies:
+        for year in target_years:
+            time.sleep(0.5)
+            params = {"crtfc_key": DART_API_KEY, "corp_code": corp_code, "bsns_year": str(year), "reprt_code": report_code, "fs_div": "CFS"}
+            
+            try:
+                res = requests.get(url, params=params)
+                data = res.json()
                 if data.get("status") != "000":
-                    print(f"ℹ️ [{corp_name}] {year}년 데이터 없음: {data.get('message')}")
-                    continue
+                    params["fs_div"] = "OFS"
+                    res = requests.get(url, params=params)
+                    data = res.json()
+                    if data.get("status") != "000":
+                        continue
 
                 account_list = data.get("list", [])
-                
-                # 중복 적재 방지: 해당 기업의 해당 연도 기존 데이터가 있다면 먼저 삭제(Clean Insert)
-                cursor.execute("""
-                    DELETE FROM financial_statement 
-                    WHERE corp_code = %s AND bsns_year = %s AND reprt_code = %s;
-                """, (corp_code, year, report_code))
+                fs_div = params["fs_div"]
+
+                cursor.execute("DELETE FROM financial_statement WHERE corp_code=%s AND bsns_year=%s AND reprt_code=%s;", (corp_code, year, report_code))
+
+                total_assets = 0
+                total_liabilities = 0
+                total_equity = 0
+                net_income = 0
 
                 for acnt in account_list:
-                    # 주요 계정 과목 필터링 (자산, 부채, 자본, 매출, 영업이익, 당기순이익)
                     account_nm = acnt.get("account_nm", "").strip()
-                    fs_div = acnt.get("fs_div", "OFS") # CFS: 연결, OFS: 별도
+                    clean_nm = account_nm.replace(" ", "")
                     
-                    # 수치 데이터 정제 (문자열 -> 숫자, 공백이나 '-' 처리)
-                    raw_amount = acnt.get("thstrm_amount", "").replace(",", "").strip()
-                    if not raw_amount or raw_amount == "-":
-                        amount = 0
-                    else:
-                        try:
-                            amount = int(raw_amount)
-                        except ValueError:
-                            amount = 0
+                    raw_val = acnt.get("thstrm_amount", "").replace(",", "").strip()
+                    amount = int(raw_val) if raw_val and raw_val != "-" else 0
 
-                    # DB 적재
-                    cursor.execute(insert_query, (corp_code, year, report_code, fs_div, account_nm, amount))
-                    total_inserted += 1
-                
-                # 연도별로 즉시 커밋
+                    is_target = False
+                    if "자산총계" in clean_nm: total_assets = amount; is_target = True
+                    elif "부채총계" in clean_nm: total_liabilities = amount; is_target = True
+                    elif "자본총계" in clean_nm: total_equity = amount; is_target = True
+                    elif clean_nm in ["매출액", "영업수익"]: is_target = True
+                    elif "영업이익" in clean_nm: is_target = True
+                    elif "당기순이익" in clean_nm or "당기순손익" in clean_nm: net_income = amount; is_target = True
+                    elif "영업활동" in clean_nm and "현금흐름" in clean_nm: 
+                        account_nm = "영업활동현금흐름"
+                        is_target = True
+
+                    if is_target:
+                        cursor.execute(fs_insert, (corp_code, year, report_code, fs_div, account_nm, amount))
+
+                debt_ratio = None
+                roe = None
+                if total_equity != 0:
+                    debt_ratio = round((total_liabilities / total_equity) * 100, 2)
+                    roe = round((net_income / total_equity) * 100, 2)
+
+                cursor.execute(ratio_upsert, (corp_code, year, report_code, fs_div, debt_ratio, roe))
                 conn.commit()
+                print(f"[{corp_name}] {year}년 전체 제표 적재 및 파생 비율 연산 완료")
                 
-        print(f"성공: 총 {total_inserted}건의 재무제표 계정 데이터가 financial_statement 테이블에 저장되었습니다.")
-        
-    except Exception as e:
-        conn.rollback()
-        print(f"재무 데이터 처리 중 전체 에러 발생: {e}")
-        
-    finally:
-        cursor.close()
-        conn.close()
+            except Exception as e:
+                print(f"[{corp_name}] 수집 실패 패스: {e}")
+                conn.rollback()
+
+    cursor.close()
+    conn.close()
 
 if __name__ == "__main__":
     collect_financial_statements()
