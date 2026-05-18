@@ -1,118 +1,166 @@
 import os
+import io
+import time
+import zipfile
 import requests
+import xml.etree.ElementTree as ET
 import psycopg2
+import pandas as pd
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# 환경변수 로드
 load_dotenv()
-
 DATABASE_URL = os.getenv("DATABASE_URL")
 DART_API_KEY = os.getenv("DART_API_KEY")
 
-def collect_dart() -> None:
-    """DART API 데이터를 가져와 고유 관계를 고려하여 Core 테이블에 다이렉트로 적재합니다."""
-    if not DART_API_KEY:
-        print("에러: .env 파일에 DART_API_KEY가 설정되지 않았습니다.")
-        return
-
-    # [Step 1] 날짜 범위 설정 (최근 3개월)
-    end_date = datetime.today()
-    begin_date = end_date - timedelta(days=89)
+def get_dart_corp_code_map():
+    print("시작: OpenDART 고유코드 매핑 데이터 다운로드 중...")
+    url = "https://opendart.fss.or.kr/api/corpCode.xml"
+    params = {"crtfc_key": DART_API_KEY}
     
-    bgn_de = begin_date.strftime("%Y%m%d")
-    end_de = end_date.strftime("%Y%m%d")
-    
-    print(f"OpenDART 실시간 파싱 및 적재 시작: {begin_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')}")
+    res = requests.get(url, params=params)
+    if not zipfile.is_zipfile(io.BytesIO(res.content)):
+        print("실패: 올바른 고유코드 파일 형식이 아닙니다.")
+        return {}
+        
+    corp_map = {}
+    with zipfile.ZipFile(io.BytesIO(res.content)) as z:
+        xml_data = z.read("CORPCODE.xml")
+        root = ET.fromstring(xml_data)
+        for corp in root.findall("list"):
+            stock_code = corp.find("stock_code").text.strip()
+            corp_code = corp.find("corp_code").text.strip()
+            if stock_code:
+                corp_map[stock_code] = corp_code
+    print(f"완료: {len(corp_map)}개 기업 매핑 테이블 준비 완료")
+    return corp_map
 
-    # [Step 2] OpenDART API 호출
-    url = "https://opendart.fss.or.kr/api/list.json"
-    params = {
-        "crtfc_key": DART_API_KEY,
-        "bgn_de": bgn_de,
-        "end_de": end_de,
-        "page_count": 100,
-        "page_no": 1
+def get_target_sectors_from_krx():
+    print("시작: KRX KIND 전 상장사 업종 정보 로드 중...")
+    url = 'http://kind.krx.co.kr/corpgeneral/corpList.do'
+    params = {'method': 'download', 'searchType': '13'}
+    res = requests.get(url, params=params)
+    
+    dfs = pd.read_html(io.BytesIO(res.content))
+    df_krx = dfs[0]
+    df_krx['종목코드'] = df_krx['종목코드'].astype(str).str.split('.').str[0].str.zfill(6)
+    
+    keywords = {
+        'semiconductor': ['반도체'],
+        'finance': ['은행', '금융', '보험', '증권', '카드'],
+        'bio': ['의약', '바이오', '생명공학', '의료용 물질']
     }
     
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
-    except Exception as e:
-        print(f"API 요청 중 오류 발생: {e}")
-        return
-        
-    if data.get("status") != "000":
-        print(f"DART API 에러 메시지: {data.get('message')}")
+    def filter_sector(sector_nm):
+        if not isinstance(sector_nm, str):
+            return None
+        for key, k_list in keywords.items():
+            if any(k in sector_nm for k in k_list):
+                return sector_nm
+        return None
+
+    df_krx['filtered_sector'] = df_krx['업종'].apply(filter_sector)
+    df_filtered = df_krx[df_krx['filtered_sector'].notnull()]
+    print(f"완료: 타겟 섹터(반도체, 금융, 바이오) 발견 기업 수: {len(df_filtered)}곳")
+    return df_filtered
+
+def collect_company_and_reports():
+    print("지정 섹터 3개년 타겟 수집 파이프라인 시작...")
+    if not DART_API_KEY:
+        print("DART_API_KEY 누락")
         return
 
-    report_list = data.get("list", [])
-    print(f"분석할 공시 내역 목록: {len(report_list)}건")
-
-    # [Step 3] Supabase 연결 및 트랜잭션 처리
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
     except Exception as e:
-        print(f"❌ DB 연결 실패: {e}")
+        print(f"DB 연결 실패: {e}")
         return
-    
-    # 1단계: 마스터 정보 저장
-    company_upsert_query = """
-        INSERT INTO company (corp_code, stock_code, corp_name)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (corp_code) 
-        DO UPDATE SET 
-            corp_name = EXCLUDED.corp_name,
-            stock_code = COALESCE(company.stock_code, EXCLUDED.stock_code);
+
+    dart_map = get_dart_corp_code_map()
+    df_krx = get_target_sectors_from_krx()
+
+    company_upsert = """
+        INSERT INTO company (corp_code, corp_name, stock_code, sector, listing_date)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (corp_code) DO UPDATE SET
+            sector = EXCLUDED.sector,
+            listing_date = EXCLUDED.listing_date;
     """
     
-    # 2단계: 목차 정보 저장
-    report_upsert_query = """
+    report_insert = """
         INSERT INTO disclosure_report (rcept_no, corp_code, report_nm, rcept_dt)
         VALUES (%s, %s, %s, %s)
-        ON CONFLICT (rcept_no) 
-        DO UPDATE SET 
-            report_nm = EXCLUDED.report_nm,
-            rcept_dt = EXCLUDED.rcept_dt;
+        ON CONFLICT (rcept_no) DO NOTHING;
     """
-    
-    try:
-        success_count = 0
-        for item in report_list:
-            raw_stock_code = item.get("stock_code")
-            stock_code = raw_stock_code.strip() if raw_stock_code and raw_stock_code.strip() else None
+
+    print("DB 마스터 정보 동기화 중...")
+    valid_companies = []
+    for _, row in df_krx.iterrows():
+        stock_code = row['종목코드']
+        corp_name = row['회사명']
+        sector = row['업종']
+        raw_date = row['상장일']
+        listing_date = raw_date.split()[0] if isinstance(raw_date, str) else None
+
+        if stock_code in dart_map:
+            corp_code = dart_map[stock_code]
+            cursor.execute(company_upsert, (corp_code, corp_name, stock_code, sector, listing_date))
+            valid_companies.append((corp_code, corp_name))
             
-            rcept_dt = item.get("rcept_dt")
-            formatted_date = f"{rcept_dt[:4]}-{rcept_dt[4:6]}-{rcept_dt[6:]}"
-            
-            # 1. 상위 테이블인 company 데이터 먼저 밀어넣기
-            cursor.execute(company_upsert_query, (
-                item.get("corp_code"),
-                stock_code,
-                item.get("corp_name")
-            ))
-            
-            # 2. 하위 테이블인 disclosure_report 데이터 밀어넣기
-            cursor.execute(report_upsert_query, (
-                item.get("rcept_no"),
-                item.get("corp_code"),
-                item.get("report_nm"),
-                formatted_date
-            ))
-            success_count += 1
-            
-        conn.commit()
-        print(f"{success_count}건의 공시 마스터 및 레포트 정보가 Supabase에 다이렉트로 완벽하게 저장되었습니다.")
+    conn.commit()
+    print(f"DB 마스터 동기화 완료: {len(valid_companies)}개 기업 등록됨")
+
+    end_date = datetime.today()
+    begin_date = end_date - timedelta(days=3 * 365)
+    bgn_de = begin_date.strftime("%Y%m%d")
+    end_de = end_date.strftime("%Y%m%d")
+
+    url = "https://opendart.fss.or.kr/api/list.json"
+    total_reports = 0
+    total_companies = len(valid_companies)
+
+    print(f"공시 목록 수집 시작 (기간: {begin_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')})")
+
+    for idx, (corp_code, corp_name) in enumerate(valid_companies, 1):
+        # 실시간 진행 상황을 터미널에 출력합니다.
+        print(f"[{idx}/{total_companies}] {corp_name} 3개년 공시 목록 가져오는 중... (현재 누적 공시: {total_reports}건)")
         
-    except Exception as e:
-        conn.rollback()
-        print(f"데이터베이스 파싱 처리 중 에러 발생: {e}")
-        
-    finally:
-        cursor.close()
-        conn.close()
+        time.sleep(0.5)
+        params = {
+            "crtfc_key": DART_API_KEY,
+            "corp_code": corp_code,
+            "bgn_de": bgn_de,
+            "end_de": end_de,
+            "page_no": "1",
+            "page_count": "100"
+        }
+
+        try:
+            res = requests.get(url, params=params)
+            data = res.json()
+            
+            if data.get("status") != "000":
+                continue
+
+            report_list = data.get("list", [])
+            for rep in report_list:
+                rcept_no = rep.get("rcept_no")
+                report_nm = rep.get("report_nm")
+                rcept_dt = rep.get("rcept_dt")
+
+                cursor.execute(report_insert, (rcept_no, corp_code, report_nm, rcept_dt))
+                total_reports += 1
+                
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"오류 발생 패스 ({corp_name}): {e}")
+            continue
+
+    print(f"최종 완료: 타겟 섹터 기업의 공시 메타데이터 총 {total_reports}건 적재 완료")
+    cursor.close()
+    conn.close()
 
 if __name__ == "__main__":
-    collect_dart()
+    collect_company_and_reports()
