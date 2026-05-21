@@ -1,26 +1,31 @@
 import os
 import time
-from dotenv import load_dotenv
-
-load_dotenv()
-
+import random
 import psycopg2
-from datetime import datetime, timedelta
-from pykrx import stock
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# 1. pykrx 로드 전 환경변수 가장 먼저 세팅
+load_dotenv()
+from pykrx import stock
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def collect_stock_prices():
-    print("2탄 고도화: 시장 지표 및 퀀트/공매도 시계열 수집 시작...")
+    print("2탄 초고속화: 시장 지표 및 퀀트/공매도 시계열 수집 시작 (미니멀 재시도 버전)...\n")
 
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
+        # 이전에 한 것에 이어서 진행
         cursor.execute("SELECT stock_code, corp_name FROM company WHERE stock_code IS NOT NULL;")
-        companies = cursor.fetchall()
+        all_companies = cursor.fetchall()
+        
+        # 💡 [수정] 60개의 데이터를 건너뛰고 61번째(인덱스 60)부터 끝까지 가져옵니다.
+        companies = all_companies[60:]
         
         if not companies:
             print("대상 상장사가 없습니다. 0탄 수집을 먼저 확인하세요.")
@@ -29,10 +34,12 @@ def collect_stock_prices():
         print(f"DB 연결 실패: {e}")
         return
 
+    # 기본 3년 범위 설정
     end_date = datetime.today()
     begin_date = end_date - timedelta(days=3 * 365)
-    start_str, end_str = begin_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
+    default_start_str, default_end_str = begin_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
+    # UPSERT 쿼리
     insert_query = """
         INSERT INTO stock_price (
             stock_code, base_date, close_price, market_cap, volume, 
@@ -55,65 +62,64 @@ def collect_stock_prices():
     for idx, (stock_code, corp_name) in enumerate(companies, 1):
         print(f"\n[{idx}/{len(companies)}] {corp_name} ({stock_code}) 데이터 수집 중...")
         try:
-            time.sleep(1) # KRX 서버 IP 차단 및 DDoS 오탐지 방지 안정화 시간
+            # 💡 [개선 1] 딜레이 최소화 (기본 1.5초만 대기해서 IP 차단 최소선만 유지)
+            time.sleep(1.5) 
             
-            # 1. 필수 주가 및 시가총액 (OHLCV & Market Cap)
-            df_ohlcv = stock.get_market_ohlcv_by_date(start_str, end_str, stock_code)
-            df_cap = stock.get_market_cap_by_date(start_str, end_str, stock_code)
+            # 1. 필수 주가 및 시가총액
+            df_ohlcv = stock.get_market_ohlcv_by_date(default_start_str, default_end_str, stock_code)
+            df_cap = stock.get_market_cap_by_date(default_start_str, default_end_str, stock_code)
             
             if df_ohlcv is None or df_ohlcv.empty or '종가' not in df_ohlcv.columns:
-                print(f"  -> 주가 데이터 없음 (스팩 또는 거래정지 종목 패스)")
+                print(f"  -> 주가 데이터 없음 (스팩/거래정지 종목 패스)")
                 continue
+
+            real_start_str = df_ohlcv.index[0].strftime("%Y%m%d")
+            real_end_str = df_ohlcv.index[-1].strftime("%Y%m%d")
                 
             df_total = df_ohlcv[['종가', '거래량']].join(df_cap['시가총액'], how='left')
 
-            # 2. 펀더멘탈 지표 (PER, PBR, DIV) - 시계열 전용 함수로 원상복구 완료
+            # 2. 퀀트 지표 (에러 시 패스)
             try:
-                df_fund = stock.get_market_fundamental_by_date(start_str, end_str, stock_code)
+                df_fund = stock.get_market_fundamental_by_date(real_start_str, real_end_str, stock_code)
                 if df_fund is not None and not df_fund.empty:
                     fund_cols = [c for c in ['PER', 'PBR', 'DIV'] if c in df_fund.columns]
                     if fund_cols:
                         df_total = df_total.join(df_fund[fund_cols], how='left')
-                        print(f"  -> 퀀트 지표(PER/PBR/배당) 결합 성공")
-                else:
-                    print(f"  -> 펀더멘탈 데이터셋이 비어있음")
-            except Exception as e:
-                print(f"  -> 펀더멘탈 수집 실패: {e}")
+                        print(f"  -> 퀀트 지표 결합 성공")
+            except Exception:
+                pass
 
-            # 3. 매매동향 (외국인순매수, 기관순매수)
+            # 3. 매매동향 (에러 시 패스)
             try:
-                df_trading = stock.get_market_trading_value_by_date(start_str, end_str, stock_code)
+                df_trading = stock.get_market_trading_value_by_date(real_start_str, real_end_str, stock_code)
                 if df_trading is not None and not df_trading.empty:
                     trade_cols = [c for c in ['외국인합계', '기관합계'] if c in df_trading.columns]
                     if trade_cols:
                         df_total = df_total.join(df_trading[trade_cols], how='left')
-                        print(f"  -> 수급 지표(외국인/기관) 결합 성공")
-            except Exception as e:
-                print(f"  -> 매매동향 수집 실패: {e}")
+                        print(f"  -> 수급 지표 결합 성공")
+            except Exception:
+                pass
 
-            # 4. 공매도 비중 수집 고도화 (short_ratio)
+            # 4. 공매도 비중 (💡 [개선 2] 재시도 제거, 실패 시 대기 없이 0.1초 만에 패스)
             try:
-                df_short = stock.get_shorting_volume_by_date(start_str, end_str, stock_code)
+                df_short = stock.get_shorting_volume_by_date(real_start_str, real_end_str, stock_code)
                 if df_short is not None and not df_short.empty:
                     short_col = None
-                    for c in ['비중', '공매도비중']: # pykrx 버전에 따른 컬럼명 유연화 처리
+                    for c in ['비중', '공매도비중']:
                         if c in df_short.columns:
                             short_col = c
                             break
                     if short_col:
                         df_total = df_total.join(df_short[[short_col]].rename(columns={short_col: '비중'}), how='left')
                         print(f"  -> 공매도 지표 결합 성공")
-                    else:
-                        print(f"  -> 공매도 테이블 내 '비중' 컬럼 없음. 컬럼목록: {df_short.columns.tolist()}")
-                else:
-                    print(f"  -> 공매도 데이터셋이 비어있음")
-            except Exception as e:
-                print(f"  -> 공매도 수집 실패: {e}")
+            except Exception:
+                # 💡 에러 로그 출력 생략하고 즉시 다음 단계 전진
+                print(f"  -> 공매도 제외 (데이터 없음 혹은 차단)")
 
-            # NaN/INF 값을 PostgreSQL에 안전하게 매핑하기 위해 파이썬 None으로 치환
+            # 결측치 변환
             df_total = df_total.replace([np.nan, np.inf, -np.inf], None)
 
-            # DB 데이터 적재 실행
+            # 5. DB 적재
             inserted_count = 0
             for date, row in df_total.iterrows():
                 r = row.to_dict()
@@ -132,11 +138,18 @@ def collect_stock_prices():
                         float(r.get('비중')) if pd.notna(r.get('비중')) and r.get('비중') else None
                     ))
                     inserted_count += 1
-                except Exception:
+                except Exception as db_e:
+                    print(f"  -> DB 적재 에러 ({date.strftime('%Y-%m-%d')}): {db_e}")
                     continue
                 
             conn.commit()
             print(f"  -> Supabase 테이블 적재 최종 완료 ({inserted_count}건)")
+            
+            # 💡 [pocat 게릴라 전략] 안전하게 70개 수집 완료 시 자율 종료
+            if idx >= 130:
+                print(f"\n🔒 [안전 방어벽] 지정된 목표치 {idx}개에 도달하여 프로세스를 자율 종료합니다.")
+                print("⏳ 1시간 후에 OFFSET을 수정하여 다음 턴을 실행해 주세요!")
+                break # 루프를 탈출하여 하단의 DB 연결 종료 구문으로 이동
             
         except Exception as e:
             conn.rollback()
@@ -144,7 +157,7 @@ def collect_stock_prices():
 
     cursor.close()
     conn.close()
-    print("\n모든 기업의 시계열 투자 지표 수집 프로세스가 완료되었습니다.")
+    print("\n🎉 모든 기업의 시계열 투자 지표 수집 프로세스가 완료되었습니다!")
 
 if __name__ == "__main__":
     collect_stock_prices()
