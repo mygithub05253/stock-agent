@@ -18,6 +18,8 @@ docs/
 │   │   ├── B3_stock_search_spec_v0.5.md
 │   │   ├── B4_stock_basic_info_spec_v0.6.md
 │   │   └── B5_portfolio_bulk_advice_spec_v0.2.md
+│   ├── demo/
+│   │   └── D1_backtesting_validation_spec_v0.1.md
 │   └── advanced/
 │       ├── A1_valuation_5y_spec_v0.7.md
 │       ├── A2_industry_qualitative_spec_v0.8.md
@@ -26,9 +28,10 @@ docs/
 │       └── A5_stock_recommendation_spec_v1.1.md
 ├── architecture/                           ← 시스템 설계
 │   ├── system_flow.md                      ← 사용자→에이전트→DB→출력 흐름도 (Mermaid)
-│   └── erd.md                              ← DB ERD
 │   ├── system_architecture_dashboard.html  ← 전체 구조와 6 에이전트 흐름을 보는 인터랙티브 HTML 대시보드
-│   ├── erd.md                              ← DB ERD (4개 테이블)
+│   ├── backtesting_demo_architecture.md    ← 5/22 타깃 예측일 기반 백테스팅 검증 설계
+│   ├── backtesting_demo_dashboard.html     ← 백테스팅 검증 아키텍처 HTML 시각화
+│   ├── erd.md                              ← DB ERD
 │   └── agent_design.md                     ← 6 에이전트 상세 설계
 ├── operations/                             ← 운영 가이드
 │   ├── db_connection_guide.md              ← 로컬/Supabase DB 연결 전환 가이드
@@ -49,8 +52,16 @@ docs/
 │   ├── database.md
 │   └── images/
 ├── glossary.md                             ← 용어집 (비전공자용)
-└── assets/                                 ← 이미지·다이어그램 PNG 보관
+└── assets/                                 ← 이미지·다이어그램 SVG/PNG 보관
 ```
+
+## 주요 시각화 문서
+
+| 문서 | 용도 |
+|------|------|
+| `docs/architecture/system_architecture_dashboard.html` | 전체 stock-agent 구조와 6 에이전트 흐름 설명 |
+| `docs/architecture/backtesting_demo_dashboard.html` | 2026-05-22 타깃 예측일 기반 백테스팅 시연 구조 설명 |
+| `docs/assets/backtesting_demo_architecture.svg` | 발표 자료에 삽입 가능한 백테스팅 아키텍처 이미지 |
 
 ## 문서 작성 규칙
 
