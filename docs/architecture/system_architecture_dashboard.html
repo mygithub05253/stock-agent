@@ -270,55 +270,55 @@ flowchart TD
             <div class="diagram-canvas min-w-[1040px]">
               <pre class="mermaid">
 flowchart LR
-    subgraph EXT["외부 데이터 소스"]
-        DART[(DART&lt;br/&gt;재무·공시)]
-        PYKRX[pykrx&lt;br/&gt;시세·거래]
-        NAVER[네이버금융·한경&lt;br/&gt;뉴스 크롤링]
-        ECOS[ECOS·FRED&lt;br/&gt;매크로]
+    subgraph EXT["External data sources"]
+        DART["DART&lt;br/&gt;재무·공시"]
+        PYKRX["pykrx&lt;br/&gt;시세·거래"]
+        NAVER["네이버금융·한경&lt;br/&gt;뉴스 크롤링"]
+        ECOS["ECOS·FRED&lt;br/&gt;매크로"]
     end
-    subgraph DATA["데이터팀 영역 (datas/)"]
-        DC[datas/dart/collector]
-        PC[datas/news/collector + Sanitizer]
-        MC[datas/macro/collector]
+    subgraph DATA["Data collectors"]
+        DC["datas/dart/collector"]
+        PC["datas/news/collector&lt;br/&gt;Sanitizer"]
+        MC["datas/macro/collector"]
     end
     DART --> DC
     PYKRX --> DC
     NAVER --> PC
     ECOS --> MC
-    subgraph STORE["저장소"]
-        PG[(Postgres&lt;br/&gt;company / financial_data / disclosure / stock_price / users / holdings)]
-        VEC[(pgvector tables&lt;br/&gt;rag_documents / rag_chunks&lt;br/&gt;뉴스·공시 본문 + 임베딩)]
+    subgraph STORE["Storage"]
+        PG["Postgres&lt;br/&gt;company&lt;br/&gt;financial_data&lt;br/&gt;disclosure&lt;br/&gt;stock_price"]
+        VEC["pgvector&lt;br/&gt;rag_documents&lt;br/&gt;rag_chunks"]
     end
-    DC -->|재무·공시 메타| PG
-    PC -->|기사 메타| PG
-    PC -->|기사 본문 + 임베딩| VEC
-    DC -->|공시 본문 + 임베딩| VEC
-    MC -->|매크로 시계열| PG
-    subgraph AGENT["AI 에이전트"]
-        CUR[Curator]
-        QNT[Quant]
-        QAL[Qual]
-        CMP[Competitor]
-        STR[Strategist]
-        GRD[Guardrail]
+    DC -->|financials and disclosures| PG
+    PC -->|news metadata| PG
+    PC -->|news text and embeddings| VEC
+    DC -->|disclosure text and embeddings| VEC
+    MC -->|macro time series| PG
+    subgraph AGENT["AI agents"]
+        CUR["Curator"]
+        QNT["Quant"]
+        QAL["Qual"]
+        CMP["Competitor"]
+        STR["Strategist"]
+        GRD["Guardrail"]
     end
-    PG -.조회.-> CUR
-    PG -.재무 조회.-> QNT
-    PG -.뉴스 메타.-> QAL
-    VEC -.RAG 검색.-> QAL
-    PG -.Peer 조회.-> CMP
-    VEC -.공시 RAG.-> CMP
-    PG -.매크로·포트 조회.-> STR
+    PG -.-> CUR
+    PG -.-> QNT
+    PG -.-> QAL
+    VEC -.-> QAL
+    PG -.-> CMP
+    VEC -.-> CMP
+    PG -.-> STR
     CUR --> STR
     QNT --> STR
     QAL --> STR
     CMP --> STR
     STR --> GRD
-    subgraph OUT["출력"]
-        UI[Streamlit UI&lt;br/&gt;Tier 1/2/3]
-        XLS[Excel 8시트&lt;br/&gt;밸류에이션]
-        HTM[HTML&lt;br/&gt;산업·뉴스 분석]
-        PDF[PDF + DOCX&lt;br/&gt;PB 리포트]
+    subgraph OUT["Outputs"]
+        UI["Streamlit UI&lt;br/&gt;Tier 1/2/3"]
+        XLS["Excel&lt;br/&gt;valuation workbook"]
+        HTM["HTML&lt;br/&gt;industry and news analysis"]
+        PDF["PDF / DOCX&lt;br/&gt;PB report"]
     end
     GRD --> UI
     GRD --> XLS
@@ -378,12 +378,12 @@ sequenceDiagram
             <div class="diagram-canvas min-w-[860px]">
               <pre class="mermaid">
 erDiagram
-    users ||--o{ holdings : "보유종목"
-    users ||--o{ analysis_history : "분석이력"
-    company ||--o{ financial_data : "재무"
-    company ||--o{ disclosure : "공시"
-    company ||--o{ stock_price : "시세"
-    company ||--o{ holdings : "보유 종목 매핑"
+    users ||--o{ holdings : owns
+    users ||--o{ analysis_history : requests
+    company ||--o{ financial_data : has
+    company ||--o{ disclosure : files
+    company ||--o{ stock_price : trades
+    company ||--o{ holdings : maps
     users {
         uuid id PK
         string email UK
@@ -451,23 +451,23 @@ erDiagram
             <div class="diagram-canvas min-w-[900px]">
               <pre class="mermaid">
 flowchart TD
-    R[분석 완료] --> T1{Tier 1&lt;br/&gt;큰 글씨 한 줄}
-    T1 --> T1A[BUY · 신뢰도 78%&lt;br/&gt;적합도 별 4개&lt;br/&gt;적정주가 80,000원&lt;br/&gt;안전마진 18.8%]
-    T1A -->|"왜?" 버튼 클릭| T2{Tier 2&lt;br/&gt;5개 근거 카드}
-    T2 --> T2A[정량 카드&lt;br/&gt;5y 밸류에이션 요약]
-    T2 --> T2B[정성 카드&lt;br/&gt;최근 호재/악재]
-    T2 --> T2C[경쟁사 카드&lt;br/&gt;Peer 대비 위치]
-    T2 --> T2D[매크로 카드&lt;br/&gt;금리·환율 영향]
-    T2 --> T2E[포트 카드&lt;br/&gt;내 비중·집중도]
-    T2A --> T3{Tier 3&lt;br/&gt;다운로드}
+    R["분석 완료"] --> T1{"Tier 1&lt;br/&gt;큰 글씨 한 줄"}
+    T1 --> T1A["BUY · 신뢰도 78%&lt;br/&gt;적합도 별 4개&lt;br/&gt;적정주가 80,000원&lt;br/&gt;안전마진 18.8%"]
+    T1A -->|why click| T2{"Tier 2&lt;br/&gt;5개 근거 카드"}
+    T2 --> T2A["정량 카드&lt;br/&gt;5y 밸류에이션 요약"]
+    T2 --> T2B["정성 카드&lt;br/&gt;최근 호재/악재"]
+    T2 --> T2C["경쟁사 카드&lt;br/&gt;Peer 대비 위치"]
+    T2 --> T2D["매크로 카드&lt;br/&gt;금리·환율 영향"]
+    T2 --> T2E["포트 카드&lt;br/&gt;내 비중·집중도"]
+    T2A --> T3{"Tier 3&lt;br/&gt;다운로드"}
     T2B --> T3
     T2C --> T3
     T2D --> T3
     T2E --> T3
-    T3 --> T3A[report.pdf&lt;br/&gt;7페이지 PB 양식]
-    T3 --> T3B[report.docx&lt;br/&gt;편집용]
-    T3 --> T3C[valuation.xlsx&lt;br/&gt;5y 모델 8시트]
-    T3 --> T3D[analysis.html&lt;br/&gt;산업/뉴스 인용]
+    T3 --> T3A["report.pdf&lt;br/&gt;7페이지 PB 양식"]
+    T3 --> T3B["report.docx&lt;br/&gt;편집용"]
+    T3 --> T3C["valuation.xlsx&lt;br/&gt;5y 모델 8시트"]
+    T3 --> T3D["analysis.html&lt;br/&gt;산업/뉴스 인용"]
               </pre>
             </div>
           </div>
