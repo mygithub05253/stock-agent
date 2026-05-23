@@ -1,0 +1,27 @@
+{
+  "name": "stock-agent",
+  "version": "1.0.0",
+  "description": "금융 데이터 수집과 분석을 위한 프로젝트입니다. 초기 구성은 PostgreSQL과 Docker Compose를 기준으로 잡았고, 팀원들이 맡는 데이터 수집 영역이 서로 충돌하지 않도록 `datas/` 아래에 데이터 소스별 하위 폴더를 분리했습니다.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pocat-1-team/stock-agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Pocat-1-team/stock-agent/issues"
+  },
+  "homepage": "https://github.com/Pocat-1-team/stock-agent#readme",
+  "dependencies": {
+    "codex": "^0.2.3"
+  }
+}
