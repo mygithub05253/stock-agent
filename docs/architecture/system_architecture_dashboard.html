@@ -680,15 +680,24 @@ flowchart TD
 
     function setupTabs() {
       document.querySelectorAll(".tab-button").forEach((button) => {
-        button.addEventListener("click", () => {
+        button.addEventListener("click", async () => {
           document.querySelectorAll(".tab-button").forEach((item) => {
             item.className = "tab-button rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700";
           });
           button.className = "tab-button rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white";
           document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
-          document.querySelector(`#panel-${button.dataset.tab}`).classList.add("active");
+          const activePanel = document.querySelector(`#panel-${button.dataset.tab}`);
+          activePanel.classList.add("active");
+          await renderMermaidPanel(activePanel);
         });
       });
+    }
+
+    async function renderMermaidPanel(panel) {
+      const diagrams = [...panel.querySelectorAll("pre.mermaid:not([data-rendered='true'])")];
+      if (diagrams.length === 0) return;
+      await mermaid.run({ nodes: diagrams });
+      diagrams.forEach((diagram) => diagram.setAttribute("data-rendered", "true"));
     }
 
     function setupDiagramTools() {
@@ -751,7 +760,7 @@ flowchart TD
     }
 
     mermaid.initialize({
-      startOnLoad: true,
+      startOnLoad: false,
       securityLevel: "loose",
       theme: "base",
       themeVariables: {
@@ -768,6 +777,7 @@ flowchart TD
     setupTabs();
     setupDiagramTools();
     lucide.createIcons();
+    renderMermaidPanel(document.querySelector(".tab-panel.active"));
   </script>
 </body>
 </html>
