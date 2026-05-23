@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1060" viewBox="0 0 1800 1060" role="img" aria-labelledby="title desc">
+  <title id="title">백테스팅 기반 AI 예측 검증 아키텍처</title>
+  <desc id="desc">Streamlit UI, Backtest Controller, Supabase, AI Agent, Ground Truth를 연결한 상세 시스템 구성도</desc>
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
+      .head { fill: #0f172a; font: 700 34px "Pretendard", "Noto Sans KR", Arial, sans-serif; }
+      .sub { fill: #475569; font: 500 18px "Pretendard", "Noto Sans KR", Arial, sans-serif; }
+      .label { fill: #0f172a; font: 700 22px "Pretendard", "Noto Sans KR", Arial, sans-serif; }
+      .small { fill: #334155; font: 500 16px "Pretendard", "Noto Sans KR", Arial, sans-serif; }
+      .tiny { fill: #64748b; font: 500 13px "Pretendard", "Noto Sans KR", Arial, sans-serif; }
+      .box { fill: #f8fafc; stroke: #cbd5e1; stroke-width: 1.5; rx: 12; }
+      .blue { fill: #eff6ff; stroke: #60a5fa; }
+      .green { fill: #ecfdf5; stroke: #34d399; }
+      .amber { fill: #fffbeb; stroke: #f59e0b; }
+      .rose { fill: #fff1f2; stroke: #fb7185; }
+      .violet { fill: #f5f3ff; stroke: #8b5cf6; }
+      .slate { fill: #f1f5f9; stroke: #94a3b8; }
+      .arrow { stroke: #475569; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .dash { stroke-dasharray: 8 8; }
+    </style>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="11" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L12,4 L0,8 Z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1800" height="1060"/>
+  <text class="head" x="70" y="70">백테스팅 기반 AI 주가 예측 성능 검증 프로세스</text>
+  <text class="sub" x="70" y="105">시연 기준일 2026-05-23 · 타깃 예측일 2026-05-22 · AI 입력 마감 2026-05-21 23:59</text>
+
+  <rect class="panel" x="70" y="145" width="1660" height="126"/>
+  <text class="label" x="105" y="187">Data Slipping &amp; Time Masking</text>
+  <line x1="160" y1="228" x2="1580" y2="228" stroke="#94a3b8" stroke-width="4"/>
+  <circle cx="290" cy="228" r="12" fill="#2563eb"/>
+  <circle cx="940" cy="228" r="12" fill="#f59e0b"/>
+  <circle cx="1240" cy="228" r="12" fill="#e11d48"/>
+  <circle cx="1540" cy="228" r="12" fill="#0f172a"/>
+  <text class="small" x="225" y="210">5/15</text>
+  <text class="tiny" x="202" y="250">1주 입력 시작</text>
+  <text class="small" x="835" y="210">5/21 23:59</text>
+  <text class="tiny" x="810" y="250">AI 입력 데이터 마감</text>
+  <text class="small" x="1185" y="210">5/22</text>
+  <text class="tiny" x="1140" y="250">AI에게 숨긴 정답 시점</text>
+  <text class="small" x="1495" y="210">5/23</text>
+  <text class="tiny" x="1450" y="250">시연 및 결과 대조</text>
+
+  <rect class="panel" x="70" y="310" width="300" height="530"/>
+  <text class="label" x="105" y="350">Streamlit UI</text>
+  <rect class="box blue" x="100" y="380" width="240" height="74"/>
+  <text class="small" x="125" y="410">종목 선택</text>
+  <text class="tiny" x="125" y="434">삼성전자 005930</text>
+  <rect class="box blue" x="100" y="470" width="240" height="96"/>
+  <text class="small" x="125" y="500">분석 단위 라디오</text>
+  <text class="tiny" x="125" y="524">1주 / 2주 / 4주</text>
+  <text class="tiny" x="125" y="546">기간 변경 시 슬라이싱 변경</text>
+  <rect class="box blue" x="100" y="582" width="240" height="86"/>
+  <text class="small" x="125" y="613">AI 판단 카드</text>
+  <text class="tiny" x="125" y="637">BUY/HOLD/SELL · 신뢰도</text>
+  <rect class="box blue" x="100" y="684" width="240" height="86"/>
+  <text class="small" x="125" y="715">정답 대조 카드</text>
+  <text class="tiny" x="125" y="739">5/22 실제 수익률</text>
+
+  <rect class="panel" x="420" y="310" width="330" height="530"/>
+  <text class="label" x="455" y="350">Backtest Controller</text>
+  <rect class="box amber" x="455" y="380" width="260" height="76"/>
+  <text class="small" x="478" y="410">BacktestConfig</text>
+  <text class="tiny" x="478" y="434">target_date / lookback_days</text>
+  <rect class="box amber" x="455" y="472" width="260" height="86"/>
+  <text class="small" x="478" y="503">Mask Calculator</text>
+  <text class="tiny" x="478" y="527">2026-05-21 23:59 고정</text>
+  <rect class="box amber" x="455" y="574" width="260" height="88"/>
+  <text class="small" x="478" y="605">Data Slicer</text>
+  <text class="tiny" x="478" y="629">target_date 이후 레코드 제외</text>
+  <rect class="box amber" x="455" y="678" width="260" height="92"/>
+  <text class="small" x="478" y="709">Prompt Builder</text>
+  <text class="tiny" x="478" y="733">시간 페르소나 + 누수 금지</text>
+
+  <rect class="panel" x="800" y="310" width="330" height="530"/>
+  <text class="label" x="835" y="350">Supabase DB</text>
+  <rect class="box green" x="835" y="380" width="260" height="76"/>
+  <text class="small" x="858" y="410">stock_price</text>
+  <text class="tiny" x="858" y="434">최근 6개월 가격/OHLCV</text>
+  <rect class="box green" x="835" y="472" width="260" height="86"/>
+  <text class="small" x="858" y="503">rag_documents / chunks</text>
+  <text class="tiny" x="858" y="527">뉴스·DART 공시 임베딩</text>
+  <rect class="box green" x="835" y="574" width="260" height="88"/>
+  <text class="small" x="858" y="605">raw_macro</text>
+  <text class="tiny" x="858" y="629">금리·환율·지수 6개월</text>
+  <rect class="box green" x="835" y="678" width="260" height="92"/>
+  <text class="small" x="858" y="709">analysis_history</text>
+  <text class="tiny" x="858" y="733">예측·정답·오차 저장</text>
+
+  <rect class="panel" x="1180" y="310" width="300" height="530"/>
+  <text class="label" x="1215" y="350">AI Agent Skeleton</text>
+  <rect class="box violet" x="1210" y="380" width="240" height="76"/>
+  <text class="small" x="1235" y="410">Quant Worker</text>
+  <text class="tiny" x="1235" y="434">가격/거래량/변동성</text>
+  <rect class="box violet" x="1210" y="472" width="240" height="86"/>
+  <text class="small" x="1235" y="503">Qual Worker</text>
+  <text class="tiny" x="1235" y="527">뉴스·공시 RAG 근거</text>
+  <rect class="box violet" x="1210" y="574" width="240" height="88"/>
+  <text class="small" x="1235" y="605">Strategist</text>
+  <text class="tiny" x="1235" y="629">BUY/HOLD/SELL 판단</text>
+  <rect class="box violet" x="1210" y="678" width="240" height="92"/>
+  <text class="small" x="1235" y="709">Guardrail</text>
+  <text class="tiny" x="1235" y="733">누수·단정표현 검증</text>
+
+  <rect class="panel" x="1530" y="310" width="200" height="530"/>
+  <text class="label" x="1560" y="350">Ground Truth</text>
+  <rect class="box rose" x="1555" y="410" width="150" height="120"/>
+  <text class="small" x="1578" y="448">5/22 실제</text>
+  <text class="tiny" x="1578" y="474">OHLCV</text>
+  <text class="tiny" x="1578" y="498">종가/수익률</text>
+  <rect class="box rose" x="1555" y="570" width="150" height="126"/>
+  <text class="small" x="1578" y="608">대조 결과</text>
+  <text class="tiny" x="1578" y="634">방향 적중</text>
+  <text class="tiny" x="1578" y="658">수익률 차이</text>
+
+  <path class="arrow" d="M370 575 C400 575 390 420 455 420"/>
+  <path class="arrow" d="M715 618 C760 618 770 420 835 420"/>
+  <path class="arrow" d="M1095 515 C1135 515 1150 418 1210 418"/>
+  <path class="arrow" d="M1095 515 C1135 515 1150 515 1210 515"/>
+  <path class="arrow" d="M1450 620 C1490 620 1495 470 1555 470"/>
+  <path class="arrow dash" d="M1555 635 C1515 760 1480 805 1450 720"/>
+  <path class="arrow" d="M1210 724 C940 880 525 890 340 725"/>
+
+  <rect class="panel" x="70" y="885" width="1660" height="112"/>
+  <text class="label" x="105" y="928">시연 메시지</text>
+  <text class="small" x="105" y="965">AI는 5월 15일~21일 데이터만 보고 5월 22일의 판단을 생성합니다. 이후 숨겨둔 실제 5월 22일 주가와 대조해 예측 신뢰성을 보여줍니다.</text>
+  <text class="tiny" x="105" y="990">OpenRouter는 중간 시연 이후 결정되므로, 현재 구조는 기존 LLM 추상화 또는 mock Strategist로도 동작하도록 설계합니다.</text>
+</svg>

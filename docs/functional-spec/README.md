@@ -15,6 +15,8 @@ docs/functional-spec/
 │   ├── B3_stock_search_spec_v0.5.md
 │   ├── B4_stock_basic_info_spec_v0.6.md
 │   └── B5_portfolio_bulk_advice_spec_v0.2.md
+├── demo/
+│   └── D1_backtesting_validation_spec_v0.1.md
 └── advanced/
     ├── A1_valuation_5y_spec_v0.7.md
     ├── A2_industry_qualitative_spec_v0.8.md
@@ -51,6 +53,7 @@ A2_industry_qualitative_spec_v0.8.md
 A3_peer_comparison_spec_v0.9.md
 A4_action_recommendation_spec_v1.0.md
 A5_stock_recommendation_spec_v1.1.md
+D1_backtesting_validation_spec_v0.1.md
 ```
 
 ## 기능 목록
@@ -68,6 +71,7 @@ A5_stock_recommendation_spec_v1.1.md
 | 고급 | A4 | BUY/HOLD/SELL 권유 | `advanced/A4_action_recommendation_spec_v1.0.md` |
 | 고급 | A5 | 종목 추천 | `advanced/A5_stock_recommendation_spec_v1.1.md` |
 | 고급 | A6 | PB 리포트 다운로드 | 예정 |
+| 데모 | D1 | 백테스팅 예측 검증 데모 | `demo/D1_backtesting_validation_spec_v0.1.md` |
 
 ## 참고
 

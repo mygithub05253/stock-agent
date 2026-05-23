@@ -283,8 +283,50 @@ flowchart TD
 
 ---
 
+## 6. 부속 — 백테스팅 기반 시연 검증 흐름
+
+> 중간 시연에서는 실제 미래 예측을 즉시 검증할 수 없으므로, 2026년 5월 22일을 타깃 예측일로 두고 AI 입력 데이터는 2026년 5월 21일 23:59 이전으로 마스킹한다.
+
+```mermaid
+flowchart LR
+    subgraph S["Streamlit 설정"]
+        A["종목: 삼성전자"]
+        B["분석 단위: 1주/2주/4주"]
+        C["타깃 예측일: 2026-05-22"]
+    end
+
+    subgraph M["마스킹/슬라이싱"]
+        D["mask_datetime<br/>2026-05-21 23:59"]
+        E["가격·뉴스·DART·매크로<br/>입력 기간 필터링"]
+        F["5월 22일 이후 데이터 제외"]
+    end
+
+    subgraph AI["AI 판단"]
+        G["Quant/Qual skeleton"]
+        H["Strategist<br/>BUY/HOLD/SELL"]
+        I["Guardrail<br/>미래 데이터 언급 차단"]
+    end
+
+    subgraph T["정답 대조"]
+        J["2026-05-22 실제 OHLCV"]
+        K["수익률·방향 적중 여부"]
+    end
+
+    A --> D
+    B --> D
+    C --> D
+    D --> E --> F --> G --> H --> I
+    J --> K
+    I --> K
+```
+
+자세한 설계는 `docs/architecture/backtesting_demo_architecture.md`, 발표용 HTML은 `docs/architecture/backtesting_demo_dashboard.html`을 참고한다.
+
+---
+
 ## 변경 이력
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-05-23 | v0.2 | 5월 22일 타깃 예측일 기반 백테스팅 시연 검증 흐름 추가 |
 | 2026-05-10 | v0.1 | 초안 — 4종 Mermaid (Sequence·Flowchart·Architecture·Gantt) + 보너스 Tier 다이어그램 |
