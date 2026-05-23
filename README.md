@@ -85,8 +85,11 @@ stock-agent/
 │   ├── prd/                       PRD (요구사항 정의서)
 │   ├── functional-spec/           기능 명세서 (각 기능 동작)
 │   ├── architecture/              시스템 설계 (흐름도·ERD·에이전트)
+│   │   └── system_architecture_dashboard.html
+│   │                                인터랙티브 시스템 아키텍처 대시보드
 │   ├── operations/                운영 가이드 (LLM 비용·배포)
 │   ├── decisions/                 ADR (의사결정 기록)
+│   ├── notion/                    노션 원본/정리본 보관
 │   ├── glossary.md                용어집
 │   └── assets/                    이미지·다이어그램 PNG
 │
@@ -377,10 +380,12 @@ PM이 주로 관리하는 문서들:
 | `docs/prd/PRD_v0.6.md` | 요구사항 정의서 (Problem·Goal·Scope·User Story·Phase) | 전원 |
 | `docs/functional-spec/` | 기능 명세서 (각 기능 트리거·입력·처리·출력·예외) | 개발팀 |
 | `docs/architecture/system_flow.md` | 시스템 흐름도 (Mermaid) | 전원 |
+| `docs/architecture/system_architecture_dashboard.html` | 시스템 아키텍처와 6 에이전트 흐름을 한 화면에서 보는 인터랙티브 HTML 대시보드 | 전원 |
 | `docs/architecture/erd.md` | DB ERD | 데이터팀·백엔드 |
 | `docs/architecture/agent_design.md` | 6 에이전트 상세 설계 | 에이전트 담당 |
 | `docs/operations/llm_cost_guide.md` | LLM 비용 절감 가이드 | 에이전트 담당·PM |
 | `docs/decisions/ADR-*.md` | 의사결정 기록 (왜 이 선택?) | 전원 (옵션) |
+| `docs/notion/` | 노션 기반 아키텍처·DB 문서와 이미지 원본 | PM·기획 |
 | `docs/glossary.md` | 용어집 | 비전공자 팀원 |
 
 ---
@@ -427,6 +432,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-05-23 | v1.3 | PM 문서 기반 인터랙티브 시스템 아키텍처 대시보드 추가, `docs/notion/` 문서 영역 반영 |
 | 2026-05-16 | v1.2 | Phase 1 E2E, Docker 앱 실행, Postgres pgvector RAG 저장소 기준 반영 |
 | 2026-05-10 | v1.0 | 협업 가이드 + 새 폴더 구조 + 6 에이전트 + 비전공자 용어풀이 추가 |
 | (이전) | v0.1 | 데이터팀 초기 셋업 (Postgres + Docker + datas/news/macro/dart) |
