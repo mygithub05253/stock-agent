@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 주간 로드맵 · 2026-05-23</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: Inter, Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .source-pill { border: 1px solid rgba(15, 23, 42, 0.1); }
+    [data-collapse-body] { transition: max-height 220ms ease, opacity 180ms ease; overflow: hidden; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <!-- Header / Navigation -->
+  <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <a href="#top" class="flex items-center gap-3">
+        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">SA</span>
+        <span>
+          <span class="block text-sm font-semibold leading-tight">stock-agent</span>
+          <span class="block text-xs text-slate-500">주간 로드맵 · 2026-05-23 (토)</span>
+        </span>
+      </a>
+      <nav class="hidden items-center gap-1 text-sm font-medium text-slate-600 md:flex">
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#progress">진행 현황</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#done">완료</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#todo">할 일</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#decisions">의사결정</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#today">오늘 플랜</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top" class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+
+    <!-- Hero / summary -->
+    <section class="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+      <div class="rounded-lg border border-slate-200 bg-white p-6">
+        <p class="text-sm font-semibold text-blue-700">데이터·인프라 트랙 주간 로드맵</p>
+        <h1 class="mt-3 max-w-4xl text-3xl font-bold leading-tight tracking-normal text-slate-950 sm:text-4xl">
+          연결은 끝났다 — 이번 주는 “어디까지·무엇을·어떻게”를 정한다
+        </h1>
+        <p class="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+          DB 연결(Supabase/Postgres), DART·ECOS 수집 로직, 기초 에이전트 툴까지 골격은 섰습니다.
+          이제 <strong>수집 범위 확정</strong>, <strong>벡터DB 전략</strong>, <strong>OpenRouter 기반 LLM 사용</strong> 세 가지를
+          결정하고 실제 적재량을 늘리는 단계입니다.
+        </p>
+        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+            <p class="text-xs font-semibold uppercase text-emerald-700">Done</p>
+            <p class="mt-2 text-sm font-medium text-slate-900">DB 연결 · 수집 로직 · 기초 에이전트 툴</p>
+          </div>
+          <div class="rounded-lg border border-blue-100 bg-blue-50 p-4">
+            <p class="text-xs font-semibold uppercase text-blue-700">This Week</p>
+            <p class="mt-2 text-sm font-medium text-slate-900">수집 범위 확정 + 실데이터 적재 확대</p>
+          </div>
+          <div class="rounded-lg border border-amber-100 bg-amber-50 p-4">
+            <p class="text-xs font-semibold uppercase text-amber-700">Decide</p>
+            <p class="mt-2 text-sm font-medium text-slate-900">벡터DB 구성 · OpenRouter 도입</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="text-base font-semibold text-slate-950">근거 / 출처</h2>
+        <div class="mt-4 flex flex-wrap gap-2 text-sm">
+          <span class="source-pill rounded-full bg-white px-3 py-1">PRD_v0.6.md</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">ADR-001 pgvector</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">ADR-004 cost-cap</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">datas/dart</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">datas/macro</span>
+        </div>
+        <dl class="mt-6 grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">완료 항목</dt>
+            <dd class="mt-1 text-xl font-bold">3</dd>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">결정 대기</dt>
+            <dd class="mt-1 text-xl font-bold">3</dd>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">월 LLM 상한</dt>
+            <dd class="mt-1 text-xl font-bold">5만원</dd>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">현재 적재</dt>
+            <dd class="mt-1 text-xl font-bold">1건</dd>
+          </div>
+        </dl>
+      </aside>
+    </section>
+
+    <!-- Progress -->
+    <section id="progress" class="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-blue-700">Status overview</p>
+          <h2 class="mt-1 text-2xl font-bold text-slate-950">트랙별 진행률</h2>
+        </div>
+        <p class="max-w-xl text-sm leading-6 text-slate-600">연결·골격은 대부분 완료, 실데이터 적재와 LLM/벡터 전략이 남았습니다.</p>
+      </div>
+
+      <div class="mt-6 space-y-5">
+        <div>
+          <div class="mb-1 flex items-center justify-between text-sm">
+            <span class="font-medium text-slate-800">DB 연결 (Supabase / Postgres)</span>
+            <span class="font-semibold text-emerald-600">90%</span>
+          </div>
+          <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full rounded-full bg-emerald-500" style="width:90%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1 flex items-center justify-between text-sm">
+            <span class="font-medium text-slate-800">DART · ECOS 수집 로직</span>
+            <span class="font-semibold text-blue-600">55%</span>
+          </div>
+          <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full rounded-full bg-blue-500" style="width:55%"></div>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">로직 완료, 테스트용 1건만 적재 중 → 적재량 확대 필요</p>
+        </div>
+        <div>
+          <div class="mb-1 flex items-center justify-between text-sm">
+            <span class="font-medium text-slate-800">기초 에이전트 툴</span>
+            <span class="font-semibold text-blue-600">60%</span>
+          </div>
+          <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full rounded-full bg-blue-500" style="width:60%"></div>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1 flex items-center justify-between text-sm">
+            <span class="font-medium text-slate-800">벡터DB 전략 (pgvector / Chroma)</span>
+            <span class="font-semibold text-amber-600">30%</span>
+          </div>
+          <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full rounded-full bg-amber-500" style="width:30%"></div>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">방향(pgvector 기본)은 확정, 학습용 Chroma 병행 여부 결정 대기</p>
+        </div>
+        <div>
+          <div class="mb-1 flex items-center justify-between text-sm">
+            <span class="font-medium text-slate-800">OpenRouter 기반 LLM 라우팅</span>
+            <span class="font-semibold text-slate-500">10%</span>
+          </div>
+          <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full rounded-full bg-slate-400" style="width:10%"></div>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">계정 생성 + 소액 결제 후 키 발급 필요</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Done -->
+    <section id="done" class="mt-8">
+      <div class="flex items-center gap-2">
+        <i data-lucide="check-circle-2" class="h-5 w-5 text-emerald-600"></i>
+        <h2 class="text-2xl font-bold text-slate-950">완료한 것</h2>
+      </div>
+      <div class="mt-4 grid gap-4 md:grid-cols-3">
+        <article class="rounded-lg border border-emerald-200 bg-white p-5">
+          <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">DB</span>
+          <h3 class="mt-3 text-lg font-semibold text-slate-900">데이터베이스 연결</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-600">
+            Postgres 기반 <strong>Supabase</strong>에 연결. <code class="rounded bg-slate-100 px-1">config.yaml</code>의 API 키로
+            접속하면 read·write 가능.
+          </p>
+          <p class="mt-3 text-xs text-slate-500">다음: 스키마(<code>db/init</code>) 실제 반영 + 권한/RLS 점검</p>
+        </article>
+        <article class="rounded-lg border border-emerald-200 bg-white p-5">
+          <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">수집</span>
+          <h3 class="mt-3 text-lg font-semibold text-slate-900">DART · ECOS 연결 로직</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-600">
+            DART(공시·재무), ECOS(매크로) 연결 로직 완료. 현재는 <strong>테스트용 1건</strong>만 가져오는 상태.
+          </p>
+          <p class="mt-3 text-xs text-slate-500">다음: 수집 범위 확정 후 실데이터 적재 확대</p>
+        </article>
+        <article class="rounded-lg border border-emerald-200 bg-white p-5">
+          <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">에이전트</span>
+          <h3 class="mt-3 text-lg font-semibold text-slate-900">기초 에이전트 툴</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-600">
+            에이전트가 호출할 <strong>기초 툴</strong> 작성 완료. (<code>src/stock_agent/tools</code> 골격)
+          </p>
+          <p class="mt-3 text-xs text-slate-500">다음: 실데이터 연동 후 툴 입출력 계약(schemas) 정합성 검증</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Todo -->
+    <section id="todo" class="mt-8">
+      <div class="flex items-center gap-2">
+        <i data-lucide="list-todo" class="h-5 w-5 text-blue-600"></i>
+        <h2 class="text-2xl font-bold text-slate-950">진행해야 할 것</h2>
+      </div>
+      <p class="mt-2 text-sm text-slate-600">카드를 클릭하면 세부 액션이 펼쳐집니다.</p>
+
+      <div class="mt-4 space-y-3">
+        <div class="rounded-lg border border-slate-200 bg-white">
+          <button data-collapse class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
+            <span class="flex items-center gap-3">
+              <span class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100 text-sm font-bold text-blue-700">1</span>
+              <span>
+                <span class="block font-semibold text-slate-900">DART · 매크로 데이터 수집 범위 확정</span>
+                <span class="block text-xs text-slate-500">“어디까지 · 무엇을” 가져올지 팀 합의 필요</span>
+              </span>
+            </span>
+            <i data-lucide="chevron-down" class="h-5 w-5 shrink-0 text-slate-400"></i>
+          </button>
+          <div data-collapse-body class="max-h-0 opacity-0">
+            <div class="border-t border-slate-100 px-5 py-4 text-sm leading-6 text-slate-600">
+              <ul class="list-disc space-y-1.5 pl-5">
+                <li><strong>DART</strong>: 대상 기업 범위(MVP 9종목 vs KOSPI200), 재무 항목(손익·재무상태·현금흐름), 기간(예: 최근 3~5년), 공시 유형(정기·주요사항)을 정한다.</li>
+                <li><strong>매크로(ECOS)</strong>: 어떤 지표(기준금리·환율·CPI·국채금리 등)와 주기(일/월)를 적재할지 정한다.</li>
+                <li>수집 범위 → <code>raw_news</code>/<code>raw_macro</code>/<code>financial_statement</code> 적재량과 임베딩 비용에 직결되므로 비용 상한과 함께 결정.</li>
+                <li>합의안을 <code>docs/decisions</code>에 ADR로 짧게 기록.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-white">
+          <button data-collapse class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
+            <span class="flex items-center gap-3">
+              <span class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100 text-sm font-bold text-blue-700">2</span>
+              <span>
+                <span class="block font-semibold text-slate-900">벡터DB 구성 결정</span>
+                <span class="block text-xs text-slate-500">Supabase pgvector 단일 vs Chroma 학습용 병행</span>
+              </span>
+            </span>
+            <i data-lucide="chevron-down" class="h-5 w-5 shrink-0 text-slate-400"></i>
+          </button>
+          <div data-collapse-body class="max-h-0 opacity-0">
+            <div class="border-t border-slate-100 px-5 py-4 text-sm leading-6 text-slate-600">
+              <ul class="list-disc space-y-1.5 pl-5">
+                <li>Postgres가 vector 기능을 제공하므로 <strong>Supabase 1대(pgvector)</strong>로 MVP를 끝낼 수 있음 — ADR-001과 동일한 방향.</li>
+                <li>다만 <strong>벡터DB 사용 경험</strong>을 위해 Chroma 등 별도 벡터DB 1개를 병행해 보는 것도 학습 가치가 있음.</li>
+                <li>결정 포인트: 운영은 pgvector 단일로 가되, Chroma는 <em>optional backend</em>로 인터페이스만 분리해 실험용으로 남길지.</li>
+                <li><code>src/stock_agent/rag/pgvector_store.py</code> 인터페이스를 추상화해 백엔드 교체 가능하게 설계.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-white">
+          <button data-collapse class="flex w-full items-center justify-between gap-3 px-5 py-4 text-left">
+            <span class="flex items-center gap-3">
+              <span class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-100 text-sm font-bold text-blue-700">3</span>
+              <span>
+                <span class="block font-semibold text-slate-900">OpenRouter 도입</span>
+                <span class="block text-xs text-slate-500">소액 결제 후 여러 모델을 편하게 라우팅</span>
+              </span>
+            </span>
+            <i data-lucide="chevron-down" class="h-5 w-5 shrink-0 text-slate-400"></i>
+          </button>
+          <div data-collapse-body class="max-h-0 opacity-0">
+            <div class="border-t border-slate-100 px-5 py-4 text-sm leading-6 text-slate-600">
+              <ul class="list-disc space-y-1.5 pl-5">
+                <li>OpenRouter 계정 생성 → <strong>소액 결제</strong> → API 키 발급.</li>
+                <li>키는 <code>.env</code>에만, <code>.env.example</code>엔 키 이름만 추가(협업 규칙).</li>
+                <li>하나의 엔드포인트로 GPT·Claude·Solar 등 여러 모델을 골고루 사용 → <code>src/stock_agent/llm</code> 라우팅과 연결.</li>
+                <li>월 5만원 상한(ADR-004) 안에서 단순 작업=작은 모델, 복잡 결정=큰 모델 라우팅 유지.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Decisions -->
+    <section id="decisions" class="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+      <div class="flex items-center gap-2">
+        <i data-lucide="git-branch" class="h-5 w-5 text-amber-600"></i>
+        <h2 class="text-2xl font-bold text-slate-950">오늘 정해야 할 의사결정</h2>
+      </div>
+      <div class="mt-5 overflow-x-auto">
+        <table class="w-full min-w-[640px] border-collapse text-sm">
+          <thead>
+            <tr class="border-b border-slate-200 text-left text-slate-500">
+              <th class="py-2 pr-4 font-medium">결정 항목</th>
+              <th class="py-2 pr-4 font-medium">선택지 A</th>
+              <th class="py-2 pr-4 font-medium">선택지 B</th>
+              <th class="py-2 font-medium">권장 / 메모</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr>
+              <td class="py-3 pr-4 font-medium text-slate-800">DART 수집 범위</td>
+              <td class="py-3 pr-4 text-slate-600">MVP 9종목 · 3년</td>
+              <td class="py-3 pr-4 text-slate-600">KOSPI200 · 5년</td>
+              <td class="py-3 text-slate-600">비용·임베딩량 고려해 <strong>A로 시작</strong> 후 확대</td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-4 font-medium text-slate-800">매크로 지표</td>
+              <td class="py-3 pr-4 text-slate-600">핵심 4~5종 (금리·환율·CPI)</td>
+              <td class="py-3 pr-4 text-slate-600">광범위 수십 종</td>
+              <td class="py-3 text-slate-600">분석에 실제 쓰는 <strong>핵심군 우선</strong></td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-4 font-medium text-slate-800">벡터DB</td>
+              <td class="py-3 pr-4 text-slate-600">Supabase pgvector 단일</td>
+              <td class="py-3 pr-4 text-slate-600">+ Chroma 학습용 병행</td>
+              <td class="py-3 text-slate-600">운영 <strong>pgvector</strong>, Chroma는 인터페이스 분리 실험</td>
+            </tr>
+            <tr>
+              <td class="py-3 pr-4 font-medium text-slate-800">LLM 접근</td>
+              <td class="py-3 pr-4 text-slate-600">개별 벤더 키</td>
+              <td class="py-3 pr-4 text-slate-600">OpenRouter 통합</td>
+              <td class="py-3 text-slate-600"><strong>OpenRouter</strong>로 통합 + 소액 결제</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Today plan -->
+    <section id="today" class="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+      <div class="flex items-center gap-2">
+        <i data-lucide="calendar-check" class="h-5 w-5 text-blue-600"></i>
+        <h2 class="text-2xl font-bold text-slate-950">오늘(2026-05-23) 작업 플랜</h2>
+      </div>
+      <ol class="mt-5 space-y-4">
+        <li class="flex gap-4">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
+          <div>
+            <p class="font-semibold text-slate-900">레포 동기화 확인</p>
+            <p class="text-sm text-slate-600">main pull 후 다른 팀원들과 동일하게 셋업됐는지 점검 (origin/main 최신, 작업트리는 CRLF 노이즈만).</p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
+          <div>
+            <p class="font-semibold text-slate-900">수집 범위 합의안 초안</p>
+            <p class="text-sm text-slate-600">DART/매크로 “어디까지·무엇을” 표로 정리 → ADR 후보로 기록.</p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">3</span>
+          <div>
+            <p class="font-semibold text-slate-900">벡터DB / OpenRouter 방향 확정</p>
+            <p class="text-sm text-slate-600">pgvector 단일 + Chroma 실험 여부, OpenRouter 계정·소액 결제 진행.</p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">4</span>
+          <div>
+            <p class="font-semibold text-slate-900">로드맵 문서화 + PR</p>
+            <p class="text-sm text-slate-600">본 대시보드를 <code>docs/roadmap/2026-05-23</code>에 추가, 브랜치 <code>docs/pm-roadmap-2026-05-23</code>로 PR.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <footer class="mt-10 border-t border-slate-200 pt-6 text-center text-xs text-slate-400">
+      stock-agent · BDAI 12기 팀 프로젝트 · 주간 로드맵 대시보드 (2026-05-23) ·
+      본 산출물은 학습 목적이며 투자 권유가 아닙니다.
+    </footer>
+  </main>
+
+  <script>
+    lucide.createIcons();
+    document.querySelectorAll('[data-collapse]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const body = btn.parentElement.querySelector('[data-collapse-body]');
+        const icon = btn.querySelector('[data-lucide="chevron-down"]');
+        const open = body.classList.contains('is-open');
+        if (open) {
+          body.style.maxHeight = '0px';
+          body.style.opacity = '0';
+          body.classList.remove('is-open');
+          if (icon) icon.style.transform = 'rotate(0deg)';
+        } else {
+          body.style.maxHeight = body.scrollHeight + 'px';
+          body.style.opacity = '1';
+          body.classList.add('is-open');
+          if (icon) icon.style.transform = 'rotate(180deg)';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
