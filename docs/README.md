@@ -27,6 +27,9 @@ docs/
 ├── architecture/                           ← 시스템 설계
 │   ├── system_flow.md                      ← 사용자→에이전트→DB→출력 흐름도 (Mermaid)
 │   └── erd.md                              ← DB ERD
+│   ├── system_architecture_dashboard.html  ← 전체 구조와 6 에이전트 흐름을 보는 인터랙티브 HTML 대시보드
+│   ├── erd.md                              ← DB ERD (4개 테이블)
+│   └── agent_design.md                     ← 6 에이전트 상세 설계
 ├── operations/                             ← 운영 가이드
 │   ├── db_connection_guide.md              ← 로컬/Supabase DB 연결 전환 가이드
 │   ├── llm_cost_guide.md                   ← LLM 비용 절감 가이드
@@ -39,6 +42,12 @@ docs/
 ├── roadmap/
 │   └── 2026-05-23/
 │       └── roadmap_dashboard.html
+│   ├── ADR-002-six-agent-structure.md
+│   └── ADR-003-cost-cap-50k-monthly.md
+├── notion/                                 ← 노션 원본/정리본 보관
+│   ├── architecture.md
+│   ├── database.md
+│   └── images/
 ├── glossary.md                             ← 용어집 (비전공자용)
 └── assets/                                 ← 이미지·다이어그램 PNG 보관
 ```
