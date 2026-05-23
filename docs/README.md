@@ -9,18 +9,36 @@ docs/
 ├── prd/                                    ← 요구사항 정의 (Product Requirements Document)
 │   └── PRD_v0.6.md
 ├── functional-spec/                        ← 기능 명세서 (각 기능의 상세 동작)
-│   └── functional_spec_v0.1.md
+│   ├── README.md                           ← 기능 명세 작성 규칙 / 인덱스
+│   ├── overview/
+│   │   └── functional_spec_all_features_v0.1.md
+│   ├── basic/
+│   │   ├── B1_signup_login_spec_v0.3.md
+│   │   ├── B2_holdings_manage_spec_v0.4.md
+│   │   ├── B3_stock_search_spec_v0.5.md
+│   │   ├── B4_stock_basic_info_spec_v0.6.md
+│   │   └── B5_portfolio_bulk_advice_spec_v0.2.md
+│   └── advanced/
+│       ├── A1_valuation_5y_spec_v0.7.md
+│       ├── A2_industry_qualitative_spec_v0.8.md
+│       ├── A3_peer_comparison_spec_v0.9.md
+│       ├── A4_action_recommendation_spec_v1.0.md
+│       └── A5_stock_recommendation_spec_v1.1.md
 ├── architecture/                           ← 시스템 설계
 │   ├── system_flow.md                      ← 사용자→에이전트→DB→출력 흐름도 (Mermaid)
-│   ├── erd.md                              ← DB ERD (4개 테이블)
-│   └── agent_design.md                     ← 6 에이전트 상세 설계
+│   └── erd.md                              ← DB ERD
 ├── operations/                             ← 운영 가이드
+│   ├── db_connection_guide.md              ← 로컬/Supabase DB 연결 전환 가이드
 │   ├── llm_cost_guide.md                   ← LLM 비용 절감 가이드
-│   └── deployment.md                       ← Streamlit Cloud 배포 가이드
+│   └── pm_workflow_guide.md                ← PM 문서 작성/협업 가이드
 ├── decisions/                              ← ADR (Architecture Decision Records)
 │   ├── ADR-001-data-arch-postgres-pgvector.md
-│   ├── ADR-002-six-agent-structure.md
-│   └── ADR-003-cost-cap-50k-monthly.md
+│   ├── ADR-002-critic-separation-vs-merge.md
+│   ├── ADR-003-six-agent-structure.md
+│   └── ADR-004-monthly-cost-cap.md
+├── roadmap/
+│   └── 2026-05-23/
+│       └── roadmap_dashboard.html
 ├── glossary.md                             ← 용어집 (비전공자용)
 └── assets/                                 ← 이미지·다이어그램 PNG 보관
 ```
