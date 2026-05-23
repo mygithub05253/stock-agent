@@ -8,7 +8,7 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgresql://stock_agent:stock_agent@db:5432/stock_agent
+      DATABASE_URL: ${DATABASE_URL:-postgresql://stock_agent:stock_agent@db:5432/stock_agent}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
       EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-1024}
       LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
