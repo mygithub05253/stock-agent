@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 시스템 아키텍처 대시보드</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: Inter, Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+    .diagram-canvas {
+      transform-origin: 0 0;
+      transition: transform 160ms ease;
+    }
+    .diagram-shell {
+      cursor: grab;
+      touch-action: none;
+    }
+    .diagram-shell.dragging {
+      cursor: grabbing;
+    }
+    .agent-card[aria-selected="true"] {
+      border-color: rgb(37 99 235);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .source-pill { border: 1px solid rgba(15, 23, 42, 0.1); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <!-- Header / Navigation -->
+  <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <a href="#overview" class="flex items-center gap-3">
+        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">SA</span>
+        <span>
+          <span class="block text-sm font-semibold leading-tight">stock-agent</span>
+          <span class="block text-xs text-slate-500">시스템 아키텍처 대시보드</span>
+        </span>
+      </a>
+      <nav class="hidden items-center gap-1 text-sm font-medium text-slate-600 md:flex">
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#flow">데이터 흐름</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#agents">6 에이전트</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#diagrams">Mermaid</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#database">DB</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#roadmap">로드맵</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="overview" class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <!-- Top-down summary -->
+    <section class="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+      <div class="rounded-lg border border-slate-200 bg-white p-6">
+        <p class="text-sm font-semibold text-blue-700">PM 문서 기반 Top-down View</p>
+        <h1 class="mt-3 max-w-4xl text-3xl font-bold leading-tight tracking-normal text-slate-950 sm:text-4xl">
+          개인투자자의 결정을 돕는 6 에이전트 분석 시스템
+        </h1>
+        <p class="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+          Streamlit 화면에서 시작된 사용자 질문을 Curator가 해석하고, Quant·Qual·Competitor가 병렬 분석한 뒤
+          Strategist와 Guardrail이 근거 있는 분석 신호와 책임 고지를 완성합니다.
+        </p>
+        <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-lg border border-blue-100 bg-blue-50 p-4">
+            <p class="text-xs font-semibold uppercase text-blue-700">Value</p>
+            <p class="mt-2 text-sm font-medium text-slate-900">투자 판단 근거를 60초 안에 요약</p>
+          </div>
+          <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+            <p class="text-xs font-semibold uppercase text-emerald-700">Control</p>
+            <p class="mt-2 text-sm font-medium text-slate-900">월 LLM 비용 5만원 상한과 캐시 우선</p>
+          </div>
+          <div class="rounded-lg border border-amber-100 bg-amber-50 p-4">
+            <p class="text-xs font-semibold uppercase text-amber-700">Trust</p>
+            <p class="mt-2 text-sm font-medium text-slate-900">출처 부착률 95%와 가드레일 검증</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="rounded-lg border border-slate-200 bg-white p-6">
+        <h2 class="text-base font-semibold text-slate-950">문서 출처</h2>
+        <div class="mt-4 flex flex-wrap gap-2 text-sm">
+          <span class="source-pill rounded-full bg-white px-3 py-1">PRD_v0.6.md</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">system_flow.md</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">erd.md</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">functional_spec_v0.1.md</span>
+          <span class="source-pill rounded-full bg-white px-3 py-1">schemas/analysis.py</span>
+        </div>
+        <dl class="mt-6 grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">MVP 종목</dt>
+            <dd class="mt-1 text-xl font-bold">9</dd>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">사용자 기능</dt>
+            <dd class="mt-1 text-xl font-bold">11</dd>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">에이전트</dt>
+            <dd class="mt-1 text-xl font-bold">6</dd>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-3">
+            <dt class="text-slate-500">DB 핵심 테이블</dt>
+            <dd class="mt-1 text-xl font-bold">7+</dd>
+          </div>
+        </dl>
+      </aside>
+    </section>
+
+    <!-- Frontend / AI / DB flow -->
+    <section id="flow" class="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-blue-700">Frontend → AI Agent → DB</p>
+          <h2 class="mt-1 text-2xl font-bold text-slate-950">전체 데이터 흐름</h2>
+        </div>
+        <p class="max-w-xl text-sm leading-6 text-slate-600">사용자 입력, 병렬 분석, 저장소 조회, 산출물 생성이 한 화면에서 이어지도록 구성했습니다.</p>
+      </div>
+
+      <div class="mt-6 grid gap-4 lg:grid-cols-3">
+        <article class="rounded-lg border border-slate-200 p-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="monitor" class="h-5 w-5 text-blue-600"></i>
+            <h3 class="font-semibold">Frontend</h3>
+          </div>
+          <p class="mt-3 text-sm leading-6 text-slate-600">Streamlit 홈, 분석 진행, 추천 결과, 상세 산출물 페이지가 Tier 1/2/3 점진 공개를 담당합니다.</p>
+          <ul class="mt-4 space-y-2 text-sm text-slate-700">
+            <li>홈: 로그인·포트폴리오·자연어 질문</li>
+            <li>결과: 한 줄 분석 신호와 근거 카드</li>
+            <li>산출물: PDF·DOCX·Excel·HTML 다운로드</li>
+          </ul>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="network" class="h-5 w-5 text-emerald-600"></i>
+            <h3 class="font-semibold">AI / LangGraph</h3>
+          </div>
+          <p class="mt-3 text-sm leading-6 text-slate-600">Curator 이후 Quant, Qual, Competitor를 fan-out하고 Strategist와 Guardrail이 결론을 완성합니다.</p>
+          <ul class="mt-4 space-y-2 text-sm text-slate-700">
+            <li>Phase 1: mock 기반 E2E 파이프라인</li>
+            <li>Phase 2: RAG, Peer, 5y 밸류에이션 확장</li>
+            <li>검증: Pydantic 스키마와 안전 표현 완화</li>
+          </ul>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="database" class="h-5 w-5 text-rose-600"></i>
+            <h3 class="font-semibold">DB / RAG</h3>
+          </div>
+          <p class="mt-3 text-sm leading-6 text-slate-600">Postgres는 정형 데이터를, pgvector 테이블은 뉴스·공시 원문과 임베딩 청크를 관리합니다.</p>
+          <ul class="mt-4 space-y-2 text-sm text-slate-700">
+            <li>정형: company, financial_data, stock_price</li>
+            <li>사용자: users, holdings, analysis_history</li>
+            <li>RAG: rag_documents, rag_chunks</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- Agent Explorer -->
+    <section id="agents" class="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-blue-700">Interactive Agent Explorer</p>
+          <h2 class="mt-1 text-2xl font-bold text-slate-950">6개 에이전트 상세 명세</h2>
+        </div>
+        <p class="max-w-xl text-sm leading-6 text-slate-600">에이전트를 선택하면 역할, 입력/출력 Pydantic 스키마, 사용하는 데이터와 툴을 확인할 수 있습니다.</p>
+      </div>
+
+      <div class="mt-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div id="agentList" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-1"></div>
+        <article class="rounded-lg border border-slate-200 bg-slate-50 p-5">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p id="agentPhase" class="text-sm font-semibold text-blue-700"></p>
+              <h3 id="agentTitle" class="mt-1 text-2xl font-bold text-slate-950"></h3>
+            </div>
+            <span id="agentBadge" class="rounded-full px-3 py-1 text-xs font-semibold"></span>
+          </div>
+          <p id="agentDesc" class="mt-4 text-sm leading-6 text-slate-700"></p>
+          <div class="mt-5 grid gap-4 md:grid-cols-2">
+            <div class="rounded-lg bg-white p-4">
+              <h4 class="text-sm font-semibold text-slate-950">입력</h4>
+              <ul id="agentInputs" class="mt-3 space-y-2 text-sm text-slate-700"></ul>
+            </div>
+            <div class="rounded-lg bg-white p-4">
+              <h4 class="text-sm font-semibold text-slate-950">출력</h4>
+              <ul id="agentOutputs" class="mt-3 space-y-2 text-sm text-slate-700"></ul>
+            </div>
+          </div>
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
+            <div class="rounded-lg bg-white p-4">
+              <h4 class="text-sm font-semibold text-slate-950">데이터 / 툴</h4>
+              <ul id="agentTools" class="mt-3 space-y-2 text-sm text-slate-700"></ul>
+            </div>
+            <div class="rounded-lg bg-white p-4">
+              <h4 class="text-sm font-semibold text-slate-950">구현 파일</h4>
+              <ul id="agentFiles" class="mt-3 space-y-2 text-sm text-slate-700"></ul>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Mermaid diagrams -->
+    <section id="diagrams" class="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-blue-700">Mermaid Native Rendering</p>
+          <h2 class="mt-1 text-2xl font-bold text-slate-950">문서 기반 다이어그램</h2>
+        </div>
+        <p class="max-w-xl text-sm leading-6 text-slate-600">각 다이어그램은 확대/축소와 드래그 이동을 지원합니다.</p>
+      </div>
+
+      <div class="mt-5 flex flex-wrap gap-2" role="tablist" aria-label="diagram tabs">
+        <button class="tab-button rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white" data-tab="langgraph">LangGraph</button>
+        <button class="tab-button rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" data-tab="architecture">Architecture</button>
+        <button class="tab-button rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" data-tab="sequence">Sequence</button>
+        <button class="tab-button rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" data-tab="erd">ERD</button>
+        <button class="tab-button rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700" data-tab="tier">Tier</button>
+      </div>
+
+      <div class="mt-4">
+        <div id="panel-langgraph" class="tab-panel active">
+          <div class="diagram-controls mb-3 flex flex-wrap items-center gap-2">
+            <button class="zoom-out rounded-md border border-slate-200 px-3 py-2 text-sm">축소</button>
+            <button class="zoom-reset rounded-md border border-slate-200 px-3 py-2 text-sm">초기화</button>
+            <button class="zoom-in rounded-md border border-slate-200 px-3 py-2 text-sm">확대</button>
+          </div>
+          <div class="diagram-shell overflow-auto rounded-lg border border-slate-200 bg-white p-4">
+            <div class="diagram-canvas min-w-[820px]">
+              <pre class="mermaid">
+flowchart TD
+    START([사용자 분석 요청]) --> CURATOR[Curator Agent&lt;br/&gt;의도 파싱&lt;br/&gt;종목 확정]
+    CURATOR -->|종목 미지정| RECOMMEND[종목 추천&lt;br/&gt;5~10 후보 카드]
+    RECOMMEND --> CURATOR
+    CURATOR -->|종목 확정| FANOUT{Send API&lt;br/&gt;병렬 분기}
+    FANOUT --> QUANT[Quant Worker&lt;br/&gt;5y 밸류에이션&lt;br/&gt;DCF + Multiple]
+    FANOUT --> QUAL[Qual Worker&lt;br/&gt;RAG 뉴스/공시&lt;br/&gt;호재·악재 분석]
+    FANOUT --> COMP[Competitor Agent&lt;br/&gt;동종업계 횡비교&lt;br/&gt;Peer Heatmap]
+    QUANT --> JOIN((merge))
+    QUAL --> JOIN
+    COMP --> JOIN
+    JOIN --> STRAT[Strategist & Synthesizer&lt;br/&gt;4 입력 종합&lt;br/&gt;BUY/HOLD/SELL 결정&lt;br/&gt;자체 검증]
+    STRAT --> GUARD[Guardrail & Evaluator&lt;br/&gt;PII/욕설/투자권유 차단&lt;br/&gt;RAGAS 자동 채점]
+    GUARD -->|통과| RENDER[Tier 1/2/3 렌더링]
+    GUARD -->|차단| RETRY[해당 부분만&lt;br/&gt;재합성 / 마스킹]
+    RETRY --> STRAT
+    RENDER --> END([Streamlit 화면 표시&lt;br/&gt;다운로드 가능])
+    style QUAL fill:#10b981,color:#fff
+    style STRAT fill:#ef4444,color:#fff
+    style GUARD fill:#6b7280,color:#fff
+    style CURATOR fill:#f59e0b,color:#fff
+    style QUANT fill:#3b82f6,color:#fff
+    style COMP fill:#8b5cf6,color:#fff
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-architecture" class="tab-panel">
+          <div class="diagram-controls mb-3 flex flex-wrap items-center gap-2">
+            <button class="zoom-out rounded-md border border-slate-200 px-3 py-2 text-sm">축소</button>
+            <button class="zoom-reset rounded-md border border-slate-200 px-3 py-2 text-sm">초기화</button>
+            <button class="zoom-in rounded-md border border-slate-200 px-3 py-2 text-sm">확대</button>
+          </div>
+          <div class="diagram-shell overflow-auto rounded-lg border border-slate-200 bg-white p-4">
+            <div class="diagram-canvas min-w-[1040px]">
+              <pre class="mermaid">
+flowchart LR
+    subgraph EXT["외부 데이터 소스"]
+        DART[(DART&lt;br/&gt;재무·공시)]
+        PYKRX[pykrx&lt;br/&gt;시세·거래]
+        NAVER[네이버금융·한경&lt;br/&gt;뉴스 크롤링]
+        ECOS[ECOS·FRED&lt;br/&gt;매크로]
+    end
+    subgraph DATA["데이터팀 영역 (datas/)"]
+        DC[datas/dart/collector]
+        PC[datas/news/collector + Sanitizer]
+        MC[datas/macro/collector]
+    end
+    DART --> DC
+    PYKRX --> DC
+    NAVER --> PC
+    ECOS --> MC
+    subgraph STORE["저장소"]
+        PG[(Postgres&lt;br/&gt;company / financial_data / disclosure / stock_price / users / holdings)]
+        VEC[(pgvector tables&lt;br/&gt;rag_documents / rag_chunks&lt;br/&gt;뉴스·공시 본문 + 임베딩)]
+    end
+    DC -->|재무·공시 메타| PG
+    PC -->|기사 메타| PG
+    PC -->|기사 본문 + 임베딩| VEC
+    DC -->|공시 본문 + 임베딩| VEC
+    MC -->|매크로 시계열| PG
+    subgraph AGENT["AI 에이전트"]
+        CUR[Curator]
+        QNT[Quant]
+        QAL[Qual]
+        CMP[Competitor]
+        STR[Strategist]
+        GRD[Guardrail]
+    end
+    PG -.조회.-> CUR
+    PG -.재무 조회.-> QNT
+    PG -.뉴스 메타.-> QAL
+    VEC -.RAG 검색.-> QAL
+    PG -.Peer 조회.-> CMP
+    VEC -.공시 RAG.-> CMP
+    PG -.매크로·포트 조회.-> STR
+    CUR --> STR
+    QNT --> STR
+    QAL --> STR
+    CMP --> STR
+    STR --> GRD
+    subgraph OUT["출력"]
+        UI[Streamlit UI&lt;br/&gt;Tier 1/2/3]
+        XLS[Excel 8시트&lt;br/&gt;밸류에이션]
+        HTM[HTML&lt;br/&gt;산업·뉴스 분석]
+        PDF[PDF + DOCX&lt;br/&gt;PB 리포트]
+    end
+    GRD --> UI
+    GRD --> XLS
+    GRD --> HTM
+    GRD --> PDF
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-sequence" class="tab-panel">
+          <div class="diagram-controls mb-3 flex flex-wrap items-center gap-2">
+            <button class="zoom-out rounded-md border border-slate-200 px-3 py-2 text-sm">축소</button>
+            <button class="zoom-reset rounded-md border border-slate-200 px-3 py-2 text-sm">초기화</button>
+            <button class="zoom-in rounded-md border border-slate-200 px-3 py-2 text-sm">확대</button>
+          </div>
+          <div class="diagram-shell overflow-auto rounded-lg border border-slate-200 bg-white p-4">
+            <div class="diagram-canvas min-w-[980px]">
+              <pre class="mermaid">
+sequenceDiagram
+    actor U as 박민호
+    participant H as streamlit_app.py
+    participant Q as 분석 진행중
+    participant R as 추천 결과
+    participant D as 상세 산출물
+    participant LG as LangGraph 파이프라인
+    participant DB as Postgres + pgvector
+    U->>H: 로그인
+    H->>DB: 사용자 조회
+    DB-->>H: 프로필 + 포트폴리오
+    H-->>U: 홈 화면
+    U->>H: "삼성전자 어떻게 할까?"
+    H->>Q: 분석 진행 페이지 이동
+    Q->>LG: AgentState 초기화
+    LG->>LG: Curator
+    LG->>LG: Quant + Qual + Competitor 병렬
+    LG->>LG: Strategist
+    LG->>LG: Guardrail
+    LG-->>Q: Tier 1/2/3 결과
+    R-->>U: BUY/HOLD/SELL 분석 신호
+    U->>R: 왜? 클릭
+    R-->>U: 5개 근거 카드
+    U->>D: PB 리포트 받기
+    D-->>U: report.pdf 다운로드
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-erd" class="tab-panel">
+          <div class="diagram-controls mb-3 flex flex-wrap items-center gap-2">
+            <button class="zoom-out rounded-md border border-slate-200 px-3 py-2 text-sm">축소</button>
+            <button class="zoom-reset rounded-md border border-slate-200 px-3 py-2 text-sm">초기화</button>
+            <button class="zoom-in rounded-md border border-slate-200 px-3 py-2 text-sm">확대</button>
+          </div>
+          <div class="diagram-shell overflow-auto rounded-lg border border-slate-200 bg-white p-4">
+            <div class="diagram-canvas min-w-[860px]">
+              <pre class="mermaid">
+erDiagram
+    users ||--o{ holdings : "보유종목"
+    users ||--o{ analysis_history : "분석이력"
+    company ||--o{ financial_data : "재무"
+    company ||--o{ disclosure : "공시"
+    company ||--o{ stock_price : "시세"
+    company ||--o{ holdings : "보유 종목 매핑"
+    users {
+        uuid id PK
+        string email UK
+        string risk_profile
+        decimal target_return
+        json interest_sectors
+        timestamp created_at
+    }
+    holdings {
+        uuid id PK
+        uuid user_id FK
+        string stock_code FK
+        decimal weight
+        bigint avg_price
+        int qty
+    }
+    company {
+        varchar corp_code PK
+        varchar stock_code UK
+        varchar corp_name
+        varchar sector
+        date listing_date
+    }
+    financial_data {
+        bigint id PK
+        varchar corp_code FK
+        int bsns_year
+        varchar std_account_nm
+        bigint thstrm_amount
+    }
+    disclosure {
+        varchar rcept_no PK
+        varchar corp_code FK
+        varchar report_nm
+        date rcept_dt
+        decimal sentiment_score
+    }
+    stock_price {
+        bigint id PK
+        varchar stock_code FK
+        date base_date
+        int close_price
+        bigint volume
+        bigint market_cap
+    }
+    analysis_history {
+        uuid id PK
+        uuid user_id FK
+        varchar stock_code
+        string action
+        decimal confidence
+    }
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-tier" class="tab-panel">
+          <div class="diagram-controls mb-3 flex flex-wrap items-center gap-2">
+            <button class="zoom-out rounded-md border border-slate-200 px-3 py-2 text-sm">축소</button>
+            <button class="zoom-reset rounded-md border border-slate-200 px-3 py-2 text-sm">초기화</button>
+            <button class="zoom-in rounded-md border border-slate-200 px-3 py-2 text-sm">확대</button>
+          </div>
+          <div class="diagram-shell overflow-auto rounded-lg border border-slate-200 bg-white p-4">
+            <div class="diagram-canvas min-w-[900px]">
+              <pre class="mermaid">
+flowchart TD
+    R[분석 완료] --> T1{Tier 1&lt;br/&gt;큰 글씨 한 줄}
+    T1 --> T1A[BUY · 신뢰도 78%&lt;br/&gt;적합도 별 4개&lt;br/&gt;적정주가 80,000원&lt;br/&gt;안전마진 18.8%]
+    T1A -->|"왜?" 버튼 클릭| T2{Tier 2&lt;br/&gt;5개 근거 카드}
+    T2 --> T2A[정량 카드&lt;br/&gt;5y 밸류에이션 요약]
+    T2 --> T2B[정성 카드&lt;br/&gt;최근 호재/악재]
+    T2 --> T2C[경쟁사 카드&lt;br/&gt;Peer 대비 위치]
+    T2 --> T2D[매크로 카드&lt;br/&gt;금리·환율 영향]
+    T2 --> T2E[포트 카드&lt;br/&gt;내 비중·집중도]
+    T2A --> T3{Tier 3&lt;br/&gt;다운로드}
+    T2B --> T3
+    T2C --> T3
+    T2D --> T3
+    T2E --> T3
+    T3 --> T3A[report.pdf&lt;br/&gt;7페이지 PB 양식]
+    T3 --> T3B[report.docx&lt;br/&gt;편집용]
+    T3 --> T3C[valuation.xlsx&lt;br/&gt;5y 모델 8시트]
+    T3 --> T3D[analysis.html&lt;br/&gt;산업/뉴스 인용]
+              </pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Database schema -->
+    <section id="database" class="mt-8 rounded-lg border border-slate-200 bg-white p-6">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-blue-700">Postgres + pgvector</p>
+          <h2 class="mt-1 text-2xl font-bold text-slate-950">데이터베이스 스키마 요약</h2>
+        </div>
+        <p class="max-w-xl text-sm leading-6 text-slate-600">데이터팀 확정 4 테이블과 PM 추가 제안 3 테이블, RAG 테이블을 목적별로 묶었습니다.</p>
+      </div>
+      <div class="mt-6 overflow-x-auto rounded-lg border border-slate-200">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-100 text-left text-xs font-semibold uppercase text-slate-600">
+            <tr>
+              <th class="px-4 py-3">그룹</th>
+              <th class="px-4 py-3">테이블</th>
+              <th class="px-4 py-3">핵심 역할</th>
+              <th class="px-4 py-3">주 사용 에이전트</th>
+            </tr>
+          </thead>
+          <tbody id="dbRows" class="divide-y divide-slate-200 bg-white"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Roadmap / risks -->
+    <section id="roadmap" class="mt-8 grid gap-4 lg:grid-cols-2">
+      <article class="rounded-lg border border-slate-200 bg-white p-6">
+        <p class="text-sm font-semibold text-blue-700">Release Plan</p>
+        <h2 class="mt-1 text-2xl font-bold text-slate-950">Phase별 산출물</h2>
+        <ol class="mt-5 space-y-4 text-sm">
+          <li class="rounded-lg border-l-4 border-blue-500 bg-blue-50 p-4">
+            <strong>Phase 1 (7~8주차)</strong>
+            <p class="mt-1 text-slate-700">기본 기능 5개, Docker/Postgres/pgvector, Hello E2E 5초 캐시 응답.</p>
+          </li>
+          <li class="rounded-lg border-l-4 border-emerald-500 bg-emerald-50 p-4">
+            <strong>Phase 2 (9~11주차)</strong>
+            <p class="mt-1 text-slate-700">5y 밸류에이션, RAG 정성 분석, Peer 비교, BUY/HOLD/SELL 분석 신호, PB 리포트.</p>
+          </li>
+          <li class="rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4">
+            <strong>Phase 3 (v2)</strong>
+            <p class="mt-1 text-slate-700">What Changed, 재분석 Trigger, 글로벌 Peer, 섹터 확장.</p>
+          </li>
+        </ol>
+      </article>
+      <article class="rounded-lg border border-slate-200 bg-white p-6">
+        <p class="text-sm font-semibold text-blue-700">Devil's Advocate</p>
+        <h2 class="mt-1 text-2xl font-bold text-slate-950">제약과 대응</h2>
+        <div class="mt-5 space-y-3 text-sm">
+          <div class="rounded-lg bg-slate-100 p-4">
+            <strong>복잡한 다이어그램 가독성</strong>
+            <p class="mt-1 text-slate-700">탭 분리, 확대/축소, 드래그 이동, 최소 너비 캔버스로 대응.</p>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-4">
+            <strong>투자권유 오해</strong>
+            <p class="mt-1 text-slate-700">Guardrail에서 금지 표현 완화와 책임 고지를 최종 부착.</p>
+          </div>
+          <div class="rounded-lg bg-slate-100 p-4">
+            <strong>비용 초과</strong>
+            <p class="mt-1 text-slate-700">모델 라우팅, 캐시 모드, 월 5만원 상한 정책으로 제어.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    // Data model: derived from docs/prd, docs/architecture, functional spec, and Pydantic schemas.
+    const agents = [
+      {
+        id: "curator",
+        name: "Curator Agent",
+        badge: "입력 파싱",
+        phase: "W3 ReAct / A5 종목 추천",
+        color: "bg-amber-100 text-amber-800",
+        desc: "사용자 자연어에서 의도, 종목, 섹터를 확정하고 종목 미지정 질문이면 MVP universe 안에서 후보를 큐레이션합니다.",
+        inputs: ["AgentState.user_query", "UserProfile.preferred_sectors", "Portfolio.holdings", "company / stock_price"],
+        outputs: ["CuratorResult.intent", "CuratorResult.stock_code", "CuratorResult.corp_code", "CuratorResult.candidates"],
+        tools: ["pykrx_tool.py", "dart_tool.py", "company", "stock_price", "users.interest_sectors"],
+        files: ["src/stock_agent/agents/curator.py", "src/stock_agent/schemas/analysis.py"]
+      },
+      {
+        id: "quant",
+        name: "Quant Worker",
+        badge: "정량 분석",
+        phase: "W3 Tool / A1 5y 밸류에이션",
+        color: "bg-blue-100 text-blue-800",
+        desc: "DART 재무와 pykrx 시세로 PER/PBR/ROE, 모멘텀, 변동성, 5개년 밸류에이션을 계산합니다.",
+        inputs: ["CuratorResult.stock_code", "financial_data", "stock_price", "company"],
+        outputs: ["QuantResult.score", "QuantResult.valuation_signal", "QuantResult.metrics", "QuantResult.reasons / risks"],
+        tools: ["dart_tool.py", "pykrx_tool.py", "financial_data", "stock_price"],
+        files: ["src/stock_agent/agents/quant.py", "src/stock_agent/schemas/analysis.py"]
+      },
+      {
+        id: "qual",
+        name: "Qual Worker",
+        badge: "RAG 핵심",
+        phase: "W1 RAG + W3 / A2 산업·정성 분석",
+        color: "bg-emerald-100 text-emerald-800",
+        desc: "뉴스와 DART 공시 본문을 pgvector로 검색해 호재·악재, 이벤트 유형, 출처 기반 근거를 추출합니다.",
+        inputs: ["CuratorResult.stock_code", "rag_chunks", "rag_documents", "disclosure"],
+        outputs: ["QualResult.score", "QualResult.sentiment", "QualResult.event_types", "QualResult.evidence / risks"],
+        tools: ["news_tool.py", "dart_tool.py", "pgvector Hybrid Search", "Source Tracker"],
+        files: ["src/stock_agent/agents/qual.py", "src/stock_agent/rag/pgvector_store.py"]
+      },
+      {
+        id: "competitor",
+        name: "Competitor Agent",
+        badge: "Peer 비교",
+        phase: "W1 Hybrid Search / A3 동종업계 횡비교",
+        color: "bg-violet-100 text-violet-800",
+        desc: "같은 섹터의 국내 Peer를 추출하고 PER, PBR, ROE, 매출성장을 비교해 상대 위치를 설명합니다.",
+        inputs: ["CuratorResult.sector", "company.sector", "financial_data", "stock_price"],
+        outputs: ["CompetitorResult.score", "CompetitorResult.peer_summary", "CompetitorResult.peers", "CompetitorResult.evidence"],
+        tools: ["dart_tool.py", "pykrx_tool.py", "company", "financial_data", "stock_price"],
+        files: ["src/stock_agent/agents/competitor.py", "src/stock_agent/schemas/analysis.py"]
+      },
+      {
+        id: "strategist",
+        name: "Strategist & Synthesizer",
+        badge: "종합 결정",
+        phase: "W3 ReAct / A4 BUY·HOLD·SELL",
+        color: "bg-rose-100 text-rose-800",
+        desc: "Quant, Qual, Competitor 결과와 사용자 포트폴리오를 종합해 분석 신호, 신뢰도, 적합도, 다음 행동을 만듭니다.",
+        inputs: ["QuantResult", "QualResult", "CompetitorResult", "UserProfile", "Portfolio", "Macro context"],
+        outputs: ["StrategistResult.signal", "StrategistResult.confidence", "StrategistResult.suitability", "key_reasons / next_actions"],
+        tools: ["Action Engine", "users", "holdings", "analysis_history", "macro time series"],
+        files: ["src/stock_agent/agents/strategist.py", "src/stock_agent/graph/pipeline.py"]
+      },
+      {
+        id: "guardrail",
+        name: "Guardrail & Evaluator",
+        badge: "안전 검증",
+        phase: "W2 평가 + W5 금융 가이드라인",
+        color: "bg-slate-200 text-slate-800",
+        desc: "PII, 욕설, 투자권유성 표현을 완화하고 책임 고지와 RAGAS/골든셋 기반 평가 흐름을 담당합니다.",
+        inputs: ["StrategistResult", "QualResult.risks", "금지어 사전", "eval/golden_set"],
+        outputs: ["GuardrailResult.passed", "GuardrailResult.warnings", "GuardrailResult.revised_headline", "GuardrailResult.disclaimer"],
+        tools: ["RAGAS", "PII masking", "banned phrase filter", "eval/golden_set"],
+        files: ["src/stock_agent/agents/guardrail.py", "src/stock_agent/harness/"]
+      }
+    ];
+
+    const dbRows = [
+      ["데이터팀 확정", "company", "기업 마스터, DART corp_code, 종목코드, 섹터", "Curator, Quant, Competitor"],
+      ["데이터팀 확정", "financial_data", "연도별 DART 재무 계정과 표준 계정", "Quant, Competitor"],
+      ["데이터팀 확정", "disclosure", "DART 공시 메타와 AI 센티먼트", "Qual, Competitor"],
+      ["데이터팀 확정", "stock_price", "일별 종가, 거래량, 시가총액", "Quant, Strategist, Curator"],
+      ["PM 추가 제안", "users", "회원 프로필, 투자성향, 관심 섹터", "Strategist, Curator"],
+      ["PM 추가 제안", "holdings", "보유 종목, 평균 매수가, 비중", "Strategist, 전체 컨텍스트"],
+      ["PM 추가 제안", "analysis_history", "분석 이력과 Tier 1 출력 저장", "Strategist, Guardrail"],
+      ["RAG", "rag_documents", "뉴스·공시·리포트 원문 단위", "Qual"],
+      ["RAG", "rag_chunks", "청크 텍스트와 vector(1024) 임베딩", "Qual, Competitor"]
+    ];
+
+    function renderAgents() {
+      const list = document.querySelector("#agentList");
+      list.innerHTML = agents.map((agent, index) => `
+        <button class="agent-card rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-blue-300"
+                data-agent="${agent.id}" aria-selected="${index === 0}">
+          <span class="inline-flex rounded-full ${agent.color} px-2.5 py-1 text-xs font-semibold">${agent.badge}</span>
+          <span class="mt-3 block font-semibold text-slate-950">${agent.name}</span>
+          <span class="mt-1 block text-sm text-slate-500">${agent.phase}</span>
+        </button>
+      `).join("");
+      list.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-agent]");
+        if (!button) return;
+        document.querySelectorAll(".agent-card").forEach((item) => item.setAttribute("aria-selected", "false"));
+        button.setAttribute("aria-selected", "true");
+        setAgent(button.dataset.agent);
+      });
+      setAgent(agents[0].id);
+    }
+
+    function renderList(target, items) {
+      document.querySelector(target).innerHTML = items.map((item) => `<li class="flex gap-2"><span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"></span><span>${item}</span></li>`).join("");
+    }
+
+    function setAgent(id) {
+      const agent = agents.find((item) => item.id === id);
+      document.querySelector("#agentPhase").textContent = agent.phase;
+      document.querySelector("#agentTitle").textContent = agent.name;
+      document.querySelector("#agentDesc").textContent = agent.desc;
+      const badge = document.querySelector("#agentBadge");
+      badge.textContent = agent.badge;
+      badge.className = `rounded-full px-3 py-1 text-xs font-semibold ${agent.color}`;
+      renderList("#agentInputs", agent.inputs);
+      renderList("#agentOutputs", agent.outputs);
+      renderList("#agentTools", agent.tools);
+      renderList("#agentFiles", agent.files);
+    }
+
+    function renderDbRows() {
+      document.querySelector("#dbRows").innerHTML = dbRows.map((row) => `
+        <tr>
+          <td class="px-4 py-3 font-medium text-slate-900">${row[0]}</td>
+          <td class="px-4 py-3 font-mono text-xs text-blue-700">${row[1]}</td>
+          <td class="px-4 py-3 text-slate-700">${row[2]}</td>
+          <td class="px-4 py-3 text-slate-700">${row[3]}</td>
+        </tr>
+      `).join("");
+    }
+
+    function setupTabs() {
+      document.querySelectorAll(".tab-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          document.querySelectorAll(".tab-button").forEach((item) => {
+            item.className = "tab-button rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700";
+          });
+          button.className = "tab-button rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white";
+          document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
+          document.querySelector(`#panel-${button.dataset.tab}`).classList.add("active");
+        });
+      });
+    }
+
+    function setupDiagramTools() {
+      document.querySelectorAll(".tab-panel").forEach((panel) => {
+        const shell = panel.querySelector(".diagram-shell");
+        const canvas = panel.querySelector(".diagram-canvas");
+        if (!shell || !canvas) return;
+        let scale = 1;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let scrollLeft = 0;
+        let scrollTop = 0;
+
+        const applyScale = () => {
+          canvas.style.transform = `scale(${scale})`;
+          canvas.style.width = `${100 / scale}%`;
+        };
+
+        panel.querySelector(".zoom-in").addEventListener("click", () => {
+          scale = Math.min(1.8, scale + 0.15);
+          applyScale();
+        });
+        panel.querySelector(".zoom-out").addEventListener("click", () => {
+          scale = Math.max(0.55, scale - 0.15);
+          applyScale();
+        });
+        panel.querySelector(".zoom-reset").addEventListener("click", () => {
+          scale = 1;
+          shell.scrollLeft = 0;
+          shell.scrollTop = 0;
+          applyScale();
+        });
+
+        shell.addEventListener("pointerdown", (event) => {
+          isDragging = true;
+          shell.classList.add("dragging");
+          startX = event.pageX - shell.offsetLeft;
+          startY = event.pageY - shell.offsetTop;
+          scrollLeft = shell.scrollLeft;
+          scrollTop = shell.scrollTop;
+        });
+        shell.addEventListener("pointerup", () => {
+          isDragging = false;
+          shell.classList.remove("dragging");
+        });
+        shell.addEventListener("pointerleave", () => {
+          isDragging = false;
+          shell.classList.remove("dragging");
+        });
+        shell.addEventListener("pointermove", (event) => {
+          if (!isDragging) return;
+          event.preventDefault();
+          const x = event.pageX - shell.offsetLeft;
+          const y = event.pageY - shell.offsetTop;
+          shell.scrollLeft = scrollLeft - (x - startX);
+          shell.scrollTop = scrollTop - (y - startY);
+        });
+      });
+    }
+
+    mermaid.initialize({
+      startOnLoad: true,
+      securityLevel: "loose",
+      theme: "base",
+      themeVariables: {
+        fontFamily: "Inter, Pretendard, Noto Sans KR, sans-serif",
+        primaryColor: "#eff6ff",
+        primaryTextColor: "#0f172a",
+        primaryBorderColor: "#93c5fd",
+        lineColor: "#64748b"
+      }
+    });
+
+    renderAgents();
+    renderDbRows();
+    setupTabs();
+    setupDiagramTools();
+    lucide.createIcons();
+  </script>
+</body>
+</html>
