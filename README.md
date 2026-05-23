@@ -87,6 +87,7 @@ stock-agent/
 │   ├── architecture/              시스템 설계 (흐름도·ERD·에이전트)
 │   │   └── system_architecture_dashboard.html
 │   │                                인터랙티브 시스템 아키텍처 대시보드
+│   ├── roadmap/                   주간 진행 로드맵 (날짜별 HTML 대시보드)
 │   ├── operations/                운영 가이드 (LLM 비용·배포)
 │   ├── decisions/                 ADR (의사결정 기록)
 │   ├── notion/                    노션 원본/정리본 보관
@@ -185,7 +186,7 @@ docker compose --profile app run --rm app python scripts/apply_db_schema.py
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\\Scripts\\activate
 pip install -r requirements-dev.txt
 ```
 
@@ -381,6 +382,7 @@ PM이 주로 관리하는 문서들:
 | `docs/functional-spec/` | 기능 명세서 (각 기능 트리거·입력·처리·출력·예외) | 개발팀 |
 | `docs/architecture/system_flow.md` | 시스템 흐름도 (Mermaid) | 전원 |
 | `docs/architecture/system_architecture_dashboard.html` | 시스템 아키텍처와 6 에이전트 흐름을 한 화면에서 보는 인터랙티브 HTML 대시보드 | 전원 |
+| `docs/roadmap/<날짜>/roadmap_dashboard.html` | 주간 진행 현황·완료/할 일·의사결정을 한 화면에서 보는 인터랙티브 로드맵 대시보드 (예: `docs/roadmap/2026-05-23/`) | 전원 |
 | `docs/architecture/erd.md` | DB ERD | 데이터팀·백엔드 |
 | `docs/architecture/agent_design.md` | 6 에이전트 상세 설계 | 에이전트 담당 |
 | `docs/operations/llm_cost_guide.md` | LLM 비용 절감 가이드 | 에이전트 담당·PM |
@@ -432,6 +434,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-05-23 | v1.4 | 주간 로드맵 대시보드(`docs/roadmap/2026-05-23/`) 추가 — DART·매크로 수집 범위, 벡터DB(pgvector/Chroma), OpenRouter 도입 결정 항목 정리 |
 | 2026-05-23 | v1.3 | PM 문서 기반 인터랙티브 시스템 아키텍처 대시보드 추가, `docs/notion/` 문서 영역 반영 |
 | 2026-05-16 | v1.2 | Phase 1 E2E, Docker 앱 실행, Postgres pgvector RAG 저장소 기준 반영 |
 | 2026-05-10 | v1.0 | 협업 가이드 + 새 폴더 구조 + 6 에이전트 + 비전공자 용어풀이 추가 |
