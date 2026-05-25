@@ -31,10 +31,54 @@ Curator
 |------|------|
 | Supervisor pattern | Strategist가 전체 분석 결과를 종합하고 최종 신호를 만든다. |
 | Specialist agents | Quant, Qual, Competitor는 각자 전문 영역만 담당한다. |
+| Personalization boundary | 사용자 성향은 Curator와 Strategist에서 강하게 반영하고, 중간 전문 agent는 객관 evidence 생성에 집중한다. |
 | Evidence-first | 모든 정성 판단은 출처와 연결되어야 한다. |
 | Calculation outside LLM | PER, PBR, ROE, valuation 등 숫자는 Python/DB가 계산한다. |
 | Structured contract | Agent 간 전달은 Pydantic schema 기반으로 한다. |
 | Financial guardrails | 투자 권유성 표현, 수익 보장, 출처 없는 단정을 막는다. |
+
+---
+
+## 1.1 개인화 경계
+
+사용자 성향과 포트폴리오 정보는 모든 agent에 동일한 강도로 주입하지 않는다. 금융 분석에서는 **객관 분석**과 **개인화된 최종 해석**을 분리해야 한다.
+
+```text
+초반 Curator
+→ 사용자 성향, 관심 섹터, 포트폴리오를 참고해 분석 대상과 의도를 정리
+
+중간 전문 Agent
+→ Quant / Qual / Competitor / Macro는 객관적 근거를 생성
+→ 같은 종목이라면 유저가 달라도 핵심 수치와 사실 판단은 동일해야 함
+
+마지막 Strategist
+→ 전문 agent들이 만든 근거를 사용자 성향, 보유 비중, 현금 비중, 투자 기간에 맞춰 개인화
+
+Guardrail
+→ 모든 유저에게 동일한 안전 기준 적용
+```
+
+Agent별 사용자 context 반영 수준은 다음처럼 나눈다.
+
+| Agent | 사용자 context 반영 수준 | 설명 |
+|-------|--------------------------|------|
+| Curator | 높음 | 관심 섹터, 보유 종목, 질문 의도를 보고 분석 대상과 후보를 정한다. |
+| Quant | 낮음 | 재무·시세 계산은 공통으로 수행한다. 단, 변동성 warning 정도만 투자성향별로 표시할 수 있다. |
+| Qual | 낮음~중간 | 뉴스/공시 요약은 출처 기반으로 공통 수행한다. 보수형에게는 리스크를 더 명확히 표시하는 정도는 가능하다. |
+| Competitor | 낮음 | Peer 선정과 비교 지표는 공통 기준으로 수행한다. |
+| Macro | 낮음~중간 | 산업 영향은 공통 분석하되, 투자 기간에 따라 단기/중기 영향을 나눠 표시할 수 있다. |
+| Strategist | 매우 높음 | 최종 signal, suitability, 현금 비중, 추가매수/관망/비중축소 판단에 사용자 맥락을 강하게 반영한다. |
+| Guardrail | 동일 기준 | 사용자 성향과 관계없이 동일한 금융 안전 기준을 적용한다. |
+
+예를 들어 삼성전자의 정량 수치와 뉴스 사실은 유저가 보수형이든 공격형이든 같아야 한다. 달라지는 것은 마지막 해석이다.
+
+| 사용자 | 같은 evidence에 대한 최종 해석 예시 |
+|--------|------------------------------------|
+| 보수형 + 이미 비중 높음 | 추가 매수보다 HOLD, 현금 비중 유지, 변동성 warning 강조 |
+| 균형형 + 비중 낮음 | 소폭 분할 매수 검토, 실적 발표 전 과도한 비중 확대는 보류 |
+| 공격형 + 현금 많음 | 일부 분할 매수 가능, 손실 허용 범위와 재분석 조건 명시 |
+
+정리하면, **전문 agent는 객관적 evidence를 만들고, Curator와 Strategist가 그 evidence를 사용자 성향과 포트폴리오 맥락에 맞게 연결한다.**
 
 ---
 
