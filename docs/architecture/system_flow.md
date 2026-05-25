@@ -1,4 +1,4 @@
-# 시스템 흐름도
+﻿# 시스템 흐름도
 
 | 항목 | 값 |
 |------|-----|
@@ -23,6 +23,29 @@
 | 2 | **LangGraph 노드 흐름** (Flowchart) | "AI 에이전트들은 어떤 순서로 일하는가?" |
 | 3 | **데이터 플로우** (Architecture) | "데이터가 어디서 와서 어디로 가는가?" |
 | 4 | **12주 일정** (Gantt) | "언제 무엇을 하는가?" |
+
+> 최신 멀티 에이전트 상세 설계와 팀 회의용 HTML은 `docs/architecture/multi_agent_architecture.md`,
+> `docs/architecture/multi_agent_architecture_review.html`을 함께 참고한다.
+
+---
+
+## 0.1 현재 구현 상태와 목표 상태
+
+현재 코드는 Phase 1 검증용 mock pipeline이다. `src/stock_agent/graph/pipeline.py`에서 다음 순서로 함수가 실행된다.
+
+```text
+Curator → Quant → Qual → Competitor → Strategist → Guardrail
+```
+
+목표 구조는 LangGraph `StateGraph` 기반이며, Curator 이후 `Quant`, `Qual`, `Competitor`를 병렬 fan-out으로 실행하고 `Strategist`에서 병합한다.
+
+| 영역 | 현재 | 목표 |
+|------|------|------|
+| Graph | 순차 함수 호출 | LangGraph `StateGraph` |
+| 전문 Agent | mock 결과 반환 | DB/Tool/LLM/RAG 연결 |
+| 병렬화 | 없음 | Quant/Qual/Competitor 병렬 실행 |
+| RAG | `pgvector_store.py` 검색 함수 준비 | Qual Agent 실제 연결 |
+| Guardrail | 금지 표현 일부 치환 | Input/Tool/Output 3계층 guardrail |
 
 ---
 
@@ -143,7 +166,7 @@ flowchart LR
     ECOS --> MC
 
     subgraph "저장소"
-        PG[(🗄 Postgres<br/>정형 데이터<br/>company / financial_data /<br/>disclosure / stock_price /<br/>users / holdings)]
+        PG[(🗄 Postgres<br/>정형 데이터<br/>company / financial_statement /<br/>disclosure / stock_price /<br/>users / holdings)]
         VEC[(🔍 pgvector tables<br/>rag_documents / rag_chunks<br/>뉴스·공시 본문<br/>+ 임베딩 벡터)]
     end
 
@@ -330,3 +353,4 @@ flowchart LR
 |------|------|------|
 | 2026-05-23 | v0.2 | 5월 22일 타깃 예측일 기반 백테스팅 시연 검증 흐름 추가 |
 | 2026-05-10 | v0.1 | 초안 — 4종 Mermaid (Sequence·Flowchart·Architecture·Gantt) + 보너스 Tier 다이어그램 |
+
