@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent Multi-Agent Architecture Review</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      themeVariables: {
+        fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+        primaryColor: "#e0f2fe",
+        primaryTextColor: "#0f172a",
+        primaryBorderColor: "#0284c7",
+        lineColor: "#64748b",
+        secondaryColor: "#f8fafc",
+        tertiaryColor: "#ecfdf5"
+      }
+    });
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body {
+      color: #172033;
+      background: #f6f7f9;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .band { border-bottom: 1px solid #d9dee7; }
+    .section { scroll-margin-top: 88px; }
+    .panel { border: 1px solid #d9dee7; background: #ffffff; border-radius: 8px; }
+    .mini { font-size: 0.82rem; line-height: 1.55; }
+    .kbd {
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      border-radius: 6px;
+      padding: 0.08rem 0.36rem;
+      font-size: 0.78rem;
+      color: #334155;
+      white-space: nowrap;
+    }
+    .tag {
+      border-radius: 999px;
+      padding: 0.18rem 0.52rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .tag-blue { background: #dbeafe; color: #1e3a8a; border-color: #bfdbfe; }
+    .tag-green { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+    .tag-amber { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .tag-red { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+    .tag-slate { background: #f1f5f9; color: #334155; border-color: #cbd5e1; }
+    .toc a { color: #475569; }
+    .toc a:hover { color: #0f766e; }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      padding: 1rem;
+      background: #fbfdff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 0.72rem 0.85rem; vertical-align: top; }
+    th { background: #f8fafc; color: #334155; font-size: 0.82rem; text-align: left; }
+    td { font-size: 0.9rem; line-height: 1.55; }
+    code { color: #0f766e; }
+  </style>
+</head>
+<body>
+  <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-5 py-3">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-teal-700">stock-agent architecture</p>
+        <h1 class="text-lg font-bold text-slate-950">Multi-Agent Architecture Review</h1>
+      </div>
+      <nav class="toc hidden gap-4 text-sm font-medium lg:flex">
+        <a href="#overview">Overview</a>
+        <a href="#graph">Graph</a>
+        <a href="#agents">Agents</a>
+        <a href="#data">Data</a>
+        <a href="#prompts">Prompts</a>
+        <a href="#guardrails">Guardrails</a>
+        <a href="#roadmap">Roadmap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="band bg-white">
+      <div class="mx-auto grid max-w-7xl gap-8 px-5 py-10 lg:grid-cols-[1.25fr_0.75fr]">
+        <div>
+          <p class="text-sm font-semibold text-teal-700">팀 논의용 아키텍처 초안</p>
+          <h2 class="mt-2 max-w-4xl text-4xl font-black leading-tight text-slate-950">
+            한국 주식 투자자를 위한 PB 보조형 멀티 에이전트 분석 시스템
+          </h2>
+          <p class="mt-5 max-w-3xl text-base leading-7 text-slate-700">
+            이 문서는 현재 프로젝트의 PRD, ADR, system flow, Phase 1 pipeline을 바탕으로
+            멀티 에이전트의 큰 구조, 각 agent의 책임, LangGraph 흐름, DB 연결, prompt 운영,
+            guardrail과 평가 지표를 한 번에 논의하기 위해 정리한 자료입니다.
+          </p>
+          <div class="mt-6 flex flex-wrap gap-2">
+            <span class="tag tag-blue">Manager / Supervisor Pattern</span>
+            <span class="tag tag-green">Postgres + pgvector</span>
+            <span class="tag tag-amber">Evidence-first Output</span>
+            <span class="tag tag-red">Financial Guardrails</span>
+          </div>
+        </div>
+        <aside class="panel p-5">
+          <h3 class="text-sm font-bold text-slate-950">한 줄 결론</h3>
+          <p class="mt-3 text-sm leading-6 text-slate-700">
+            현재 프로젝트는 완전 분산형 A2A보다, <strong>Curator가 요청을 구조화하고,
+            Quant/Qual/Competitor가 병렬 분석한 뒤, Strategist가 종합하고 Guardrail이 검증하는
+            Supervisor graph</strong>가 가장 안전합니다.
+          </p>
+          <dl class="mt-5 grid gap-3 text-sm">
+            <div>
+              <dt class="font-semibold text-slate-500">현재 구현</dt>
+              <dd class="text-slate-900">순차 mock pipeline</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-500">목표 구조</dt>
+              <dd class="text-slate-900">LangGraph 병렬 fan-out + evidence/audit contract</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-slate-500">핵심 원칙</dt>
+              <dd class="text-slate-900">수치는 Python/DB, 판단은 agent, 검증은 guardrail</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+
+    <section id="overview" class="section band">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="grid gap-5 lg:grid-cols-4">
+          <article class="panel p-5">
+            <p class="tag tag-blue inline-flex">1. 입구</p>
+            <h3 class="mt-4 text-lg font-bold">Curator</h3>
+            <p class="mt-2 mini text-slate-600">자연어 질문을 종목, 의도, 분석 타입으로 구조화합니다.</p>
+          </article>
+          <article class="panel p-5">
+            <p class="tag tag-green inline-flex">2. 전문 분석</p>
+            <h3 class="mt-4 text-lg font-bold">Quant / Qual / Competitor</h3>
+            <p class="mt-2 mini text-slate-600">정량, 정성 RAG, Peer 비교를 병렬로 수행합니다.</p>
+          </article>
+          <article class="panel p-5">
+            <p class="tag tag-amber inline-flex">3. 종합</p>
+            <h3 class="mt-4 text-lg font-bold">Strategist</h3>
+            <p class="mt-2 mini text-slate-600">사용자 포트폴리오 맥락으로 BUY/HOLD/SELL 분석 신호를 만듭니다.</p>
+          </article>
+          <article class="panel p-5">
+            <p class="tag tag-red inline-flex">4. 검증</p>
+            <h3 class="mt-4 text-lg font-bold">Guardrail</h3>
+            <p class="mt-2 mini text-slate-600">투자 권유성 표현, 근거 부족, 출처 누락, PII를 검사합니다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="graph" class="section bg-white">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6 max-w-3xl">
+          <p class="text-sm font-semibold text-teal-700">LangGraph Target Design</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">메인 그래프 구조</h2>
+          <p class="mt-3 text-sm leading-6 text-slate-700">
+            MVP에서는 하나의 supervisor graph 안에서 agent를 관리합니다. A2A 같은 외부 agent protocol은
+            v2에서 외부 report agent, notification agent, backtest agent가 분리될 때 검토하는 것이 안전합니다.
+          </p>
+        </div>
+        <div class="mermaid">
+flowchart TD
+    START["User Query + User Profile + Portfolio"] --> INPUT_GUARD["Input Guardrail"]
+    INPUT_GUARD --> CURATOR["Curator Agent<br/>의도 파악 / 종목 확정 / 후보 추천"]
+    CURATOR --> ROUTE{"종목이 확정됐는가?"}
+    ROUTE -->|"No"| RECOMMEND["Candidate Recommendation<br/>5~10개 후보 생성"]
+    RECOMMEND --> STRATEGIST
+    ROUTE -->|"Yes"| FANOUT{"Parallel Fan-out"}
+    FANOUT --> QUANT["Quant Agent<br/>재무 / 시세 / 밸류에이션"]
+    FANOUT --> QUAL["Qual Agent<br/>뉴스 / 공시 RAG"]
+    FANOUT --> COMP["Competitor Agent<br/>Peer 비교"]
+    QUANT --> JOIN["Merge Analysis Results"]
+    QUAL --> JOIN
+    COMP --> JOIN
+    JOIN --> STRATEGIST["Strategist Agent<br/>종합 / 신호 생성 / 자체 검토"]
+    STRATEGIST --> OUTPUT_GUARD["Guardrail & Evaluator<br/>금융 표현 / 근거 부족 / 출처 검증"]
+    OUTPUT_GUARD -->|"Pass"| RENDER["Tier 1 / Tier 2 / Tier 3 Output"]
+    OUTPUT_GUARD -->|"Needs Revision"| STRATEGIST
+    RENDER --> END["Streamlit UI / Report"]
+        </div>
+      </div>
+    </section>
+
+    <section id="state" class="section band">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <p class="text-sm font-semibold text-teal-700">Shared Contract</p>
+            <h2 class="mt-1 text-2xl font-black text-slate-950">AgentState가 시스템의 중심</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-700">
+              멀티 에이전트에서 가장 중요한 것은 agent끼리 자유 대화하게 하는 것이 아니라,
+              모든 agent가 같은 state contract를 읽고 쓰도록 만드는 것입니다.
+            </p>
+          </div>
+          <div class="panel overflow-hidden">
+            <table>
+              <thead>
+                <tr><th>필드</th><th>역할</th><th>필요 이유</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>request_id</code></td><td>분석 요청 고유 ID</td><td>로그, 비용, 평가, 재현성 연결</td></tr>
+                <tr><td><code>as_of_date</code></td><td>분석 기준일</td><td>백테스트와 미래 데이터 차단</td></tr>
+                <tr><td><code>data_version</code></td><td>데이터 스냅샷 버전</td><td>동일 결과 재현</td></tr>
+                <tr><td><code>evidence_bundle</code></td><td>모든 출처 묶음</td><td>출처 부착률, hallucination 검사</td></tr>
+                <tr><td><code>cost_trace</code></td><td>agent별 비용/토큰</td><td>월 5만원 비용 상한 관리</td></tr>
+                <tr><td><code>errors / warnings</code></td><td>부분 실패와 경고</td><td>Tier 1 부분 응답과 운영 디버깅</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="agents" class="section bg-white">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6">
+          <p class="text-sm font-semibold text-teal-700">Agent Responsibilities</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">세부 에이전트 작동 방식</h2>
+        </div>
+
+        <div class="grid gap-5">
+          <article class="panel p-5">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-xl font-black text-slate-950">Curator Agent</h3>
+              <span class="tag tag-blue">입구 / 라우터</span>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+              <div><h4 class="font-bold">Input</h4><p class="mini text-slate-600">user_query, user_profile, portfolio, company DB</p></div>
+              <div><h4 class="font-bold">Work</h4><p class="mini text-slate-600">종목명/코드 추출, 의도 분류, 후보 추천, KRX stock_code 확정</p></div>
+              <div><h4 class="font-bold">Output</h4><p class="mini text-slate-600">intent, stock_code, corp_code, corp_name, sector, candidates</p></div>
+            </div>
+            <p class="mt-4 mini text-slate-700"><strong>Prompt 원칙:</strong> 모르면 추측하지 말고 후보를 반환한다. KRX 6자리 종목코드와 DART corp_code를 함께 반환한다.</p>
+          </article>
+
+          <article class="panel p-5">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-xl font-black text-slate-950">Quant Agent</h3>
+              <span class="tag tag-green">정량 / 계산</span>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+              <div><h4 class="font-bold">Input</h4><p class="mini text-slate-600">stock_code, corp_code, stock_price, financial_statement, raw_macro</p></div>
+              <div><h4 class="font-bold">Work</h4><p class="mini text-slate-600">PER/PBR/ROE, 성장률, 5년 valuation, 안전마진, volatility 계산</p></div>
+              <div><h4 class="font-bold">Output</h4><p class="mini text-slate-600">quant_score, valuation_signal, metrics, valuation_range, reasons, risks</p></div>
+            </div>
+            <p class="mt-4 mini text-slate-700"><strong>핵심 정책:</strong> 숫자는 LLM이 만들지 않는다. 계산은 Python/DB가 하고, LLM은 계산 결과 해석만 한다.</p>
+          </article>
+
+          <article class="panel p-5">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-xl font-black text-slate-950">Qual Agent</h3>
+              <span class="tag tag-green">뉴스 / 공시 RAG</span>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+              <div><h4 class="font-bold">Input</h4><p class="mini text-slate-600">stock_code, corp_code, query intent, rag_documents, rag_chunks</p></div>
+              <div><h4 class="font-bold">Work</h4><p class="mini text-slate-600">pgvector 검색, 호재/악재 분류, 이벤트 유형 분류, 출처 기반 요약</p></div>
+              <div><h4 class="font-bold">Output</h4><p class="mini text-slate-600">sentiment, qual_score, event_types, evidence, source_urls, risks</p></div>
+            </div>
+            <p class="mt-4 mini text-slate-700"><strong>핵심 정책:</strong> 검색된 chunk에 없는 사실은 말하지 않는다. RAG 결과가 약하면 confidence를 낮춘다.</p>
+          </article>
+
+          <article class="panel p-5">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-xl font-black text-slate-950">Competitor Agent</h3>
+              <span class="tag tag-green">Peer 비교</span>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+              <div><h4 class="font-bold">Input</h4><p class="mini text-slate-600">target stock_code, sector, company, stock_price, financial_statement</p></div>
+              <div><h4 class="font-bold">Work</h4><p class="mini text-slate-600">동종업계 peer 선정, PER/PBR/ROE/성장률 비교, 상대 위치 판단</p></div>
+              <div><h4 class="font-bold">Output</h4><p class="mini text-slate-600">peer_list, peer_metrics, relative_position, competitor_score, evidence</p></div>
+            </div>
+            <p class="mt-4 mini text-slate-700"><strong>핵심 정책:</strong> peer 선정 기준을 설명 가능하게 남긴다. 글로벌 peer는 MVP 범위 밖이면 제외한다.</p>
+          </article>
+
+          <article class="panel p-5">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-xl font-black text-slate-950">Strategist Agent</h3>
+              <span class="tag tag-amber">Supervisor / 종합</span>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+              <div><h4 class="font-bold">Input</h4><p class="mini text-slate-600">Curator, Quant, Qual, Competitor 결과 + user_profile + portfolio</p></div>
+              <div><h4 class="font-bold">Work</h4><p class="mini text-slate-600">정량/정성/Peer 종합, 포트 적합도 계산, 5가지 관점 self-critique</p></div>
+              <div><h4 class="font-bold">Output</h4><p class="mini text-slate-600">signal, confidence, suitability, headline, key_reasons, risks, next_actions</p></div>
+            </div>
+            <p class="mt-4 mini text-slate-700"><strong>핵심 정책:</strong> signal과 suitability를 분리한다. 종목은 좋아도 이미 비중이 높으면 suitability는 낮을 수 있다.</p>
+          </article>
+
+          <article class="panel p-5">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-xl font-black text-slate-950">Guardrail & Evaluator</h3>
+              <span class="tag tag-red">안전 / 평가</span>
+            </div>
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+              <div><h4 class="font-bold">Input</h4><p class="mini text-slate-600">strategist_result, evidence_bundle, user_query, policy rules</p></div>
+              <div><h4 class="font-bold">Work</h4><p class="mini text-slate-600">투자 권유성 표현 완화, 수익 보장 차단, 출처 없는 주장 검사, 평가 점수 기록</p></div>
+              <div><h4 class="font-bold">Output</h4><p class="mini text-slate-600">passed, warnings, revised_headline, disclaimer, eval_scores</p></div>
+            </div>
+            <p class="mt-4 mini text-slate-700"><strong>핵심 정책:</strong> 마지막 문장 다듬기가 아니라 금융 시스템의 runtime control layer로 설계한다.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="data" class="section band">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6 max-w-3xl">
+          <p class="text-sm font-semibold text-teal-700">Data Architecture</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">어떤 DB에서 무엇을 가져오는가</h2>
+          <p class="mt-3 text-sm leading-6 text-slate-700">
+            MVP 기본 방향은 Postgres + pgvector 단일 DB입니다. 정형 데이터는 일반 table,
+            뉴스/공시 원문과 embedding은 <code>rag_documents</code>, <code>rag_chunks</code>에서 관리합니다.
+          </p>
+        </div>
+        <div class="mermaid">
+flowchart LR
+    DART["DART<br/>재무/공시"] --> COLLECT_DART["datas/dart collectors"]
+    PYKRX["pykrx<br/>시세"] --> COLLECT_PRICE["price collector"]
+    NEWS["뉴스<br/>네이버/한경 등"] --> COLLECT_NEWS["news collector"]
+    MACRO["ECOS/FRED<br/>매크로"] --> COLLECT_MACRO["macro collector"]
+    COLLECT_DART --> PG["Postgres"]
+    COLLECT_PRICE --> PG
+    COLLECT_MACRO --> PG
+    COLLECT_NEWS --> RAW["raw_news"]
+    COLLECT_NEWS --> RAGDOC["rag_documents"]
+    RAGDOC --> CHUNK["rag_chunks + embedding"]
+    PG --> CURATOR["Curator"]
+    PG --> QUANT["Quant"]
+    PG --> COMP["Competitor"]
+    CHUNK --> QUAL["Qual RAG"]
+    RAGDOC --> QUAL
+        </div>
+
+        <div class="mt-6 panel overflow-hidden">
+          <table>
+            <thead>
+              <tr><th>테이블</th><th>주요 역할</th><th>사용 Agent</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>company</code></td><td>corp_code, stock_code, corp_name, sector</td><td>Curator, Quant, Competitor</td></tr>
+              <tr><td><code>stock_price</code></td><td>종가, 시총, 거래량, 가격 급변동 확인</td><td>Quant, Competitor, Guardrail</td></tr>
+              <tr><td><code>financial_statement</code></td><td>DART 재무제표 계정별 수치</td><td>Quant, Competitor</td></tr>
+              <tr><td><code>disclosure_report</code></td><td>DART 공시 메타데이터</td><td>Qual</td></tr>
+              <tr><td><code>disclosure_content</code></td><td>공시 원문/요약</td><td>Qual RAG</td></tr>
+              <tr><td><code>raw_news</code></td><td>뉴스 원천 데이터</td><td>Qual, 데이터 품질 확인</td></tr>
+              <tr><td><code>raw_macro</code></td><td>금리, 환율, 경기 지표</td><td>Quant, Strategist</td></tr>
+              <tr><td><code>rag_documents</code></td><td>RAG 문서 단위, title/url/date/content</td><td>Qual</td></tr>
+              <tr><td><code>rag_chunks</code></td><td>청크와 <code>vector(1024)</code> embedding</td><td>Qual similarity search</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="prompts" class="section bg-white">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <p class="text-sm font-semibold text-teal-700">Prompt Operations</p>
+            <h2 class="mt-1 text-2xl font-black text-slate-950">프롬프트는 코드 밖에서 관리</h2>
+            <p class="mt-3 text-sm leading-6 text-slate-700">
+              PM과 기획자가 함께 관리할 수 있도록 agent별 prompt를 markdown으로 분리합니다.
+              모든 prompt는 구조화 출력, 근거 제한, 모르면 모른다고 답하기, 금융 표현 제한을 포함해야 합니다.
+            </p>
+          </div>
+          <div class="panel p-5">
+            <pre class="overflow-x-auto rounded-md bg-slate-950 p-4 text-sm leading-6 text-slate-100"><code>src/stock_agent/prompts/
+├── curator/system.md
+├── quant/system.md
+├── qual/rag_summary.md
+├── competitor/system.md
+├── strategist/system.md
+├── strategist/self_critique.md
+└── guardrail/finance_policy.md</code></pre>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div class="panel p-4"><h3 class="font-bold">Role</h3><p class="mini mt-2 text-slate-600">agent가 맡은 책임을 한 문장으로 고정합니다.</p></div>
+          <div class="panel p-4"><h3 class="font-bold">Data Boundary</h3><p class="mini mt-2 text-slate-600">사용 가능한 데이터와 금지된 추정을 명시합니다.</p></div>
+          <div class="panel p-4"><h3 class="font-bold">Schema</h3><p class="mini mt-2 text-slate-600">Pydantic/JSON schema에 맞춰 반환하게 합니다.</p></div>
+          <div class="panel p-4"><h3 class="font-bold">Safety</h3><p class="mini mt-2 text-slate-600">투자 권유, 수익 보장, 출처 없는 단정을 금지합니다.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tools" class="section band">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6 max-w-3xl">
+          <p class="text-sm font-semibold text-teal-700">Tools Boundary</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">agents/와 tools/ 책임 분리</h2>
+          <p class="mt-3 text-sm leading-6 text-slate-700">
+            <code>agents/</code>에는 판단 흐름을, <code>tools/</code>에는 DB 조회, API 호출, 계산식을 둡니다.
+            이렇게 해야 agent prompt를 바꿔도 데이터 로직이 흔들리지 않습니다.
+          </p>
+        </div>
+        <div class="panel overflow-hidden">
+          <table>
+            <thead><tr><th>Tool</th><th>제공 기능</th><th>사용 Agent</th></tr></thead>
+            <tbody>
+              <tr><td><code>company_tool.py</code></td><td>종목 검색, stock_code/corp_code 조회</td><td>Curator, Competitor</td></tr>
+              <tr><td><code>price_tool.py</code></td><td>최근 가격, 가격 히스토리, 모멘텀 계산</td><td>Quant, Competitor</td></tr>
+              <tr><td><code>financial_tool.py</code></td><td>재무제표 조회, PER/PBR/ROE, valuation 계산</td><td>Quant, Competitor</td></tr>
+              <tr><td><code>rag_tool.py</code></td><td>뉴스/공시 chunk 검색, source bundle 반환</td><td>Qual</td></tr>
+              <tr><td><code>peer_tool.py</code></td><td>동종업계 peer 선정, 비교 지표 생성</td><td>Competitor</td></tr>
+              <tr><td><code>macro_tool.py</code></td><td>금리/환율/경기 지표 context 생성</td><td>Quant, Strategist</td></tr>
+              <tr><td><code>cache_tool.py</code></td><td>analysis_cache 조회/저장</td><td>Pipeline, Strategist</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="guardrails" class="section bg-white">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6 max-w-3xl">
+          <p class="text-sm font-semibold text-teal-700">Runtime Controls</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">금융 Guardrail 설계</h2>
+        </div>
+        <div class="grid gap-5 lg:grid-cols-3">
+          <article class="panel p-5">
+            <span class="tag tag-blue">Input Guardrail</span>
+            <h3 class="mt-4 text-lg font-bold">입력 단계</h3>
+            <ul class="mt-3 space-y-2 mini text-slate-700">
+              <li>PII 탐지</li>
+              <li>욕설/광고성 입력 차단</li>
+              <li>자동매매/실거래 요청 거절</li>
+              <li>존재하지 않는 종목 코드 처리</li>
+            </ul>
+          </article>
+          <article class="panel p-5">
+            <span class="tag tag-amber">Tool Guardrail</span>
+            <h3 class="mt-4 text-lg font-bold">도구 호출 단계</h3>
+            <ul class="mt-3 space-y-2 mini text-slate-700">
+              <li>DB 조회 범위 제한</li>
+              <li>비용 상한 확인</li>
+              <li>권한 없는 데이터 접근 차단</li>
+              <li>외부 API rate limit 관리</li>
+            </ul>
+          </article>
+          <article class="panel p-5">
+            <span class="tag tag-red">Output Guardrail</span>
+            <h3 class="mt-4 text-lg font-bold">출력 단계</h3>
+            <ul class="mt-3 space-y-2 mini text-slate-700">
+              <li>수익 보장 표현 차단</li>
+              <li>투자 권유성 문구 완화</li>
+              <li>출처 없는 주장 경고</li>
+              <li>근거 부족 시 HOLD 보수화</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="outputs" class="section band">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6 max-w-3xl">
+          <p class="text-sm font-semibold text-teal-700">User Output</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">Tier 1 / Tier 2 / Tier 3 결과 구조</h2>
+        </div>
+        <div class="mermaid">
+flowchart TD
+    R["분석 완료"] --> T1["Tier 1<br/>한 줄 결론"]
+    T1 --> T1A["signal / confidence / suitability<br/>headline / disclaimer"]
+    T1A --> T2["Tier 2<br/>근거 카드"]
+    T2 --> Q["정량 근거"]
+    T2 --> N["정성 근거"]
+    T2 --> P["Peer 비교"]
+    T2 --> PF["포트폴리오 적합도"]
+    T2 --> RK["리스크"]
+    Q --> T3["Tier 3<br/>산출물"]
+    N --> T3
+    P --> T3
+    PF --> T3
+    RK --> T3
+    T3 --> PDF["PB Report PDF/DOCX"]
+    T3 --> XLS["Valuation Excel"]
+    T3 --> HTML["News/Industry HTML"]
+        </div>
+      </div>
+    </section>
+
+    <section id="eval" class="section bg-white">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6 max-w-3xl">
+          <p class="text-sm font-semibold text-teal-700">Evaluation</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">팀이 합의해야 할 품질 지표</h2>
+        </div>
+        <div class="panel overflow-hidden">
+          <table>
+            <thead><tr><th>지표</th><th>의미</th><th>목표</th></tr></thead>
+            <tbody>
+              <tr><td>Schema Valid Rate</td><td>모든 agent output이 schema를 통과하는 비율</td><td>95%+</td></tr>
+              <tr><td>Source Attachment Rate</td><td>근거 문장에 source가 붙은 비율</td><td>95%+</td></tr>
+              <tr><td>RAG Faithfulness</td><td>Qual 요약이 검색 chunk에 근거하는 정도</td><td>0.80+</td></tr>
+              <tr><td>Action Consistency</td><td>같은 입력 5회 반복 시 signal 일치율</td><td>80%+</td></tr>
+              <tr><td>Guardrail Block Rate</td><td>금지 표현/자동매매 요청 차단 성공률</td><td>100%</td></tr>
+              <tr><td>Latency</td><td>캐시/Tier 1/live 응답 시간</td><td>캐시 5초, live 60초</td></tr>
+              <tr><td>Cost Per Run</td><td>1회 분석 비용과 agent별 비용 비중</td><td>월 5만원 이하</td></tr>
+              <tr><td>Tier Consistency</td><td>Tier 1 결론과 Tier 3 리포트 결론 일치</td><td>90%+</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="roadmap" class="section band">
+      <div class="mx-auto max-w-7xl px-5 py-10">
+        <div class="mb-6 max-w-3xl">
+          <p class="text-sm font-semibold text-teal-700">Recommended Roadmap</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">아키텍처 우선순위</h2>
+        </div>
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div class="panel p-5"><span class="tag tag-blue">1</span><h3 class="mt-4 font-bold">Schema 확정</h3><p class="mini mt-2 text-slate-600">AgentState와 Result schema에 evidence/audit 필드 추가</p></div>
+          <div class="panel p-5"><span class="tag tag-blue">2</span><h3 class="mt-4 font-bold">DB 매핑 확정</h3><p class="mini mt-2 text-slate-600">각 agent가 어떤 table을 읽는지 합의</p></div>
+          <div class="panel p-5"><span class="tag tag-blue">3</span><h3 class="mt-4 font-bold">Prompt 구조 확정</h3><p class="mini mt-2 text-slate-600">agent별 system prompt와 finance policy 분리</p></div>
+          <div class="panel p-5"><span class="tag tag-blue">4</span><h3 class="mt-4 font-bold">Tool 책임 분리</h3><p class="mini mt-2 text-slate-600">DB/API/계산은 tools, 판단은 agents</p></div>
+          <div class="panel p-5"><span class="tag tag-green">5</span><h3 class="mt-4 font-bold">LangGraph 설계</h3><p class="mini mt-2 text-slate-600">Curator 이후 Quant/Qual/Competitor 병렬 fan-out</p></div>
+          <div class="panel p-5"><span class="tag tag-green">6</span><h3 class="mt-4 font-bold">Evidence log</h3><p class="mini mt-2 text-slate-600">출처, 기준일, data_version, cost trace 저장</p></div>
+          <div class="panel p-5"><span class="tag tag-green">7</span><h3 class="mt-4 font-bold">Evaluation</h3><p class="mini mt-2 text-slate-600">golden set과 지표를 먼저 작게 운영</p></div>
+          <div class="panel p-5"><span class="tag tag-amber">8</span><h3 class="mt-4 font-bold">Implementation</h3><p class="mini mt-2 text-slate-600">mock agent를 실제 DB/LLM/tool 연결로 교체</p></div>
+        </div>
+
+        <div class="mt-8 panel p-5">
+          <h3 class="text-lg font-black text-slate-950">팀 논의용 최종 문장</h3>
+          <p class="mt-3 text-sm leading-7 text-slate-700">
+            우리는 6-agent 구조를 유지한다. Curator는 질문을 분석 요청으로 바꾸고,
+            Quant/Qual/Competitor는 병렬로 전문 분석을 수행하고, Strategist는 사용자 포트폴리오 맥락으로 종합하며,
+            Guardrail은 금융 표현과 근거 품질을 최종 검증한다. 모든 agent는 schema로 대화하고,
+            모든 수치 계산은 Python/DB가 하며, 모든 정성 판단은 RAG evidence를 가져야 한다.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-slate-950 px-5 py-8 text-slate-300">
+    <div class="mx-auto max-w-7xl">
+      <p class="text-sm">
+        stock-agent Multi-Agent Architecture Review · 팀 논의용 초안 · 본 시스템 출력은 투자 권유가 아니라 데이터 기반 분석 신호입니다.
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
