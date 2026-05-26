@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PR #20 PM Alignment Review</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: "default", securityLevel: "loose" });
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased">
+  <main class="mx-auto max-w-7xl px-6 py-8">
+    <header class="mb-8 border-b border-slate-200 pb-7">
+      <p class="text-sm font-bold uppercase tracking-wide text-blue-700">Lead PM Review</p>
+      <h1 class="mt-2 text-4xl font-black tracking-tight text-slate-950">PR #20 Multi-Agent Architecture</h1>
+      <p class="mt-4 max-w-4xl text-base leading-7 text-slate-600">
+        이 문서는 PR #20을 단순 요약하는 문서가 아니라, PM으로서 어디까지 동의하고 어디부터 구현 전 합의가 필요한지 정리한 회의용 리뷰 문서입니다.
+      </p>
+      <div class="mt-5 flex flex-wrap gap-2 text-xs font-bold">
+        <span class="rounded-md bg-green-100 px-3 py-1.5 text-green-800">Direction Approved</span>
+        <span class="rounded-md bg-blue-100 px-3 py-1.5 text-blue-800">Baseline, Not Implementation Approval</span>
+        <span class="rounded-md bg-red-100 px-3 py-1.5 text-red-800">No A2A For MVP</span>
+        <span class="rounded-md bg-amber-100 px-3 py-1.5 text-amber-800">Decisions Must Be Closed</span>
+      </div>
+    </header>
+
+    <section class="mb-8 grid gap-4 md:grid-cols-4">
+      <article class="rounded-lg border border-green-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-black uppercase tracking-wide text-green-700">Agree</h2>
+        <p class="mt-3 text-sm leading-6 text-slate-700">
+          PR #20의 큰 방향은 맞다. MVP 구조의 기준선으로 승인한다.
+        </p>
+      </article>
+      <article class="rounded-lg border border-red-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-black uppercase tracking-wide text-red-700">Block</h2>
+        <p class="mt-3 text-sm leading-6 text-slate-700">
+          MVP에서 A2A/full decentralized agents는 제외한다. 지금은 너무 이르다.
+        </p>
+      </article>
+      <article class="rounded-lg border border-amber-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-black uppercase tracking-wide text-amber-700">Need Decision</h2>
+        <p class="mt-3 text-sm leading-6 text-slate-700">
+          AgentState, evidence, Guardrail, cost, partial failure, evaluation gate를 먼저 닫는다.
+        </p>
+      </article>
+      <article class="rounded-lg border border-blue-200 bg-white p-5 shadow-sm">
+        <h2 class="text-sm font-black uppercase tracking-wide text-blue-700">My Position</h2>
+        <p class="mt-3 text-sm leading-6 text-slate-700">
+          이 PR은 구현 승인 아니라 architecture baseline 승인이다.
+        </p>
+      </article>
+    </section>
+
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <p class="text-sm font-bold text-blue-700">Approved MVP Flow</p>
+      <h2 class="mt-1 text-2xl font-black text-slate-950">작업반장 구조로 간다</h2>
+      <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
+        어렵게 말하면 LangGraph central supervisor pattern이고, 쉽게 말하면 작업반장이 일을 나눠주고 결과를 모아 검수하는 구조입니다.
+      </p>
+      <div class="mermaid mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+flowchart TD
+    START([User Query + Portfolio]) --> CURATOR[Curator<br/>질문을 주문서로 정리]
+    CURATOR --> FANOUT{Parallel fan-out}
+    FANOUT --> QUANT[Quant<br/>숫자 계산]
+    FANOUT --> QUAL[Qual<br/>뉴스/공시 근거]
+    FANOUT --> COMP[Competitor<br/>동종업계 비교]
+    QUANT --> JOIN((Merge))
+    QUAL --> JOIN
+    COMP --> JOIN
+    JOIN --> STRAT[Strategist<br/>종합 판단]
+    STRAT --> GUARD[Guardrail<br/>최종 검수]
+    GUARD --> OUTPUT[Tier 1 / Tier 2 / Tier 3]
+      </div>
+    </section>
+
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <p class="text-sm font-bold text-blue-700">PM Opinion</p>
+      <h2 class="mt-1 text-2xl font-black text-slate-950">내가 동의하는 것과 우려하는 것</h2>
+      <div class="mt-5 grid gap-4 lg:grid-cols-2">
+        <article class="rounded-lg border border-green-200 bg-green-50 p-5">
+          <h3 class="font-black text-green-950">동의하는 것</h3>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-green-950">
+            <li>MVP는 central supervisor 구조가 맞다.</li>
+            <li>Quant/Qual/Competitor를 specialist로 나눈 것은 좋다.</li>
+            <li>계산은 tools/DB, 정성 근거는 RAG, 종합은 Strategist, 검수는 Guardrail로 나누는 방향이 맞다.</li>
+            <li>Prompt와 schema를 분리하는 방향은 PM 리뷰에도 도움이 된다.</li>
+          </ul>
+        </article>
+        <article class="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h3 class="font-black text-amber-950">우려하는 것</h3>
+          <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-amber-950">
+            <li>AgentState가 아직 PB report와 UI까지 고려한 계약인지 불명확하다.</li>
+            <li>Guardrail이 구체적인 차단/완화 정책 없이 구호로 남을 수 있다.</li>
+            <li>Evidence contract가 없으면 Tier 3 보고서의 설득력이 약해진다.</li>
+            <li>일부 agent 실패 시 전체를 막을지 warning으로 진행할지 정책이 필요하다.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <p class="text-sm font-bold text-blue-700">Plain Language</p>
+      <h2 class="mt-1 text-2xl font-black text-slate-950">어려운 용어 쉽게 풀기</h2>
+      <div class="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">AgentState</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">agent들이 함께 쓰는 공용 작업일지입니다. 이 일지가 부실하면 UI와 PB report도 부실해집니다.</p>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">Evidence bundle</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">보고서에 붙는 영수증입니다. 어떤 근거로 말했는지 확인할 수 있어야 합니다.</p>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">Guardrail</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">사용자에게 결과가 나가기 전 마지막 검수대입니다. 위험한 표현과 출처 없는 단정을 막습니다.</p>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">Faithfulness</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">RAG가 찾은 근거 안에 있는 말만 했는지 보는 지표입니다. hallucination 방지의 핵심입니다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <p class="text-sm font-bold text-blue-700">Decision Tickets</p>
+      <h2 class="mt-1 text-2xl font-black text-slate-950">구현 전에 닫아야 할 이슈</h2>
+      <div class="mt-5 space-y-4">
+        <article class="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h3 class="font-black text-amber-950">NEED-DECISION-001: [Architecture] AgentState와 report-ready result schema 확정</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">request_id, as_of_date, data_version, mode, evidence_bundle, cost_trace, errors, warnings를 포함할지 결정한다. AgentState는 공용 작업일지다.</p>
+        </article>
+        <article class="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h3 class="font-black text-amber-950">NEED-DECISION-002: [Architecture] Evidence bundle과 source attachment contract 확정</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">source_type, title, url/document_id, published_at, chunk_id, retrieval_score를 포함한 source contract를 확정한다. Evidence bundle은 보고서의 영수증이다.</p>
+        </article>
+        <article class="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h3 class="font-black text-amber-950">NEED-DECISION-003: [Guardrail] Input/Tool/Output Guardrail enforcement plan 확정</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">무엇을 block하고, 무엇을 warning으로 통과시키고, disclaimer를 언제 붙일지 결정한다. Guardrail은 마지막 검수대다.</p>
+        </article>
+        <article class="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h3 class="font-black text-amber-950">NEED-DECISION-004: [LLM] Cost trace와 월 5만원 상한 정책 구현 기준 확정</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">agent별 token/cost, cache hit, 3만원/4만원/5만원 임계 동작을 정한다. 비용 추적은 가계부다.</p>
+        </article>
+        <article class="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h3 class="font-black text-amber-950">NEED-DECISION-005: [Architecture] Partial Success with Warnings 정책 채택 여부 결정</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">Quant 실패처럼 일부 실패는 warning으로 진행하고, Strategist/Guardrail 실패는 block할지 결정한다.</p>
+        </article>
+        <article class="rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h3 class="font-black text-amber-950">NEED-DECISION-006: [Evaluation] MVP evaluation gate 확정</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">RAG Faithfulness를 Qual hallucination 방지의 최우선 gate로 둔다. 검색 근거에 없는 말은 만들면 안 된다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <p class="text-sm font-bold text-blue-700">Recommended Failure Policy</p>
+      <h2 class="mt-1 text-2xl font-black text-slate-950">Partial Success with Warnings</h2>
+      <div class="mt-5 overflow-hidden rounded-lg border border-slate-200">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-slate-100 text-slate-700">
+            <tr>
+              <th class="px-4 py-3">상황</th>
+              <th class="px-4 py-3">내 제안</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 bg-white">
+            <tr>
+              <td class="px-4 py-3 font-bold">Quant 실패, Qual/Competitor 성공</td>
+              <td class="px-4 py-3">분석 진행. 정량 근거 부족 warning과 confidence 하향.</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 font-bold">Qual RAG 실패</td>
+              <td class="px-4 py-3">정성 요약 생성 금지. source 부족 warning 표시.</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 font-bold">Competitor 실패</td>
+              <td class="px-4 py-3">Peer 비교만 제외하고 진행.</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 font-bold">Strategist 실패</td>
+              <td class="px-4 py-3">최종 signal 생성 불가. 결과 block.</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 font-bold">Guardrail 실패</td>
+              <td class="px-4 py-3">사용자-facing 출력 block.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <p class="text-sm font-bold text-blue-700">Benchmark Basis</p>
+      <h2 class="mt-1 text-2xl font-black text-slate-950">내 판단 근거</h2>
+      <div class="mt-5 grid gap-4 md:grid-cols-2">
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">LangGraph</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">stateful workflow와 병렬 fan-out에 맞다. 우리 MVP의 central supervisor 기준과 맞는다.</p>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">OpenAI Agents</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">manager가 specialist output을 모으는 방식이 우리 Strategist 구조와 맞다.</p>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">OpenAI Guardrails</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">input/tool/output guardrail을 나누는 방향이 우리 금융 안전 계층과 맞다.</p>
+        </article>
+        <article class="rounded-lg border border-slate-200 p-5">
+          <h3 class="font-black">Ragas / 금융 AI 기준</h3>
+          <p class="mt-2 text-sm leading-6 text-slate-700">RAG Faithfulness, model risk, data privacy, reliability, accuracy를 MVP gate에 반영해야 한다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="mb-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <p class="text-sm font-bold text-blue-700">Meeting Script</p>
+      <h2 class="mt-1 text-2xl font-black text-slate-950">회의에서 내가 말할 문장</h2>
+      <pre class="mt-5 whitespace-pre-wrap rounded-lg bg-slate-950 p-5 text-sm leading-6 text-slate-100">저는 PR #20의 큰 방향에는 동의합니다.
+MVP에서는 Curator -> Quant/Qual/Competitor 병렬 -> Strategist -> Guardrail 구조를 기준선으로 잡는 게 맞다고 봅니다.
+
+다만 이것은 구현 승인이라기보다는 architecture baseline 승인입니다.
+구현 전에 AgentState, evidence contract, Guardrail enforcement, cost trace, partial failure policy, evaluation gate는 별도 이슈로 닫고 가야 합니다.
+
+특히 MVP에서 A2A/full decentralized agents는 제외했으면 합니다.
+지금 우리 구조는 Streamlit + Postgres + 단일 repo이기 때문에 central supervisor가 더 안전합니다.
+
+또 하나 중요한 건 RAG Faithfulness입니다.
+Qual agent가 검색된 근거에 없는 내용을 만들어내면 금융 분석 제품에서는 가장 위험한 문제가 됩니다.
+그래서 Ragas Faithfulness를 MVP 최우선 evaluation gate로 두는 것을 제안합니다.</pre>
+    </section>
+  </main>
+</body>
+</html>
