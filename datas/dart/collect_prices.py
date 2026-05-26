@@ -1,13 +1,11 @@
 import os
 import time
-import random
 import psycopg2
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# 1. pykrx 로드 전 환경변수 가장 먼저 세팅
 load_dotenv()
 from pykrx import stock
 
@@ -20,12 +18,14 @@ def collect_stock_prices():
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
-        # 이전에 한 것에 이어서 진행
-        cursor.execute("SELECT stock_code, corp_name FROM company WHERE stock_code IS NOT NULL;")
-        all_companies = cursor.fetchall()
-        
-        # 💡 [수정] 60개의 데이터를 건너뛰고 61번째(인덱스 60)부터 끝까지 가져옵니다.
-        companies = all_companies[60:]
+        cursor.execute("""
+            SELECT stock_code, corp_name 
+            FROM company 
+            WHERE stock_code IS NOT NULL
+            ORDER BY stock_code
+            OFFSET 139;
+        """)
+        companies = cursor.fetchall()
         
         if not companies:
             print("대상 상장사가 없습니다. 0탄 수집을 먼저 확인하세요.")
@@ -34,12 +34,11 @@ def collect_stock_prices():
         print(f"DB 연결 실패: {e}")
         return
 
-    # 기본 3년 범위 설정
+    # 최근 6개월 수정
     end_date = datetime.today()
-    begin_date = end_date - timedelta(days=3 * 365)
+    begin_date = end_date - timedelta(days=180)
     default_start_str, default_end_str = begin_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d")
 
-    # UPSERT 쿼리
     insert_query = """
         INSERT INTO stock_price (
             stock_code, base_date, close_price, market_cap, volume, 
@@ -62,10 +61,8 @@ def collect_stock_prices():
     for idx, (stock_code, corp_name) in enumerate(companies, 1):
         print(f"\n[{idx}/{len(companies)}] {corp_name} ({stock_code}) 데이터 수집 중...")
         try:
-            # 💡 [개선 1] 딜레이 최소화 (기본 1.5초만 대기해서 IP 차단 최소선만 유지)
             time.sleep(1.5) 
             
-            # 1. 필수 주가 및 시가총액
             df_ohlcv = stock.get_market_ohlcv_by_date(default_start_str, default_end_str, stock_code)
             df_cap = stock.get_market_cap_by_date(default_start_str, default_end_str, stock_code)
             
@@ -78,7 +75,6 @@ def collect_stock_prices():
                 
             df_total = df_ohlcv[['종가', '거래량']].join(df_cap['시가총액'], how='left')
 
-            # 2. 퀀트 지표 (에러 시 패스)
             try:
                 df_fund = stock.get_market_fundamental_by_date(real_start_str, real_end_str, stock_code)
                 if df_fund is not None and not df_fund.empty:
@@ -89,7 +85,6 @@ def collect_stock_prices():
             except Exception:
                 pass
 
-            # 3. 매매동향 (에러 시 패스)
             try:
                 df_trading = stock.get_market_trading_value_by_date(real_start_str, real_end_str, stock_code)
                 if df_trading is not None and not df_trading.empty:
@@ -100,7 +95,6 @@ def collect_stock_prices():
             except Exception:
                 pass
 
-            # 4. 공매도 비중 (💡 [개선 2] 재시도 제거, 실패 시 대기 없이 0.1초 만에 패스)
             try:
                 df_short = stock.get_shorting_volume_by_date(real_start_str, real_end_str, stock_code)
                 if df_short is not None and not df_short.empty:
@@ -113,13 +107,10 @@ def collect_stock_prices():
                         df_total = df_total.join(df_short[[short_col]].rename(columns={short_col: '비중'}), how='left')
                         print(f"  -> 공매도 지표 결합 성공")
             except Exception:
-                # 💡 에러 로그 출력 생략하고 즉시 다음 단계 전진
                 print(f"  -> 공매도 제외 (데이터 없음 혹은 차단)")
 
-            # 결측치 변환
             df_total = df_total.replace([np.nan, np.inf, -np.inf], None)
 
-            # 5. DB 적재
             inserted_count = 0
             for date, row in df_total.iterrows():
                 r = row.to_dict()
@@ -145,11 +136,10 @@ def collect_stock_prices():
             conn.commit()
             print(f"  -> Supabase 테이블 적재 최종 완료 ({inserted_count}건)")
             
-            # 💡 [pocat 게릴라 전략] 안전하게 70개 수집 완료 시 자율 종료
-            if idx >= 130:
+            if idx >= 70:
                 print(f"\n🔒 [안전 방어벽] 지정된 목표치 {idx}개에 도달하여 프로세스를 자율 종료합니다.")
                 print("⏳ 1시간 후에 OFFSET을 수정하여 다음 턴을 실행해 주세요!")
-                break # 루프를 탈출하여 하단의 DB 연결 종료 구문으로 이동
+                break 
             
         except Exception as e:
             conn.rollback()
