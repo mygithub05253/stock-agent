@@ -103,6 +103,40 @@ def test_relative_position_scores_target_against_peers() -> None:
     assert position.relative_position["operating_margin_percentile"] >= 0.5
 
 
+def test_relative_position_returns_zero_when_no_comparable_peers() -> None:
+    target = calculate_metric_row(
+        CompanyPeer(corp_code="1", stock_code="AAA001", corp_name="Target", sector="test"),
+        PriceSnapshot(stock_code="AAA001", base_date="2026-05-25", close_price=1, market_cap=1000, volume=1),
+        FinancialSnapshot(
+            corp_code="1",
+            bsns_year=2025,
+            revenue=100,
+            operating_income=20,
+            net_income=10,
+            equity=100,
+            liabilities=20,
+        ),
+        FinancialSnapshot(
+            corp_code="1",
+            bsns_year=2024,
+            revenue=90,
+            operating_income=18,
+            net_income=9,
+            equity=90,
+            liabilities=20,
+        ),
+    )
+
+    position = calculate_relative_position([target], "AAA001")
+
+    assert position.score == 0
+    assert position.relative_position["valuation_percentile"] is None
+    assert position.relative_position["data_quality_score"] == 100
+    assert "no_comparable_peers" in position.data_quality_flags
+    assert "peer_count_below_minimum" in position.data_quality_flags
+    assert position.a1_peer_multiple_payload == {"median_per": None, "median_pbr": None}
+
+
 def test_median_or_none_ignores_none_values() -> None:
     assert median_or_none([None, 10.0, 20.0]) == 15.0
     assert median_or_none([None, None]) is None
@@ -293,3 +327,60 @@ def test_build_peer_comparison_orchestrates_loaders_and_returns_position(monkeyp
     assert "peer_count_below_minimum" in comparison.warnings
     assert comparison.evidence
     assert comparison.a1_peer_multiple_payload == {"median_per": 107.5, "median_pbr": 10.75}
+
+
+def test_build_peer_comparison_limits_score_when_no_peers(monkeypatch) -> None:
+    target = CompanyPeer(corp_code="1", stock_code="AAA001", corp_name="Target", sector=None)
+
+    def fake_load_target_company(conn, stock_code):
+        assert stock_code == "AAA001"
+        return target
+
+    def fake_load_latest_prices(conn, stock_codes):
+        assert stock_codes == ["AAA001"]
+        return {
+            "AAA001": PriceSnapshot(
+                stock_code="AAA001",
+                base_date="2026-05-25",
+                close_price=100,
+                market_cap=1_000,
+                volume=10,
+            )
+        }
+
+    def fake_load_financial_snapshots(conn, corp_codes, lookback_years=3):
+        assert corp_codes == ["1"]
+        return {
+            "1": (
+                FinancialSnapshot(
+                    corp_code="1",
+                    bsns_year=2025,
+                    revenue=100,
+                    operating_income=20,
+                    net_income=10,
+                    equity=100,
+                    liabilities=20,
+                ),
+                FinancialSnapshot(
+                    corp_code="1",
+                    bsns_year=2024,
+                    revenue=90,
+                    operating_income=18,
+                    net_income=9,
+                    equity=90,
+                    liabilities=20,
+                ),
+            )
+        }
+
+    monkeypatch.setattr(peer_tool, "load_target_company", fake_load_target_company)
+    monkeypatch.setattr(peer_tool, "load_latest_prices", fake_load_latest_prices)
+    monkeypatch.setattr(peer_tool, "load_financial_snapshots", fake_load_financial_snapshots)
+
+    comparison = peer_tool.build_peer_comparison(object(), "AAA001")
+
+    assert comparison.score == 0
+    assert comparison.peers == []
+    assert "sector_missing" in comparison.warnings
+    assert "peer_count_below_minimum" in comparison.warnings
+    assert "no_comparable_peers" in comparison.data_quality_flags

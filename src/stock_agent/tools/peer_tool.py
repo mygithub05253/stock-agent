@@ -22,6 +22,7 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 PEER_SUMMARY_FLAG_MESSAGES: dict[str, str] = {
+    "no_comparable_peers": "비교 가능한 peer가 없어 상대 위치를 계산하지 못했습니다.",
     "peer_count_below_minimum": "비교 가능한 peer 수가 부족해 결과 해석이 제한적입니다.",
     "sector_missing": "섹터 정보가 없어 자동 peer 선정이 제한되었습니다.",
     "target_data_quality_low": "대상 종목의 핵심 지표가 부족해 점수를 보수적으로 해석해야 합니다.",
@@ -138,7 +139,7 @@ def _percentile(values: list[float], target: float, higher_is_better: bool) -> f
 
 
 def _metric_percentile(rows: list[PeerMetricRow], target: PeerMetricRow, metric: str, higher_is_better: bool) -> float:
-    values = [getattr(row, metric) for row in rows]
+    values = [getattr(row, metric) for row in rows if row.stock_code != target.stock_code]
     numeric_values = [float(value) for value in values if value is not None]
     target_value = getattr(target, metric)
     if target_value is None or not numeric_values:
@@ -217,6 +218,27 @@ def calculate_metric_row(
 
 def calculate_relative_position(rows: list[PeerMetricRow], target_stock_code: str) -> PeerPosition:
     target = next(row for row in rows if row.stock_code == target_stock_code)
+    peer_rows = [row for row in rows if row.stock_code != target_stock_code]
+
+    if not peer_rows:
+        flags = _dedupe([*target.metric_flags, "no_comparable_peers", "peer_count_below_minimum"])
+        return PeerPosition(
+            score=0,
+            relative_position={
+                "valuation_percentile": None,
+                "roe_percentile": None,
+                "growth_percentile": None,
+                "operating_margin_percentile": None,
+                "balance_sheet_percentile": None,
+                "data_quality_score": target.data_quality_score,
+            },
+            evidence=[
+                f"{target.corp_name}은 비교 가능한 peer가 없어 상대 위치를 계산하지 못했습니다.",
+                f"데이터 완성도 점수는 {target.data_quality_score}점입니다.",
+            ],
+            data_quality_flags=flags,
+            a1_peer_multiple_payload={"median_per": None, "median_pbr": None},
+        )
 
     valuation_position = (
         _metric_percentile(rows, target, "per", higher_is_better=False)
@@ -245,7 +267,6 @@ def calculate_relative_position(rows: list[PeerMetricRow], target_stock_code: st
         flags.append("target_data_quality_low")
         score = min(score, 55)
 
-    peer_rows = [row for row in rows if row.stock_code != target_stock_code]
     median_per = median_or_none([row.per for row in peer_rows])
     median_pbr = median_or_none([row.pbr for row in peer_rows])
 
@@ -257,12 +278,6 @@ def calculate_relative_position(rows: list[PeerMetricRow], target_stock_code: st
         "balance_sheet_percentile": rounded(balance_sheet_position),
         "data_quality_score": target.data_quality_score,
     }
-
-    evidence = [
-        f"{target.corp_name}의 peer 대비 valuation 위치는 {round(valuation_position * 100)} 분위입니다.",
-        f"ROE 기준 peer 내 위치는 {round(profitability_position * 100)} 분위입니다.",
-        f"데이터 완성도 점수는 {target.data_quality_score}점입니다.",
-    ]
 
     evidence = [
         f"{target.corp_name}의 peer 대비 밸류에이션 위치는 {round(valuation_position * 100)}분위입니다.",

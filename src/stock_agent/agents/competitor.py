@@ -11,6 +11,27 @@ except ModuleNotFoundError as exc:
         raise RuntimeError("psycopg is required to connect to the DB.")
 
 
+_DB_FALLBACK_MARKERS = (
+    "authentication",
+    "connection",
+    "connectionerror",
+    "database",
+    "db",
+    "interfaceerror",
+    "operationalerror",
+    "psycopg",
+    "timeout",
+)
+
+
+def _is_expected_fallback_error(exc: Exception) -> bool:
+    if isinstance(exc, (ConnectionError, OSError, TimeoutError)):
+        return True
+
+    error_text = f"{exc.__class__.__name__}: {exc}".lower()
+    return any(marker in error_text for marker in _DB_FALLBACK_MARKERS)
+
+
 def _peer_row_to_dict(row) -> dict[str, float | int | str | None]:
     return {
         "stock_code": row.stock_code,
@@ -156,6 +177,8 @@ def run_competitor(state: AgentState) -> AgentState:
             )
         state.competitor = _result_from_comparison(comparison)
     except Exception as exc:
+        if not _is_expected_fallback_error(exc):
+            raise
         state.competitor = _mock_fallback_result(f"{exc.__class__.__name__}: {exc}")
 
     return state

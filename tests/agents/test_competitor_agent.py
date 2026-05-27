@@ -144,3 +144,28 @@ def test_run_competitor_uses_explicit_mock_fallback_when_db_fails(monkeypatch) -
     assert state.competitor.peer_selection_summary is not None
     assert "fallback" in state.competitor.peer_selection_summary.lower()
     assert any("fallback" in flag.lower() for flag in state.competitor.data_quality_flags)
+
+
+def test_run_competitor_reraises_unexpected_internal_error(monkeypatch) -> None:
+    class FakeConnection:
+        def __enter__(self):
+            return "fake-conn"
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_get_connection():
+        return FakeConnection()
+
+    def failing_build_peer_comparison(conn, stock_code, sector):
+        raise ValueError("calculation contract changed")
+
+    monkeypatch.setattr(competitor_module, "get_connection", fake_get_connection)
+    monkeypatch.setattr(competitor_module, "build_peer_comparison", failing_build_peer_comparison)
+
+    state = _state_with_curator()
+
+    with pytest.raises(ValueError, match="calculation contract changed"):
+        competitor_module.run_competitor(state)
+
+    assert state.competitor is None
