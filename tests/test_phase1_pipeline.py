@@ -1,4 +1,5 @@
 from stock_agent.graph import run_phase1_analysis
+from stock_agent.schemas import UserProfile
 
 
 def test_phase1_analysis_returns_guarded_tier1() -> None:
@@ -21,3 +22,22 @@ def test_phase1_analysis_uses_candidates_when_stock_is_missing() -> None:
     assert output.state.curator is not None
     assert output.state.curator.candidates
     assert output.tier1.confidence > 0
+
+
+def test_user_profile_accepts_phase1_intake_fields() -> None:
+    profile = UserProfile(
+        risk_tolerance="low",
+        investment_horizon_months=24,
+        target_return_rate=0.08,
+        max_drawdown_tolerance=-0.1,
+        investment_goal="wealth_preservation",
+        experience_level="beginner",
+        preferred_sectors=["반도체", "금융"],
+        excluded_sectors=["바이오"],
+        liquidity_need_level="high",
+    )
+
+    assert profile.risk_tolerance == "low"
+    assert profile.target_return_rate == 0.08
+    assert profile.max_drawdown_tolerance == -0.1
+    assert profile.preferred_sectors == ["반도체", "금융"]

@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 
 Signal = Literal["BUY", "HOLD", "SELL"]
 RiskTolerance = Literal["low", "medium", "high"]
+InvestmentGoal = Literal["wealth_preservation", "growth", "short_term_profit", "dividend"]
+ExperienceLevel = Literal["beginner", "intermediate", "advanced"]
+LiquidityNeedLevel = Literal["low", "medium", "high"]
 
 
 class Holding(BaseModel):
@@ -20,8 +23,14 @@ class UserProfile(BaseModel):
     user_id: str = "demo-user"
     risk_tolerance: RiskTolerance = "medium"
     investment_horizon_months: int = Field(default=12, ge=1)
+    target_return_rate: float | None = Field(default=None, ge=0, le=1)
+    max_drawdown_tolerance: float | None = Field(default=None, ge=-1, le=0)
+    investment_goal: InvestmentGoal = "growth"
+    experience_level: ExperienceLevel = "beginner"
     cash_source: str = "surplus_cash"
     preferred_sectors: list[str] = Field(default_factory=list)
+    excluded_sectors: list[str] = Field(default_factory=list)
+    liquidity_need_level: LiquidityNeedLevel = "medium"
 
 
 class Portfolio(BaseModel):
