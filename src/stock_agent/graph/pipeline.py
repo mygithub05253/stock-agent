@@ -2,6 +2,7 @@ from stock_agent.agents import (
     run_competitor,
     run_curator,
     run_guardrail,
+    run_investment_analyst,
     run_qual,
     run_quant,
     run_request_classifier,
@@ -78,6 +79,7 @@ def run_phase1_analysis(
     state = run_qual(state)
     state = run_competitor(state)
     state = run_strategist(state)
+    state = run_investment_analyst(state)
     state = run_guardrail(state)
 
     if state.strategist is None or state.guardrail is None:

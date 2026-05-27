@@ -9,6 +9,7 @@ from stock_agent.intake import (
     onboarding_card_count,
     parse_holdings_text,
 )
+from stock_agent.llm.glm_client import _api_key_for_header, _strip_json_fence
 from stock_agent.schemas import AgentState, Holding, Portfolio, UserProfile, UserRequest
 
 
@@ -53,6 +54,11 @@ def test_user_profile_accepts_phase1_intake_fields() -> None:
     assert profile.target_return_rate == 0.08
     assert profile.max_drawdown_tolerance == -0.1
     assert profile.preferred_sectors == ["반도체", "금융"]
+
+
+def test_glm_client_normalizes_key_and_json_fence() -> None:
+    assert _api_key_for_header("glm:abc.def") == "abc.def"
+    assert _strip_json_fence('```json\n{"ok": true}\n```') == '{"ok": true}'
 
 
 def test_portfolio_holding_calculates_basic_values() -> None:

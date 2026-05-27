@@ -11,6 +11,7 @@
 | `investor_profile.py` | Investor Profile Agent | 온보딩 답변을 투자성향, 투자기간, 손실감내, 유동성 니즈로 구조화 | W3 (Routing) |
 | `curator.py` | Curator Agent | 사용자 자연어와 포트폴리오를 보고 분석 대상 종목/후보 큐레이션 | W3 (ReAct) |
 | `request_classifier.py` | Request Classifier Agent | 질문을 intent, analysis_scope, urgency_reason으로 구조화 | W3 (Routing) |
+| `investment_analyst.py` | Investment Analyst Agent | GLM으로 투자성향·포트폴리오·분석 근거를 종합해 최종 신호 보정 | W3 (Reasoning) |
 | `qual.py` ⭐ | Qual Worker Agent | 뉴스·공시 RAG + 호재/악재 센티먼트 분석 | **W1 + W3** (핵심) |
 | `quant.py` | Quant Worker Agent | DART 재무 + pykrx 시세 → PER/PBR/성장률 계산, 5y 밸류에이션 | W3 (Tool) |
 | `competitor.py` | Competitor Agent | 동종업계 Peer 추출 + 횡비교 Heatmap | W1 (Hybrid Search) |
@@ -26,6 +27,7 @@
 | Investor Profile | 사용자 답변을 `UserProfile`로 구조화 | 종목 분석, 매수/매도 판단 |
 | Curator | 분석 대상 종목과 후보 확정 | 질문 intent 분류, 정량 계산, 최종 투자 판단 |
 | Request Classifier | 질문 intent, scope, urgency 분류 | 종목 lookup, 정량 계산, 최종 투자 판단 |
+| Investment Analyst | GLM으로 최종 분석 신호와 포트폴리오 적합도 보정 | 근거 없는 숫자/뉴스 생성, 확정 투자권유 |
 | Quant | 재무·시세 계산과 정량 해석 | LLM으로 숫자 생성 |
 | Qual | RAG 검색 결과 기반 정성 분석 | 출처 없는 뉴스 요약 |
 | Competitor | 같은 섹터 peer 선정과 비교 | 임의 peer 생성, 글로벌 peer 확장 |

@@ -287,13 +287,14 @@ def _ensure_initial_analysis_output(user_profile: UserProfile, portfolio: Portfo
         st.write("InvestorProfile Agent: 투자성향 context 준비")
         st.write("Curator Agent: 분석 대상 종목/후보 탐색")
         st.write("RequestClassifier Agent: 질문 intent/scope/urgency 분류")
+        st.write("Quant, Qual, Competitor Worker: 기초 분석 생성")
+        st.write("InvestmentAnalyst Agent: GLM 기반 투자 분석 보정")
+        st.write("Strategist, Guardrail: 최종 결과와 안전 문구 생성")
         output = run_phase1_analysis(
             _build_initial_query(portfolio),
             user_profile=user_profile,
             portfolio=portfolio,
         )
-        st.write("Quant, Qual, Competitor Worker: mock 분석 실행")
-        st.write("Strategist, Guardrail: 최종 결과와 안전 문구 생성")
         status.update(label="에이전트 파이프라인 완료", state="complete", expanded=False)
     st.session_state["analysis_output"] = output
 
