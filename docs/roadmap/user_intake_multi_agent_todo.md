@@ -112,15 +112,15 @@ DB schema는 팀 합의 후 별도 PR로 진행한다. Phase 0 기준 책임 범
 
 ### Phase 1. UserProfile 확장
 
-- [ ] `risk_tolerance` 기준 확정: `low`, `medium`, `high`
-- [ ] `investment_horizon_months` 유지 또는 단기/중기/장기 enum 변환 여부 결정
-- [ ] `target_return_rate` 추가
-- [ ] `max_drawdown_tolerance` 추가
-- [ ] `investment_goal` 추가
-- [ ] `experience_level` 추가
-- [ ] `preferred_sectors`를 MVP 산업 범위에 맞게 정리: 반도체, 금융
-- [ ] `excluded_sectors` 필요 여부 검토
-- [ ] schema 변경에 맞춘 테스트 추가
+- [x] `risk_tolerance` 기준 확정: `low`, `medium`, `high`
+- [x] `investment_horizon_months` 유지 또는 단기/중기/장기 enum 변환 여부 결정
+- [x] `target_return_rate` 추가
+- [x] `max_drawdown_tolerance` 추가
+- [x] `investment_goal` 추가
+- [x] `experience_level` 추가
+- [x] `preferred_sectors`를 MVP 산업 범위에 맞게 정리: 반도체, 금융
+- [x] `excluded_sectors` 필요 여부 검토
+- [x] schema 변경에 맞춘 테스트 추가
 
 ### Phase 2. Portfolio / Holding 확장
 
