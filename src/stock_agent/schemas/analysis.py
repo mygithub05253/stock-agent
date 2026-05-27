@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -15,8 +16,24 @@ LiquidityNeedLevel = Literal["low", "medium", "high"]
 class Holding(BaseModel):
     stock_code: str
     corp_name: str
-    weight: float = Field(ge=0, le=1)
-    avg_price: int | None = None
+    sector: str | None = None
+    weight: float | None = Field(default=None, ge=0, le=1)
+    avg_price: int | None = Field(default=None, ge=0)
+    qty: int | None = Field(default=None, ge=0)
+    bought_at: date | None = None
+    current_price: int | None = Field(default=None, ge=0)
+
+    @property
+    def cost_basis(self) -> int | None:
+        if self.avg_price is None or self.qty is None:
+            return None
+        return self.avg_price * self.qty
+
+    @property
+    def market_value(self) -> int | None:
+        if self.current_price is None or self.qty is None:
+            return None
+        return self.current_price * self.qty
 
 
 class UserProfile(BaseModel):
@@ -36,6 +53,28 @@ class UserProfile(BaseModel):
 class Portfolio(BaseModel):
     holdings: list[Holding] = Field(default_factory=list)
     cash_weight: float = Field(default=0.2, ge=0, le=1)
+    as_of_date: date | None = None
+
+    @property
+    def total_market_value(self) -> int | None:
+        values = [holding.market_value for holding in self.holdings]
+        if any(value is None for value in values):
+            return None
+        return sum(value for value in values if value is not None)
+
+    def sector_weights(self) -> dict[str, float]:
+        valued_holdings = [
+            holding for holding in self.holdings if holding.sector and holding.market_value is not None
+        ]
+        total_value = sum(holding.market_value or 0 for holding in valued_holdings)
+        if total_value <= 0:
+            return {}
+
+        weights: dict[str, float] = {}
+        for holding in valued_holdings:
+            sector = holding.sector or "기타"
+            weights[sector] = weights.get(sector, 0.0) + (holding.market_value or 0) / total_value
+        return weights
 
 
 class CuratorResult(BaseModel):

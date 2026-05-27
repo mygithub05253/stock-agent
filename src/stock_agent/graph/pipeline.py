@@ -27,8 +27,24 @@ def build_demo_profile() -> tuple[UserProfile, Portfolio]:
         ),
         Portfolio(
             holdings=[
-                Holding(stock_code="005930", corp_name="삼성전자", weight=0.32, avg_price=72000),
-                Holding(stock_code="000660", corp_name="SK하이닉스", weight=0.18, avg_price=185000),
+                Holding(
+                    stock_code="005930",
+                    corp_name="삼성전자",
+                    sector="반도체",
+                    weight=0.32,
+                    avg_price=72000,
+                    qty=10,
+                    current_price=78000,
+                ),
+                Holding(
+                    stock_code="000660",
+                    corp_name="SK하이닉스",
+                    sector="반도체",
+                    weight=0.18,
+                    avg_price=185000,
+                    qty=3,
+                    current_price=201000,
+                ),
             ],
             cash_weight=0.2,
         ),
