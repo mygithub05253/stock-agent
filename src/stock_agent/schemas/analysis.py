@@ -104,6 +104,7 @@ class CuratorResult(BaseModel):
     corp_code: str | None = None
     sector: str
     candidates: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class QuantResult(BaseModel):

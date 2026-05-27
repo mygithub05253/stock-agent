@@ -21,6 +21,8 @@ def test_phase1_analysis_uses_candidates_when_stock_is_missing() -> None:
 
     assert output.state.curator is not None
     assert output.state.curator.candidates
+    assert output.state.user_request is not None
+    assert output.state.user_request.intent == "portfolio_review"
     assert output.tier1.confidence > 0
 
 
@@ -81,3 +83,13 @@ def test_phase1_analysis_attaches_user_request() -> None:
 
     assert output.state.user_request is not None
     assert output.state.user_request.raw_query == "삼성전자 봐줘"
+
+
+def test_curator_matches_non_samsung_holding_from_query() -> None:
+    output = run_phase1_analysis("SK하이닉스 비중 괜찮아?")
+
+    assert output.state.curator is not None
+    assert output.state.curator.stock_code == "000660"
+    assert output.state.curator.sector == "반도체"
+    assert output.state.user_request is not None
+    assert output.state.user_request.target_corp_name == "SK하이닉스"
