@@ -192,6 +192,7 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     with col_next:
         if st.button("투자성향 확인", type="primary", disabled=not portfolio.holdings):
             st.session_state["intake_portfolio"] = portfolio.model_dump(mode="json")
+            st.session_state.pop("analysis_output", None)
             st.session_state["intake_stage"] = "analysis"
             st.rerun()
 
@@ -224,6 +225,25 @@ def _render_portfolio_summary(portfolio: Portfolio) -> None:
             st.progress(weight, text=f"{sector} {weight:.0%}")
 
 
+def _build_initial_query(portfolio: Portfolio) -> str:
+    if portfolio.holdings:
+        names = ", ".join(holding.corp_name for holding in portfolio.holdings[:3])
+        return f"{names} 보유 포트폴리오를 투자성향 기준으로 먼저 점검해줘"
+    return "현재 포트폴리오를 투자성향 기준으로 먼저 점검해줘"
+
+
+def _ensure_initial_analysis_output(user_profile: UserProfile, portfolio: Portfolio) -> None:
+    if st.session_state.get("analysis_output") is not None:
+        return
+    with st.spinner("저장된 포트폴리오를 먼저 분석하는 중..."):
+        output = run_phase1_analysis(
+            _build_initial_query(portfolio),
+            user_profile=user_profile,
+            portfolio=portfolio,
+        )
+    st.session_state["analysis_output"] = output
+
+
 def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> None:
     _render_profile_summary(user_profile)
     st.success(
@@ -231,6 +251,9 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
     )
     st.subheader("3. 저장된 포트폴리오")
     _render_portfolio_summary(portfolio)
+
+    _ensure_initial_analysis_output(user_profile, portfolio)
+    _render_output()
 
     st.subheader("4. 대화형 질문")
     if st.session_state["intake_messages"]:
@@ -261,9 +284,11 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
                         ),
                     }
                 )
+            st.rerun()
     with col_edit:
         if st.button("포트폴리오 다시 입력"):
             st.session_state["intake_stage"] = "portfolio"
+            st.session_state.pop("analysis_output", None)
             st.rerun()
 
 
@@ -274,7 +299,6 @@ def _render_output() -> None:
         return
 
     tier1 = output.tier1
-    st.divider()
     st.subheader("분석 결과")
     col_signal, col_confidence, col_suitability = st.columns(3)
     col_signal.markdown(_signal_badge(tier1.signal), unsafe_allow_html=True)
@@ -321,7 +345,6 @@ def main() -> None:
             st.session_state["intake_stage"] = "portfolio"
             st.rerun()
         _render_analysis_step(user_profile, portfolio)
-        _render_output()
 
 
 if __name__ == "__main__":
