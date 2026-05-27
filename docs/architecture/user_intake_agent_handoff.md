@@ -328,7 +328,7 @@ MVP에서는 DB 저장 전까지 Streamlit session/mock 객체로 유지하고, 
 
 ## 4. Question Routing
 
-Curator는 질문을 다음 기준으로 분기한다.
+Request Classifier는 Curator가 찾은 대상 종목/후보를 바탕으로 질문을 다음 기준으로 분기한다.
 
 | 분기 필드 | 값 | 감지 기준 | 후속 처리 |
 |-----------|----|-----------|-----------|
@@ -343,7 +343,7 @@ Curator는 질문을 다음 기준으로 분기한다.
 | `urgency_reason` | `news` | `뉴스`, `공시`, `이슈` | Qual/RAG 중심 |
 | `urgency_reason` | `general` | 위 조건 없음 | 일반 분석 |
 
-현재 Phase 1은 모든 route가 같은 mock pipeline을 탄다. 후속 구현에서는 `intent`와 `urgency_reason`에 따라 UI 강조 영역과 agent 호출 깊이를 바꾼다.
+현재 Phase 1의 Request Classifier는 LLM 호출이 아니라 deterministic rule-based node다. 후속 구현에서는 `src/stock_agent/llm/` adapter를 통해 GLM/LLM 기반 분류로 교체하고, `intent`와 `urgency_reason`에 따라 UI 강조 영역과 agent 호출 깊이를 바꾼다.
 
 ---
 
