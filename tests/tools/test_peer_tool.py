@@ -1,3 +1,4 @@
+from stock_agent.tools import peer_tool
 from stock_agent.tools.peer_tool import (
     CompanyPeer,
     FinancialSnapshot,
@@ -105,3 +106,162 @@ def test_relative_position_scores_target_against_peers() -> None:
 def test_median_or_none_ignores_none_values() -> None:
     assert median_or_none([None, 10.0, 20.0]) == 15.0
     assert median_or_none([None, None]) is None
+
+
+def test_select_peer_rows_excludes_target_and_prefers_quality_then_market_cap_proximity() -> None:
+    target = peer_tool.PeerMetricRow(
+        corp_code="1",
+        stock_code="AAA001",
+        corp_name="Target",
+        sector="semiconductor",
+        market_cap=1_000,
+        data_quality_score=100,
+    )
+    low_quality_close_peer = peer_tool.PeerMetricRow(
+        corp_code="2",
+        stock_code="BBB001",
+        corp_name="Lower Quality Close",
+        sector="semiconductor",
+        market_cap=1_010,
+        data_quality_score=60,
+    )
+    high_quality_far_peer = peer_tool.PeerMetricRow(
+        corp_code="3",
+        stock_code="CCC001",
+        corp_name="High Quality Far",
+        sector="semiconductor",
+        market_cap=5_000,
+        data_quality_score=90,
+    )
+    high_quality_close_peer = peer_tool.PeerMetricRow(
+        corp_code="4",
+        stock_code="DDD001",
+        corp_name="High Quality Close",
+        sector="semiconductor",
+        market_cap=1_050,
+        data_quality_score=90,
+    )
+
+    selected = peer_tool.select_peer_rows(
+        target,
+        [target, low_quality_close_peer, high_quality_far_peer, high_quality_close_peer],
+        max_peer_count=2,
+    )
+
+    assert [row.stock_code for row in selected] == ["DDD001", "CCC001"]
+
+
+def test_build_peer_summary_mentions_peer_count_and_warnings() -> None:
+    target = peer_tool.PeerMetricRow(
+        corp_code="1",
+        stock_code="AAA001",
+        corp_name="Target",
+        sector="semiconductor",
+        data_quality_score=100,
+    )
+
+    summary = peer_tool.build_peer_summary(
+        target,
+        peer_count=2,
+        data_quality_flags=["peer_count_below_minimum", "sector_missing"],
+    )
+
+    assert "2개" in summary
+    assert "peer_count_below_minimum" in summary
+    assert "sector_missing" in summary
+
+
+def test_build_peer_comparison_orchestrates_loaders_and_returns_position(monkeypatch) -> None:
+    target = CompanyPeer(corp_code="1", stock_code="AAA001", corp_name="Target", sector=None)
+    peers = [
+        CompanyPeer(corp_code="2", stock_code="BBB001", corp_name="Peer B", sector="semiconductor"),
+        CompanyPeer(corp_code="3", stock_code="CCC001", corp_name="Peer C", sector="semiconductor"),
+        CompanyPeer(corp_code="4", stock_code="DDD001", corp_name="Peer D", sector="semiconductor"),
+    ]
+
+    def fake_load_target_company(conn, stock_code):
+        assert stock_code == "AAA001"
+        return target
+
+    def fake_load_peer_candidates(conn, target_company, max_peer_count=8):
+        assert target_company.sector == "semiconductor"
+        return peers
+
+    def fake_load_latest_prices(conn, stock_codes):
+        assert stock_codes == ["AAA001", "BBB001", "CCC001", "DDD001"]
+        return {
+            "AAA001": PriceSnapshot(
+                stock_code="AAA001",
+                base_date="2026-05-25",
+                close_price=100,
+                market_cap=1_000,
+                volume=10,
+            ),
+            "BBB001": PriceSnapshot(
+                stock_code="BBB001",
+                base_date="2026-05-25",
+                close_price=100,
+                market_cap=1_050,
+                volume=10,
+            ),
+            "CCC001": PriceSnapshot(
+                stock_code="CCC001",
+                base_date="2026-05-25",
+                close_price=100,
+                market_cap=1_100,
+                volume=10,
+            ),
+            "DDD001": PriceSnapshot(
+                stock_code="DDD001",
+                base_date="2026-05-25",
+                close_price=100,
+                market_cap=5_000,
+                volume=10,
+            ),
+        }
+
+    def fake_load_financial_snapshots(conn, corp_codes, lookback_years=3):
+        assert corp_codes == ["1", "2", "3", "4"]
+        assert lookback_years == 3
+        return {
+            corp_code: (
+                FinancialSnapshot(
+                    corp_code=corp_code,
+                    bsns_year=2025,
+                    revenue=100,
+                    operating_income=20,
+                    net_income=10,
+                    equity=100,
+                    liabilities=20,
+                ),
+                FinancialSnapshot(
+                    corp_code=corp_code,
+                    bsns_year=2024,
+                    revenue=90,
+                    operating_income=18,
+                    net_income=9,
+                    equity=90,
+                    liabilities=20,
+                ),
+            )
+            for corp_code in ["1", "2", "3", "4"]
+        }
+
+    monkeypatch.setattr(peer_tool, "load_target_company", fake_load_target_company)
+    monkeypatch.setattr(peer_tool, "load_peer_candidates", fake_load_peer_candidates)
+    monkeypatch.setattr(peer_tool, "load_latest_prices", fake_load_latest_prices)
+    monkeypatch.setattr(peer_tool, "load_financial_snapshots", fake_load_financial_snapshots)
+
+    comparison = peer_tool.build_peer_comparison(
+        object(),
+        "AAA001",
+        sector="semiconductor",
+        min_peer_count=3,
+        max_peer_count=2,
+    )
+
+    assert comparison.score > 0
+    assert [row.stock_code for row in comparison.peers] == ["BBB001", "CCC001"]
+    assert "peer_count_below_minimum" in comparison.warnings
+    assert comparison.evidence
+    assert comparison.a1_peer_multiple_payload == {"median_per": 107.5, "median_pbr": 10.75}
