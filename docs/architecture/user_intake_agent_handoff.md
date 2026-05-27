@@ -120,7 +120,7 @@ User Intake / Curator 단계는 사용자 입력을 다음 agent들이 처리하
 | 단계형 수집 UX | 뉴스 카드처럼 질문 하나를 읽고 답하면 다음 카드로 넘어간다. |
 | 메모리 우선 저장 | DB 확정 전까지 `st.session_state`에 `profile`, `portfolio`, `messages`를 저장한다. |
 | 성향 자동 추론 | 사용자가 직접 안정형/공격형을 고르지 않고, 답변 점수로 `risk_tolerance`를 추론한다. |
-| 보유 종목 자연어 입력 | `삼성전자 10주, SK하이닉스 3주` 같은 입력을 구조화한다. |
+| 보유 종목 선택 입력 | 사용자가 종목을 고르고 수량과 현금 비중을 입력하면 포트폴리오를 구조화한다. |
 | 질문 분기 | 이후 질문을 `intent`, `analysis_scope`, `urgency_reason`으로 나눈다. |
 | 다음 agent handoff | `UserProfile`, `Portfolio`, `UserRequest`, `CuratorResult`를 기존 pipeline에 넘긴다. |
 
@@ -178,9 +178,19 @@ Streamlit 메모리는 다음 key를 사용한다.
 | 투자 기간 3개월 이하 | `high`가 나와도 `medium` 이하 |
 | 3년 이상 + 여유자금 + 하락 시 추가 매수 | `high` 가능 |
 
-#### Step 3. 보유 종목 자연어 파싱
+#### Step 3. 보유 종목 입력
 
-1차 MVP에서는 정규식 기반으로 처리한다.
+1차 MVP에서는 직접 타이핑보다 선택형 입력을 기본으로 둔다. 종목명을 자유 입력하면 오타, 종목명 약칭, 중복 입력 처리가 어려워지기 때문이다.
+
+기본 입력:
+
+| 입력 | 방식 |
+|------|------|
+| 종목 | selectbox |
+| 수량 | number_input |
+| 현금 비중 | slider |
+
+보조 입력으로 자연어 파서도 유지한다. CLI demo나 후속 채팅형 입력에서 사용할 수 있다.
 
 입력 예시:
 
@@ -197,11 +207,18 @@ Streamlit 메모리는 다음 key를 사용한다.
 ]
 ```
 
-제한:
+선택형 입력의 장점:
 
-- 평균 매수가는 사용자가 주지 않으면 mock 현재가를 기본값으로 둔다.
-- 종목 master는 현재 `_STOCK_OPTIONS` 또는 Curator alias와 맞춘다.
-- 파싱 실패한 항목은 warning으로 보여준다.
+- 사용자가 입력하기 쉽다.
+- 지원 종목 범위를 명확히 제한할 수 있다.
+- 중복 종목과 수량 validation이 단순하다.
+- DB의 `company` 테이블과 연결하기 쉽다.
+
+현재 제한:
+
+- 평균 매수가는 mock 현재가를 기본값으로 둔다.
+- 종목 master는 `STOCK_CATALOG`에 하드코딩되어 있다.
+- 후속 단계에서 `company` DB lookup으로 바꾼다.
 
 #### Step 4. 포트폴리오 요약 카드
 
@@ -246,7 +263,7 @@ Streamlit 메모리는 다음 key를 사용한다.
 | Phase 0 | 큰 계획/세부 계획 문서화 | 이 문서에 단계형 카드/추론/저장 전략 반영 |
 | Phase 1 | 카드 정의와 성향 추론 도메인 로직 | `infer_user_profile()` 테스트 통과 |
 | Phase 2 | 단계형 Streamlit 온보딩 UI | 한 번에 카드 하나만 렌더링 |
-| Phase 3 | 보유 종목 입력/요약 연결 | 자연어 보유 종목 파싱과 요약 카드 표시 |
+| Phase 3 | 보유 종목 입력/요약 연결 | 선택형 종목/수량/현금비중 입력과 요약 카드 표시 |
 | Phase 4 | 질문 분류/분석 pipeline 연결 | 질문 실행 후 `UserRequest` 분류 표시 |
 | Phase 5 | 전체 검증/로컬 실행 | pytest, py_compile, AppTest, localhost 확인 |
 
@@ -255,7 +272,8 @@ Streamlit 메모리는 다음 key를 사용한다.
 - [ ] 한 번에 하나씩 보이는 단계형 카드 UI 추가
 - [ ] 룰 기반 투자성향 추론 추가
 - [ ] `st.session_state`에 profile/portfolio/messages 저장
-- [ ] `삼성전자 10주, SK하이닉스 3주` 형태의 보유 종목 입력 파서 추가
+- [ ] 선택형 종목/수량/현금비중 입력 추가
+- [ ] `삼성전자 10주, SK하이닉스 3주` 형태의 보유 종목 입력 파서는 보조 기능으로 유지
 - [ ] 포트폴리오 요약 카드 추가
 - [ ] 질문 입력 시 기존 `run_phase1_analysis()` 연결
 

@@ -194,6 +194,19 @@ def build_holding_weights(holdings: list[Holding]) -> list[Holding]:
     ]
 
 
+def build_holding_from_selection(corp_name: str, qty: int) -> Holding:
+    meta = STOCK_CATALOG[corp_name]
+    current_price = int(meta["current_price"])
+    return Holding(
+        stock_code=str(meta["stock_code"]),
+        corp_name=str(meta.get("corp_name", corp_name)),
+        sector=str(meta["sector"]),
+        avg_price=current_price,
+        qty=qty,
+        current_price=current_price,
+    )
+
+
 def build_portfolio_from_text(text: str, cash_weight: float = 0.2) -> tuple[Portfolio, list[str]]:
     result = parse_holdings_text(text)
     return Portfolio(holdings=result.holdings, cash_weight=cash_weight), result.warnings

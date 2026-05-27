@@ -1,6 +1,7 @@
 from stock_agent.graph import run_phase1_analysis
 from stock_agent.intake import (
     ONBOARDING_CARDS,
+    build_holding_from_selection,
     build_portfolio_from_text,
     infer_user_profile,
     onboarding_card_count,
@@ -76,6 +77,14 @@ def test_parse_holdings_text_extracts_supported_stocks() -> None:
     assert [holding.corp_name for holding in result.holdings] == ["삼성전자", "SK하이닉스"]
     assert [holding.qty for holding in result.holdings] == [10, 3]
     assert round(sum(holding.weight or 0 for holding in result.holdings), 6) == 1
+
+
+def test_build_holding_from_selection_uses_catalog_price() -> None:
+    holding = build_holding_from_selection("삼성전자", 10)
+
+    assert holding.stock_code == "005930"
+    assert holding.qty == 10
+    assert holding.market_value == 780000
 
 
 def test_build_portfolio_from_text_returns_warnings_for_unknown_items() -> None:

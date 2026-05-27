@@ -2,7 +2,9 @@ import streamlit as st
 
 from stock_agent.graph import run_phase1_analysis
 from stock_agent.intake import (
-    build_portfolio_from_text,
+    STOCK_CATALOG,
+    build_holding_from_selection,
+    build_holding_weights,
     get_onboarding_card,
     infer_user_profile,
     onboarding_card_count,
@@ -24,8 +26,8 @@ def _init_intake_state() -> None:
     st.session_state.setdefault("onboarding_step", 0)
     st.session_state.setdefault("onboarding_answers", {})
     st.session_state.setdefault("inferred_profile", None)
-    st.session_state.setdefault("holdings_text", "삼성전자 10주, SK하이닉스 3주")
     st.session_state.setdefault("cash_weight", 0.2)
+    st.session_state.setdefault("selected_holding_count", 2)
     st.session_state.setdefault("intake_portfolio", None)
     st.session_state.setdefault("intake_messages", [])
 
@@ -36,8 +38,8 @@ def _reset_intake() -> None:
         "onboarding_step",
         "onboarding_answers",
         "inferred_profile",
-        "holdings_text",
         "cash_weight",
+        "selected_holding_count",
         "intake_portfolio",
         "analysis_output",
         "intake_messages",
@@ -129,13 +131,17 @@ def _render_profile_summary(user_profile: UserProfile) -> None:
 def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     _render_profile_summary(user_profile)
     st.subheader("3. 보유 종목 입력")
-    holdings_text = st.text_area(
-        "보유 종목을 알려주세요",
-        value=st.session_state["holdings_text"],
-        placeholder="예: 삼성전자 10주, SK하이닉스 3주",
-        height=90,
+    st.caption("종목을 고르고 수량만 입력하면 현재 mock 가격 기준으로 평가금액과 비중을 계산합니다.")
+
+    stock_names = [name for name, meta in STOCK_CATALOG.items() if "corp_name" not in meta]
+    holding_count = st.number_input(
+        "보유 종목 수",
+        min_value=1,
+        max_value=5,
+        value=st.session_state["selected_holding_count"],
+        step=1,
     )
-    st.session_state["holdings_text"] = holdings_text
+    st.session_state["selected_holding_count"] = int(holding_count)
 
     cash_weight = st.slider(
         "현금 비중",
@@ -145,15 +151,46 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     ) / 100
     st.session_state["cash_weight"] = cash_weight
 
-    portfolio, warnings = build_portfolio_from_text(holdings_text, cash_weight=cash_weight)
-    if warnings:
-        for warning in warnings:
-            st.warning(warning)
+    selected_holdings = []
+    selected_codes: set[str] = set()
+    duplicate_names: list[str] = []
+    for index in range(int(holding_count)):
+        col_stock, col_qty = st.columns([2, 1])
+        with col_stock:
+            default_index = min(index, len(stock_names) - 1)
+            corp_name = st.selectbox(
+                f"종목 {index + 1}",
+                options=stock_names,
+                index=default_index,
+                key=f"selected_corp_name_{index}",
+            )
+        with col_qty:
+            qty = st.number_input(
+                "수량",
+                min_value=1,
+                value=10 if index == 0 else 3,
+                step=1,
+                key=f"selected_qty_{index}",
+            )
 
+        holding = build_holding_from_selection(corp_name, int(qty))
+        if holding.stock_code in selected_codes:
+            duplicate_names.append(holding.corp_name)
+            continue
+        selected_codes.add(holding.stock_code)
+        selected_holdings.append(holding)
+
+    if duplicate_names:
+        st.warning(f"중복 선택된 종목은 한 번만 반영했습니다: {', '.join(duplicate_names)}")
+
+    portfolio = Portfolio(
+        holdings=build_holding_weights(selected_holdings),
+        cash_weight=cash_weight,
+    )
     if portfolio.holdings:
         _render_portfolio_summary(portfolio)
     else:
-        st.info("예시처럼 `삼성전자 10주, SK하이닉스 3주` 형태로 입력해 주세요.")
+        st.info("보유 종목을 1개 이상 선택해 주세요.")
 
     col_back, col_next = st.columns([1, 1])
     with col_back:
@@ -161,7 +198,7 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
             st.session_state["intake_stage"] = "onboarding"
             st.rerun()
     with col_next:
-        if st.button("포트폴리오 저장", type="primary", disabled=not portfolio.holdings):
+        if st.button("투자성향 확인", type="primary", disabled=not portfolio.holdings):
             st.session_state["intake_portfolio"] = portfolio.model_dump(mode="json")
             st.session_state["intake_stage"] = "analysis"
             st.rerun()
@@ -197,12 +234,20 @@ def _render_portfolio_summary(portfolio: Portfolio) -> None:
 
 def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> None:
     _render_profile_summary(user_profile)
+    st.success(
+        f"답변을 바탕으로 현재 투자성향은 {_format_risk_label(user_profile.risk_tolerance)}으로 추론했습니다."
+    )
     st.subheader("3. 저장된 포트폴리오")
     _render_portfolio_summary(portfolio)
 
-    st.subheader("4. 질문 입력")
+    st.subheader("4. 대화형 질문")
+    if st.session_state["intake_messages"]:
+        for message in st.session_state["intake_messages"]:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+
     query = st.text_input(
-        "이제 궁금한 점을 질문해 주세요",
+        "궁금한 점을 입력해 주세요",
         value="삼성전자 급등했는데 안정형이면 어떻게 할까?",
         placeholder="예: SK하이닉스 비중 괜찮아?",
     )
@@ -214,6 +259,16 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
             with st.spinner("에이전트 파이프라인 실행 중..."):
                 output = run_phase1_analysis(query, user_profile=user_profile, portfolio=portfolio)
             st.session_state["analysis_output"] = output
+            if output.state.user_request:
+                st.session_state["intake_messages"].append(
+                    {
+                        "role": "assistant",
+                        "content": (
+                            f"질문 유형은 {output.state.user_request.intent}, "
+                            f"긴급도는 {output.state.user_request.urgency_reason}로 분류했어요."
+                        ),
+                    }
+                )
     with col_edit:
         if st.button("포트폴리오 다시 입력"):
             st.session_state["intake_stage"] = "portfolio"
