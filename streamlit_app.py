@@ -1,7 +1,34 @@
 import streamlit as st
 
-from stock_agent.graph import build_demo_profile, run_phase1_analysis
+from stock_agent.graph import run_phase1_analysis
+from stock_agent.intake import (
+    STOCK_CATALOG,
+    build_holding_from_selection,
+    build_holding_weights,
+    get_stock_options,
+    get_onboarding_card,
+    infer_user_profile,
+    onboarding_card_count,
+)
 from stock_agent.schemas import Portfolio, UserProfile
+
+
+_DEFAULT_QTY_BY_CORP = {
+    "SK하이닉스": 2,
+    "삼성전자": 3,
+    "한미반도체": 2,
+    "KB금융": 5,
+    "신한지주": 5,
+}
+
+
+_DEFAULT_AVG_PRICE_RATIO_BY_CORP = {
+    "SK하이닉스": 0.92,
+    "삼성전자": 0.95,
+    "한미반도체": 0.9,
+    "KB금융": 0.94,
+    "신한지주": 0.96,
+}
 
 
 def _signal_badge(signal: str) -> str:
@@ -13,61 +40,321 @@ def _signal_badge(signal: str) -> str:
     )
 
 
-def main() -> None:
-    st.set_page_config(
-        page_title="stock-agent - 포트폴리오 분석",
-        page_icon="📊",
-        layout="wide",
+def _init_intake_state() -> None:
+    st.session_state.setdefault("intake_stage", "onboarding")
+    st.session_state.setdefault("onboarding_step", 0)
+    st.session_state.setdefault("onboarding_answers", {})
+    st.session_state.setdefault("inferred_profile", None)
+    st.session_state.setdefault("cash_amount", 0)
+    st.session_state.setdefault("intake_portfolio", None)
+    st.session_state.setdefault("intake_messages", [])
+
+
+def _reset_intake() -> None:
+    for key in [
+        "intake_stage",
+        "onboarding_step",
+        "onboarding_answers",
+        "inferred_profile",
+        "cash_amount",
+        "intake_portfolio",
+        "analysis_output",
+        "intake_messages",
+    ]:
+        st.session_state.pop(key, None)
+    _init_intake_state()
+
+
+def _format_risk_label(risk_tolerance: str) -> str:
+    return {"low": "안정형", "medium": "중립형", "high": "공격형"}.get(
+        risk_tolerance,
+        risk_tolerance,
     )
 
-    demo_profile, demo_portfolio = build_demo_profile()
 
-    with st.sidebar:
-        st.subheader("MVP 사용자 데이터")
-        risk_label = st.selectbox(
-            "위험 감내도",
-            options=["medium", "low", "high"],
-            format_func={"low": "낮음", "medium": "보통", "high": "높음"}.get,
+def _render_onboarding_step() -> None:
+    total_steps = onboarding_card_count()
+    step = st.session_state["onboarding_step"]
+    card = get_onboarding_card(step)
+    answers = st.session_state["onboarding_answers"]
+
+    st.subheader(f"1. 투자 성향 질문 {step + 1}/{total_steps}")
+    st.progress((step + 1) / total_steps)
+    st.markdown(f"### {card['question']}")
+
+    options = card["options"]
+    labels = [option["label"] for option in options]
+    current_value = answers.get(card["id"])
+    current_index = 0
+    if current_value is not None:
+        for index, option in enumerate(options):
+            if option["value"] == current_value:
+                current_index = index
+                break
+
+    selected_label = st.radio(
+        "답변을 선택해 주세요",
+        options=labels,
+        index=current_index,
+        label_visibility="collapsed",
+        key=f"onboarding_card_{card['id']}",
+    )
+    selected_option = options[labels.index(selected_label)]
+
+    col_prev, col_next, col_reset = st.columns([1, 1, 1])
+    with col_prev:
+        if st.button("이전", disabled=step == 0):
+            st.session_state["onboarding_step"] = max(0, step - 1)
+            st.rerun()
+    with col_next:
+        next_label = "성향 분석" if step == total_steps - 1 else "다음"
+        if st.button(next_label, type="primary"):
+            answers[card["id"]] = selected_option["value"]
+            st.session_state["onboarding_answers"] = answers
+            if step == total_steps - 1:
+                profile = infer_user_profile(answers)
+                st.session_state["inferred_profile"] = profile.model_dump(mode="json")
+                st.session_state["intake_stage"] = "portfolio"
+            else:
+                st.session_state["onboarding_step"] = step + 1
+            st.rerun()
+    with col_reset:
+        if st.button("처음부터"):
+            _reset_intake()
+            st.rerun()
+
+
+def _get_inferred_profile() -> UserProfile:
+    profile_data = st.session_state.get("inferred_profile")
+    if not profile_data:
+        return infer_user_profile(st.session_state["onboarding_answers"])
+    return UserProfile(**profile_data)
+
+
+def _render_profile_summary(user_profile: UserProfile) -> None:
+    st.subheader("2. 투자 성향 분석 에이전트 결과")
+    col_risk, col_horizon, col_loss = st.columns(3)
+    col_risk.metric("투자성향", _format_risk_label(user_profile.risk_tolerance))
+    col_horizon.metric("투자 기간", f"{user_profile.investment_horizon_months}개월")
+    loss_label = (
+        f"{user_profile.max_drawdown_tolerance:.0%}"
+        if user_profile.max_drawdown_tolerance is not None
+        else "미정"
+    )
+    col_loss.metric("손실 감내", loss_label)
+    with st.status("InvestorProfile Agent 완료", state="complete", expanded=False):
+        st.write("온보딩 답변 점수화")
+        st.write("투자 기간, 손실 감내, 유동성 필요도 보정")
+        st.write("최종 투자성향과 목표수익률 산출")
+
+
+def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
+    _render_profile_summary(user_profile)
+    st.subheader("3. 보유 종목 입력")
+    st.caption("후보 산업을 고르면 시가총액 상위 후보 10개 안에서 종목을 선택할 수 있습니다.")
+
+    selected_sectors = st.multiselect(
+        "후보 산업",
+        options=["반도체", "금융"],
+        default=user_profile.preferred_sectors or ["반도체", "금융"],
+    )
+    if not selected_sectors:
+        selected_sectors = ["반도체", "금융"]
+        st.info("후보 산업을 최소 1개 이상 선택해야 해서 전체 후보를 보여줍니다.")
+
+    stock_names = get_stock_options(selected_sectors, limit=10)
+
+    selected_holdings = []
+    st.write("보유 종목")
+    for row_start in range(0, len(stock_names), 2):
+        row_columns = st.columns(2, gap="medium")
+        for column, corp_name in zip(row_columns, stock_names[row_start : row_start + 2], strict=False):
+            with column:
+                current_price = int(STOCK_CATALOG[corp_name]["current_price"])
+                default_avg_price = int(
+                    current_price * _DEFAULT_AVG_PRICE_RATIO_BY_CORP.get(corp_name, 1.0)
+                )
+                name_col, qty_col, price_col = st.columns([1.35, 0.75, 1])
+                with name_col:
+                    st.markdown(f"**{corp_name}**")
+                    st.caption(f"현재가 {current_price:,}원")
+                with qty_col:
+                    qty = st.number_input(
+                        f"{corp_name} 수량",
+                        min_value=0,
+                        value=_DEFAULT_QTY_BY_CORP.get(corp_name, 0),
+                        step=1,
+                        label_visibility="visible",
+                        key=f"stock_qty_{corp_name}",
+                    )
+                with price_col:
+                    avg_price = st.number_input(
+                        f"{corp_name} 평단가",
+                        min_value=0,
+                        value=default_avg_price,
+                        step=1000,
+                        format="%d",
+                        label_visibility="visible",
+                        key=f"stock_avg_price_{corp_name}",
+                    )
+                if qty > 0:
+                    selected_holdings.append(
+                        build_holding_from_selection(corp_name, int(qty), avg_price=int(avg_price))
+                    )
+
+    holdings_value = sum(holding.market_value or 0 for holding in selected_holdings)
+    cash_amount = st.number_input(
+        "보유 현금",
+        min_value=0,
+        value=st.session_state["cash_amount"],
+        step=100000,
+        format="%d",
+    )
+    st.session_state["cash_amount"] = int(cash_amount)
+    total_assets = holdings_value + int(cash_amount)
+    cash_weight = int(cash_amount) / total_assets if total_assets > 0 else 0
+
+    portfolio = Portfolio(
+        holdings=build_holding_weights(selected_holdings),
+        cash_weight=cash_weight,
+    )
+    if portfolio.holdings:
+        _render_portfolio_summary(portfolio)
+    else:
+        st.info("보유 종목을 1개 이상 선택해 주세요.")
+
+    col_back, col_next = st.columns([1, 1])
+    with col_back:
+        if st.button("성향 질문으로 돌아가기"):
+            st.session_state["intake_stage"] = "onboarding"
+            st.rerun()
+    with col_next:
+        if st.button("투자성향 확인", type="primary", disabled=not portfolio.holdings):
+            st.session_state["intake_portfolio"] = portfolio.model_dump(mode="json")
+            st.session_state.pop("analysis_output", None)
+            st.session_state["intake_stage"] = "analysis"
+            st.rerun()
+
+    return portfolio
+
+
+def _get_saved_portfolio() -> Portfolio | None:
+    portfolio_data = st.session_state.get("intake_portfolio")
+    if not portfolio_data:
+        return None
+    return Portfolio(**portfolio_data)
+
+
+def _render_portfolio_summary(portfolio: Portfolio) -> None:
+    st.write("포트폴리오 요약")
+    total_value = portfolio.total_market_value or 0
+    col_total, col_cash = st.columns(2)
+    col_total.metric("총 평가금액", f"{total_value:,}원")
+    col_cash.metric("현금 비중", f"{portfolio.cash_weight:.0%}")
+
+    for holding in portfolio.holdings:
+        weight_label = f"{holding.weight:.0%}" if holding.weight is not None else "계산 불가"
+        market_value = holding.market_value or 0
+        cost_basis = holding.cost_basis or 0
+        pnl_rate = (
+            (market_value - cost_basis) / cost_basis
+            if cost_basis > 0 and market_value > 0
+            else 0
         )
-        horizon = st.slider("투자 기간(개월)", min_value=1, max_value=36, value=12)
-        cash_weight = st.slider("현금 비중", min_value=0, max_value=100, value=20) / 100
+        st.write(
+            f"- {holding.corp_name}: {holding.qty}주 / 평단 {(holding.avg_price or 0):,}원 / "
+            f"평가 {market_value:,}원 / 손익률 {pnl_rate:.1%} / {weight_label}"
+        )
 
-        st.caption("Phase 1에서는 회원가입 없이 목 프로필과 보유 종목으로 E2E를 검증합니다.")
-        st.write("보유 종목")
-        for holding in demo_portfolio.holdings:
-            st.write(f"- {holding.corp_name} {holding.weight:.0%}")
+    sector_weights = portfolio.sector_weights()
+    if sector_weights:
+        st.write("섹터 비중")
+        for sector, weight in sector_weights.items():
+            st.progress(weight, text=f"{sector} {weight:.0%}")
 
-    user_profile = UserProfile(
-        user_id=demo_profile.user_id,
-        risk_tolerance=risk_label,
-        investment_horizon_months=horizon,
-        cash_source=demo_profile.cash_source,
-        preferred_sectors=demo_profile.preferred_sectors,
+
+def _build_initial_query(portfolio: Portfolio) -> str:
+    if portfolio.holdings:
+        names = ", ".join(holding.corp_name for holding in portfolio.holdings[:3])
+        return f"{names} 보유 포트폴리오를 투자성향 기준으로 먼저 점검해줘"
+    return "현재 포트폴리오를 투자성향 기준으로 먼저 점검해줘"
+
+
+def _ensure_initial_analysis_output(user_profile: UserProfile, portfolio: Portfolio) -> None:
+    if st.session_state.get("analysis_output") is not None:
+        return
+    with st.status("에이전트 파이프라인 실행 중", expanded=True) as status:
+        st.write("InvestorProfile Agent: 투자성향 context 준비")
+        st.write("Curator Agent: 분석 대상 종목/후보 탐색")
+        st.write("RequestClassifier Agent: 질문 intent/scope/urgency 분류")
+        st.write("Quant, Qual, Competitor Worker: 기초 분석 생성")
+        st.write("InvestmentAnalyst Agent: GLM 기반 투자 분석 보정")
+        st.write("Strategist, Guardrail: 최종 결과와 안전 문구 생성")
+        output = run_phase1_analysis(
+            _build_initial_query(portfolio),
+            user_profile=user_profile,
+            portfolio=portfolio,
+        )
+        status.update(label="에이전트 파이프라인 완료", state="complete", expanded=False)
+    st.session_state["analysis_output"] = output
+
+
+def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> None:
+    _render_profile_summary(user_profile)
+    st.success(
+        f"답변을 바탕으로 현재 투자성향은 {_format_risk_label(user_profile.risk_tolerance)}으로 추론했습니다."
     )
-    portfolio = Portfolio(holdings=demo_portfolio.holdings, cash_weight=cash_weight)
+    st.subheader("3. 저장된 포트폴리오")
+    _render_portfolio_summary(portfolio)
 
-    st.title("국내 주식 포트폴리오 분석")
-    st.caption("Curator -> Quant/Qual/Competitor -> Strategist -> Guardrail")
+    _ensure_initial_analysis_output(user_profile, portfolio)
+    _render_output()
+
+    st.subheader("4. 대화형 질문")
+    if st.session_state["intake_messages"]:
+        for message in st.session_state["intake_messages"]:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
 
     query = st.text_input(
-        "질문",
-        value="내 포트폴리오에서 삼성전자 어떻게 할까?",
-        placeholder="예: 내 포트폴리오에서 삼성전자 어떻게 할까?",
+        "궁금한 점을 입력해 주세요",
+        value="삼성전자 급등했는데 안정형이면 어떻게 할까?",
+        placeholder="예: SK하이닉스 비중 괜찮아?",
     )
 
-    if st.button("분석 실행", type="primary", use_container_width=False):
-        with st.spinner("에이전트 파이프라인 실행 중..."):
-            output = run_phase1_analysis(query, user_profile=user_profile, portfolio=portfolio)
-        st.session_state["analysis_output"] = output
+    col_run, col_edit = st.columns([1, 1])
+    with col_run:
+        if st.button("분석 실행", type="primary"):
+            st.session_state["intake_messages"].append({"role": "user", "content": query})
+            with st.spinner("에이전트 파이프라인 실행 중..."):
+                output = run_phase1_analysis(query, user_profile=user_profile, portfolio=portfolio)
+            st.session_state["analysis_output"] = output
+            if output.state.user_request:
+                st.session_state["intake_messages"].append(
+                    {
+                        "role": "assistant",
+                        "content": (
+                            f"질문 유형은 {output.state.user_request.intent}, "
+                            f"긴급도는 {output.state.user_request.urgency_reason}로 분류했어요."
+                        ),
+                    }
+                )
+            st.rerun()
+    with col_edit:
+        if st.button("포트폴리오 다시 입력"):
+            st.session_state["intake_stage"] = "portfolio"
+            st.session_state.pop("analysis_output", None)
+            st.rerun()
 
+
+def _render_output() -> None:
     output = st.session_state.get("analysis_output")
     if output is None:
-        st.info("분석 실행을 누르면 Phase 1 mock 파이프라인 결과가 표시됩니다.")
+        st.info("질문을 실행하면 분류 결과와 분석 결과가 표시됩니다.")
         return
 
     tier1 = output.tier1
-    st.divider()
-    st.subheader("Tier 1. 한 줄 결론")
+    st.subheader("분석 결과")
     col_signal, col_confidence, col_suitability = st.columns(3)
     col_signal.markdown(_signal_badge(tier1.signal), unsafe_allow_html=True)
     col_confidence.metric("신뢰도", f"{tier1.confidence}%")
@@ -75,15 +362,67 @@ def main() -> None:
     st.markdown(f"### {tier1.headline}")
     st.caption(tier1.disclaimer)
 
-    st.subheader("Tier 2. 핵심 근거")
+    if output.state.user_request:
+        st.write("질문 분류")
+        st.json(output.state.user_request.model_dump(mode="json"), expanded=False)
+
     tabs = st.tabs(["정량", "정성", "Peer", "적합도", "리스크"])
     for tab, key in zip(tabs, ["정량 근거", "정성 근거", "Peer 비교", "포트폴리오 적합도", "리스크"], strict=True):
         with tab:
             for item in output.tier2.get(key, []):
                 st.write(f"- {item}")
 
-    with st.expander("Phase 1 상세 상태 보기"):
+    with st.expander("상세 상태 보기"):
         st.json(output.model_dump(mode="json"), expanded=False)
+
+
+def main() -> None:
+    st.set_page_config(
+        page_title="stock-agent - 단계형 투자성향 수집",
+        page_icon="📊",
+        layout="wide",
+    )
+    _init_intake_state()
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: #f8fafc;
+            color: #0f172a;
+        }
+        div[data-testid="stMetric"],
+        div[data-testid="stStatus"] {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+        div[data-testid="stNumberInput"] label p,
+        div[data-testid="stMultiSelect"] label p {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.title("단계형 투자성향 수집")
+    st.caption("질문 카드에 하나씩 답하면 투자성향을 추론하고, 보유 종목을 받아 분석합니다.")
+
+    stage = st.session_state["intake_stage"]
+    if stage == "onboarding":
+        _render_onboarding_step()
+    elif stage == "portfolio":
+        user_profile = _get_inferred_profile()
+        _render_portfolio_step(user_profile)
+    else:
+        user_profile = _get_inferred_profile()
+        portfolio = _get_saved_portfolio()
+        if portfolio is None:
+            st.session_state["intake_stage"] = "portfolio"
+            st.rerun()
+        _render_analysis_step(user_profile, portfolio)
 
 
 if __name__ == "__main__":

@@ -2,8 +2,10 @@ from stock_agent.agents import (
     run_competitor,
     run_curator,
     run_guardrail,
+    run_investment_analyst,
     run_qual,
     run_quant,
+    run_request_classifier,
     run_strategist,
 )
 from stock_agent.schemas.analysis import (
@@ -13,6 +15,7 @@ from stock_agent.schemas.analysis import (
     Portfolio,
     Tier1Result,
     UserProfile,
+    UserRequest,
 )
 
 
@@ -27,8 +30,24 @@ def build_demo_profile() -> tuple[UserProfile, Portfolio]:
         ),
         Portfolio(
             holdings=[
-                Holding(stock_code="005930", corp_name="삼성전자", weight=0.32, avg_price=72000),
-                Holding(stock_code="000660", corp_name="SK하이닉스", weight=0.18, avg_price=185000),
+                Holding(
+                    stock_code="005930",
+                    corp_name="삼성전자",
+                    sector="반도체",
+                    weight=0.32,
+                    avg_price=72000,
+                    qty=10,
+                    current_price=78000,
+                ),
+                Holding(
+                    stock_code="000660",
+                    corp_name="SK하이닉스",
+                    sector="반도체",
+                    weight=0.18,
+                    avg_price=185000,
+                    qty=3,
+                    current_price=201000,
+                ),
             ],
             cash_weight=0.2,
         ),
@@ -45,8 +64,14 @@ def run_phase1_analysis(
         user_profile = user_profile or demo_profile
         portfolio = portfolio or demo_portfolio
 
-    state = AgentState(user_query=user_query, user_profile=user_profile, portfolio=portfolio)
+    state = AgentState(
+        user_query=user_query,
+        user_request=UserRequest(raw_query=user_query),
+        user_profile=user_profile,
+        portfolio=portfolio,
+    )
     state = run_curator(state)
+    state = run_request_classifier(state)
 
     # Phase 1 uses local mock workers. The contract mirrors the future LangGraph
     # fan-out: Quant, Qual, and Competitor only depend on Curator output.
@@ -54,6 +79,7 @@ def run_phase1_analysis(
     state = run_qual(state)
     state = run_competitor(state)
     state = run_strategist(state)
+    state = run_investment_analyst(state)
     state = run_guardrail(state)
 
     if state.strategist is None or state.guardrail is None:
