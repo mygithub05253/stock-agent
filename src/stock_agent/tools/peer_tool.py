@@ -21,6 +21,20 @@ ACCOUNT_ALIASES: dict[str, tuple[str, ...]] = {
     "liabilities": ("부채총계",),
 }
 
+PEER_SUMMARY_FLAG_MESSAGES: dict[str, str] = {
+    "peer_count_below_minimum": "비교 가능한 peer 수가 부족해 결과 해석이 제한적입니다.",
+    "sector_missing": "섹터 정보가 없어 자동 peer 선정이 제한되었습니다.",
+    "target_data_quality_low": "대상 종목의 핵심 지표가 부족해 점수를 보수적으로 해석해야 합니다.",
+    "per_not_applicable": "순이익 기준의 PER 비교가 제한되었습니다.",
+    "pbr_not_applicable": "자본총계 기준의 PBR 비교가 제한되었습니다.",
+    "roe_missing": "ROE 산출에 필요한 지표가 부족합니다.",
+    "revenue_growth_missing": "매출 성장률 산출에 필요한 전년 비교 데이터가 부족합니다.",
+    "operating_margin_missing": "영업이익률 산출에 필요한 지표가 부족합니다.",
+    "debt_ratio_missing": "부채비율 산출에 필요한 지표가 부족합니다.",
+}
+
+UNKNOWN_PEER_SUMMARY_FLAG_MESSAGE = "일부 데이터 품질 이슈가 있어 세부 지표 해석에 주의가 필요합니다."
+
 
 class CompanyPeer(BaseModel):
     corp_code: str
@@ -311,6 +325,7 @@ def load_peer_candidates(
     if not target.sector:
         return []
 
+    candidate_limit = max(max_peer_count * 4, 20)
     rows = _fetch_all(
         conn,
         """
@@ -322,7 +337,7 @@ def load_peer_candidates(
         ORDER BY corp_name ASC
         LIMIT %s
         """,
-        (target.sector, target.stock_code, max_peer_count),
+        (target.sector, target.stock_code, candidate_limit),
     )
     return [
         CompanyPeer(
@@ -489,7 +504,13 @@ def build_peer_summary(
     peer_count: int,
     data_quality_flags: list[str],
 ) -> str:
-    flag_summary = ", ".join(data_quality_flags) if data_quality_flags else "없음"
+    flag_messages = _dedupe(
+        [
+            PEER_SUMMARY_FLAG_MESSAGES.get(flag, UNKNOWN_PEER_SUMMARY_FLAG_MESSAGE)
+            for flag in data_quality_flags
+        ]
+    )
+    flag_summary = " ".join(flag_messages) if flag_messages else "없음"
     return (
         f"{target.corp_name}은 같은 섹터 peer {peer_count}개와 비교되었습니다. "
         f"데이터 품질 경고: {flag_summary}."

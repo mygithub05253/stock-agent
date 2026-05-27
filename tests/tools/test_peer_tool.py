@@ -151,6 +151,30 @@ def test_select_peer_rows_excludes_target_and_prefers_quality_then_market_cap_pr
     assert [row.stock_code for row in selected] == ["DDD001", "CCC001"]
 
 
+def test_load_peer_candidates_fetches_broader_candidate_pool(monkeypatch) -> None:
+    target = CompanyPeer(corp_code="1", stock_code="AAA001", corp_name="Target", sector="semiconductor")
+    captured_params = None
+
+    def fake_fetch_all(conn, query, params):
+        nonlocal captured_params
+        captured_params = params
+        return [
+            {
+                "corp_code": "2",
+                "stock_code": "BBB001",
+                "corp_name": "Peer B",
+                "sector": "semiconductor",
+            }
+        ]
+
+    monkeypatch.setattr(peer_tool, "_fetch_all", fake_fetch_all)
+
+    peers = peer_tool.load_peer_candidates(object(), target, max_peer_count=3)
+
+    assert [peer.stock_code for peer in peers] == ["BBB001"]
+    assert captured_params == ("semiconductor", "AAA001", 20)
+
+
 def test_build_peer_summary_mentions_peer_count_and_warnings() -> None:
     target = peer_tool.PeerMetricRow(
         corp_code="1",
@@ -163,12 +187,16 @@ def test_build_peer_summary_mentions_peer_count_and_warnings() -> None:
     summary = peer_tool.build_peer_summary(
         target,
         peer_count=2,
-        data_quality_flags=["peer_count_below_minimum", "sector_missing"],
+        data_quality_flags=["peer_count_below_minimum", "sector_missing", "target_data_quality_low"],
     )
 
     assert "2개" in summary
-    assert "peer_count_below_minimum" in summary
-    assert "sector_missing" in summary
+    assert "비교 가능한 peer 수가 부족해 결과 해석이 제한적입니다." in summary
+    assert "섹터 정보가 없어 자동 peer 선정이 제한되었습니다." in summary
+    assert "대상 종목의 핵심 지표가 부족해 점수를 보수적으로 해석해야 합니다." in summary
+    assert "peer_count_below_minimum" not in summary
+    assert "sector_missing" not in summary
+    assert "target_data_quality_low" not in summary
 
 
 def test_build_peer_comparison_orchestrates_loaders_and_returns_position(monkeypatch) -> None:
