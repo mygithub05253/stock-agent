@@ -38,7 +38,11 @@ def run_strategist(state: AgentState) -> AgentState:
 
     suitability = max(30, min(90, suitability))
     raw_query = state.user_request.raw_query if state.user_request else state.user_query
-    price_event = _detect_price_event(raw_query)
+    price_event = (
+        state.user_request.urgency_reason
+        if state.user_request and state.user_request.urgency_reason in {"surge", "drop"}
+        else _detect_price_event(raw_query)
+    )
 
     next_actions = [
         "보유 비중이 이미 높다면 추가 매수보다 실적 발표와 업황 지표 확인을 우선합니다.",

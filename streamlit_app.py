@@ -119,6 +119,15 @@ def main() -> None:
             weight_label = f"{holding.weight:.0%}" if holding.weight is not None else "계산 불가"
             st.write(f"- {holding.corp_name} {weight_label}")
 
+        validation_errors: list[str] = []
+        if not preferred_sectors:
+            validation_errors.append("관심 산업을 1개 이상 선택해 주세요.")
+        if not holdings:
+            validation_errors.append("보유 종목을 1개 이상 입력해 주세요.")
+        stock_codes = [holding.stock_code for holding in holdings]
+        if len(stock_codes) != len(set(stock_codes)):
+            validation_errors.append("같은 종목이 중복 입력되어 있습니다.")
+
     user_profile = UserProfile(
         user_id=demo_profile.user_id,
         risk_tolerance=risk_label,
@@ -141,7 +150,11 @@ def main() -> None:
         placeholder="예: 내 포트폴리오에서 삼성전자 어떻게 할까?",
     )
 
-    if st.button("분석 실행", type="primary", use_container_width=False):
+    if validation_errors:
+        for error in validation_errors:
+            st.error(error)
+
+    if st.button("분석 실행", type="primary", use_container_width=False, disabled=bool(validation_errors)):
         with st.spinner("에이전트 파이프라인 실행 중..."):
             output = run_phase1_analysis(query, user_profile=user_profile, portfolio=portfolio)
         st.session_state["analysis_output"] = output
