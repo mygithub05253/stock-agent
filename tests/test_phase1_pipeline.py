@@ -93,6 +93,24 @@ def test_curator_matches_non_samsung_holding_from_query() -> None:
     assert output.state.curator.sector == "반도체"
     assert output.state.user_request is not None
     assert output.state.user_request.target_corp_name == "SK하이닉스"
+    assert output.state.user_request.intent == "risk_review"
+    assert output.state.user_request.urgency_reason == "general"
+
+
+def test_curator_classifies_sell_decision_and_urgency() -> None:
+    output = run_phase1_analysis("삼성전자 급락했는데 손절해야 해?")
+
+    assert output.state.user_request is not None
+    assert output.state.user_request.intent == "sell_decision"
+    assert output.state.user_request.urgency_reason == "drop"
+
+
+def test_curator_classifies_news_urgency() -> None:
+    output = run_phase1_analysis("삼성전자 공시 이슈 확인해줘")
+
+    assert output.state.user_request is not None
+    assert output.state.user_request.intent == "holding_review"
+    assert output.state.user_request.urgency_reason == "news"
 
 
 def test_strategist_lowers_suitability_for_conservative_high_weight_user() -> None:
@@ -135,5 +153,7 @@ def test_strategist_lowers_suitability_for_conservative_high_weight_user() -> No
     )
 
     assert conservative_output.tier1.suitability < aggressive_output.tier1.suitability
+    assert conservative_output.state.user_request is not None
+    assert conservative_output.state.user_request.urgency_reason == "surge"
     assert any("리밸런싱" in action for action in conservative_output.state.strategist.next_actions)
     assert any("급등" in action for action in conservative_output.state.strategist.next_actions)

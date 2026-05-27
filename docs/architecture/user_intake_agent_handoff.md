@@ -21,6 +21,7 @@ User Intake / Curator 단계는 사용자 입력을 다음 agent들이 처리하
 3. 자연어 질문을 `UserRequest`로 보존하고, Curator가 intent/target/scope를 채운다.
 4. 분석 대상 종목을 확정하거나 candidates를 다음 단계에 넘긴다.
 5. MVP 지원 범위 밖이면 warnings에 남긴다.
+6. 질문을 category/urgency 기준으로 분기할 수 있게 `UserRequest`를 채운다.
 
 하지 않는 일:
 
@@ -86,12 +87,69 @@ User Intake / Curator 단계는 사용자 입력을 다음 agent들이 처리하
 | `target_stock_code` | `None` | `005930` |
 | `target_corp_name` | `None` | `삼성전자` |
 | `analysis_scope` | `None` | `single_stock` |
-| `urgency_reason` | `None` | 현재는 미사용. 향후 `surge` 등 |
+| `urgency_reason` | `None` | `surge`, `drop`, `earnings`, `news`, `general` |
 | `requested_depth` | `summary` | `summary` |
 
 ---
 
-## 3. Curator Output Contract
+## 3. Conversation Intake Plan
+
+초기 제품에서는 사용자가 한 번에 모든 정보를 입력하지 않을 수 있다. 따라서 초입 agent는 대화형으로 부족한 정보를 채우고, 충분해진 뒤 DB에 저장하는 방향이 맞다.
+
+권장 흐름:
+
+```text
+사용자 첫 진입
+-> 투자성향/목표/손실감내도 질문
+-> 보유 종목/평단/수량/현금비중 질문
+-> UserProfile + Portfolio 완성도 확인
+-> 충분하면 users/holdings 저장
+-> 이후 질문은 UserRequest로 정규화
+-> intent/category에 따라 분석 route 분기
+```
+
+MVP에서는 DB 저장 전까지 Streamlit session/mock 객체로 유지하고, DB schema 합의 후 다음 순서로 저장한다.
+
+| 단계 | 저장 대상 | 설명 |
+|------|-----------|------|
+| 프로필 수집 완료 | `users` | 투자성향, 목표수익률, 손실감내도, 관심 산업 |
+| 포트폴리오 수집 완료 | `holdings` | 종목코드, 평균 매수가, 수량, 대표 매수일 |
+| 분석 실행 완료 | `analysis_history` | request/profile/portfolio snapshot과 최종 output |
+
+필수 수집값:
+
+| 구분 | 최소 필요값 |
+|------|-------------|
+| 투자성향 | `risk_tolerance`, `investment_horizon_months`, `max_drawdown_tolerance`, `preferred_sectors` |
+| 포트폴리오 | `stock_code`, `avg_price`, `qty`, `cash_weight` |
+| 질문 | `raw_query` |
+
+부족한 값이 있으면 분석을 바로 실행하지 않고 보강 질문을 먼저 한다. 예를 들어 보유 종목이 없으면 “보유 종목을 먼저 알려주세요”, 관심 산업이 비어 있으면 “반도체/금융 중 관심 산업을 선택해 주세요”처럼 처리한다.
+
+---
+
+## 4. Question Routing
+
+Curator는 질문을 다음 기준으로 분기한다.
+
+| 분기 필드 | 값 | 감지 기준 | 후속 처리 |
+|-----------|----|-----------|-----------|
+| `intent` | `holding_review` | 보유 종목 일반 점검 | 단일 종목 분석 |
+| `intent` | `risk_review` | `위험`, `리스크`, `괜찮`, `비중`, `손실` | 리스크/비중 중심 표시 |
+| `intent` | `sell_decision` | `팔`, `매도`, `익절`, `손절`, `정리` | 매도 판단 보조 |
+| `intent` | `portfolio_review` | 종목 미지정 포트폴리오 질문 | 후보 또는 bulk 분석 |
+| `intent` | `new_recommendation` | 보유 외 관심 종목 | 신규 관심 종목 점검 |
+| `urgency_reason` | `surge` | `급등`, `상승`, `올랐` | 추격 매수 주의/리밸런싱 |
+| `urgency_reason` | `drop` | `급락`, `하락`, `떨어졌`, `빠졌` | 손실 허용 범위 확인 |
+| `urgency_reason` | `earnings` | `실적`, `어닝`, `발표` | 실적 이벤트 중심 |
+| `urgency_reason` | `news` | `뉴스`, `공시`, `이슈` | Qual/RAG 중심 |
+| `urgency_reason` | `general` | 위 조건 없음 | 일반 분석 |
+
+현재 Phase 1은 모든 route가 같은 mock pipeline을 탄다. 후속 구현에서는 `intent`와 `urgency_reason`에 따라 UI 강조 영역과 agent 호출 깊이를 바꾼다.
+
+---
+
+## 5. Curator Output Contract
 
 Curator의 output은 `AgentState.curator`에 저장되는 `CuratorResult`다.
 
@@ -116,7 +174,7 @@ Curator의 output은 `AgentState.curator`에 저장되는 `CuratorResult`다.
 
 ---
 
-## 4. Handoff To Next Agents
+## 6. Handoff To Next Agents
 
 다음 agent는 User Intake output을 이렇게 사용한다.
 
@@ -136,7 +194,7 @@ Curator의 output은 `AgentState.curator`에 저장되는 `CuratorResult`다.
 
 ---
 
-## 5. Example Outputs
+## 7. Example Outputs
 
 ### 5.1 보유 종목 직접 질문
 
@@ -169,7 +227,7 @@ Curator의 output은 `AgentState.curator`에 저장되는 `CuratorResult`다.
   "target_stock_code": "005930",
   "target_corp_name": "삼성전자",
   "analysis_scope": "single_stock",
-  "urgency_reason": null,
+  "urgency_reason": "general",
   "requested_depth": "summary"
 }
 ```
@@ -227,7 +285,7 @@ Curator의 output은 `AgentState.curator`에 저장되는 `CuratorResult`다.
 
 ---
 
-## 6. Local Demo
+## 8. Local Demo
 
 터미널에서 다음 명령으로 초입 agent output을 확인할 수 있다.
 
@@ -265,19 +323,19 @@ PYTHONPATH=src python3 scripts/run_user_intake_demo.py
 
 ---
 
-## 7. Known Gaps
+## 9. Known Gaps
 
 | Gap | 설명 | 다음 작업 |
 |-----|------|-----------|
 | 실제 LLM/GLM 호출 없음 | 현재는 mock pipeline | `src/stock_agent/llm/` adapter 필요 |
 | 종목 master 하드코딩 | Streamlit/Curator에 MVP 후보가 박혀 있음 | `company` DB lookup 연결 |
 | 포트폴리오 전체 분석 미완성 | 종목 미지정 시 대표 후보 1개로 분석 | bulk pipeline 설계 |
-| `urgency_reason` 자동 파싱 미완성 | Strategist는 query keyword를 직접 봄 | Curator에서 `surge/drop` 채우기 |
+| portfolio route 분리 미완성 | 현재는 대표 후보 1개로 단일 종목 pipeline 실행 | `BulkPortfolioAdvice` 또는 종목별 loop 설계 |
 | DB 저장 없음 | UserProfile/Holding은 세션/mock 상태 | `users`, `holdings` schema 합의 후 연결 |
 
 ---
 
-## 8. 변경 이력
+## 10. 변경 이력
 
 | 날짜 | 변경 내용 |
 |------|-----------|
