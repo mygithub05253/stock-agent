@@ -27,7 +27,6 @@ def _init_intake_state() -> None:
     st.session_state.setdefault("onboarding_answers", {})
     st.session_state.setdefault("inferred_profile", None)
     st.session_state.setdefault("cash_weight", 0.2)
-    st.session_state.setdefault("selected_holding_count", 2)
     st.session_state.setdefault("intake_portfolio", None)
     st.session_state.setdefault("intake_messages", [])
 
@@ -39,7 +38,6 @@ def _reset_intake() -> None:
         "onboarding_answers",
         "inferred_profile",
         "cash_weight",
-        "selected_holding_count",
         "intake_portfolio",
         "analysis_output",
         "intake_messages",
@@ -146,15 +144,6 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     with st.expander(f"선택 가능 후보 {len(stock_names)}개 보기"):
         st.write(", ".join(stock_names))
 
-    holding_count = st.number_input(
-        "입력할 보유 종목 개수",
-        min_value=1,
-        max_value=5,
-        value=st.session_state["selected_holding_count"],
-        step=1,
-    )
-    st.session_state["selected_holding_count"] = int(holding_count)
-
     cash_weight = st.slider(
         "현금 비중",
         min_value=0,
@@ -164,36 +153,25 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     st.session_state["cash_weight"] = cash_weight
 
     selected_holdings = []
-    selected_codes: set[str] = set()
-    duplicate_names: list[str] = []
-    for index in range(int(holding_count)):
-        col_stock, col_qty = st.columns([2, 1])
-        with col_stock:
-            default_index = min(index, len(stock_names) - 1)
-            corp_name = st.selectbox(
-                f"종목 {index + 1}",
-                options=stock_names,
-                index=default_index,
-                key=f"selected_corp_name_{index}",
-            )
-        with col_qty:
-            qty = st.number_input(
-                "수량",
-                min_value=1,
-                value=10 if index == 0 else 3,
-                step=1,
-                key=f"selected_qty_{index}",
-            )
-
-        holding = build_holding_from_selection(corp_name, int(qty))
-        if holding.stock_code in selected_codes:
-            duplicate_names.append(holding.corp_name)
-            continue
-        selected_codes.add(holding.stock_code)
-        selected_holdings.append(holding)
-
-    if duplicate_names:
-        st.warning(f"중복 선택된 종목은 한 번만 반영했습니다: {', '.join(duplicate_names)}")
+    st.write("보유 수량")
+    for row_start in range(0, len(stock_names), 2):
+        row_columns = st.columns(2, gap="medium")
+        for column, corp_name in zip(row_columns, stock_names[row_start : row_start + 2], strict=False):
+            with column:
+                name_col, qty_col = st.columns([1.8, 1])
+                with name_col:
+                    st.markdown(f"**{corp_name}**")
+                with qty_col:
+                    qty = st.number_input(
+                        f"{corp_name} 수량",
+                        min_value=0,
+                        value=0,
+                        step=1,
+                        label_visibility="collapsed",
+                        key=f"stock_qty_{corp_name}",
+                    )
+                if qty > 0:
+                    selected_holdings.append(build_holding_from_selection(corp_name, int(qty)))
 
     portfolio = Portfolio(
         holdings=build_holding_weights(selected_holdings),

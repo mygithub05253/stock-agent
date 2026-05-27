@@ -19,8 +19,14 @@ def test_staged_intake_reaches_portfolio_step() -> None:
 
     assert any("분석된 투자 성향" in widget.value for widget in at.subheader)
     assert any("후보 산업" in widget.label for widget in at.multiselect)
-    assert any("입력할 보유 종목 개수" in widget.label for widget in at.number_input)
-    assert any("종목 1" in widget.label for widget in at.selectbox)
+    assert any("SK하이닉스 수량" in widget.label for widget in at.number_input)
+    assert any("삼성전자 수량" in widget.label for widget in at.number_input)
+    assert any("보유 종목을 1개 이상 선택해 주세요." in widget.value for widget in at.info)
+
+    qty_input = next(widget for widget in at.number_input if widget.label == "SK하이닉스 수량")
+    qty_input.set_value(10)
+    at.run(timeout=10)
+
     assert any(widget.label == "총 평가금액" for widget in at.metric)
 
 
@@ -28,6 +34,10 @@ def test_staged_intake_runs_analysis_after_portfolio_save() -> None:
     at = AppTest.from_file("streamlit_app.py")
     at.run(timeout=10)
     _complete_onboarding(at)
+
+    qty_input = next(widget for widget in at.number_input if widget.label == "SK하이닉스 수량")
+    qty_input.set_value(10)
+    at.run(timeout=10)
 
     save_button = next(widget for widget in at.button if widget.label == "투자성향 확인")
     save_button.click()
