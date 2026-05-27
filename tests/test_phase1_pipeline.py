@@ -1,4 +1,5 @@
 from stock_agent.graph import run_phase1_analysis
+from stock_agent.intake import build_portfolio_from_text, parse_holdings_text
 from stock_agent.schemas import Holding, Portfolio, UserProfile, UserRequest
 
 
@@ -60,6 +61,23 @@ def test_portfolio_holding_calculates_basic_values() -> None:
     assert holding.market_value == 770000
     assert portfolio.total_market_value == 770000
     assert portfolio.sector_weights() == {"반도체": 1.0}
+
+
+def test_parse_holdings_text_extracts_supported_stocks() -> None:
+    result = parse_holdings_text("삼성전자 10주, SK하이닉스 3주")
+
+    assert not result.warnings
+    assert [holding.corp_name for holding in result.holdings] == ["삼성전자", "SK하이닉스"]
+    assert [holding.qty for holding in result.holdings] == [10, 3]
+    assert round(sum(holding.weight or 0 for holding in result.holdings), 6) == 1
+
+
+def test_build_portfolio_from_text_returns_warnings_for_unknown_items() -> None:
+    portfolio, warnings = build_portfolio_from_text("삼성전자 10주, 모르는종목 5주")
+
+    assert len(portfolio.holdings) == 1
+    assert warnings
+    assert "모르는종목" in warnings[0]
 
 
 def test_user_request_keeps_raw_query_with_structured_context() -> None:

@@ -96,6 +96,139 @@ User Intake / Curator 단계는 사용자 입력을 다음 agent들이 처리하
 
 초기 제품에서는 사용자가 한 번에 모든 정보를 입력하지 않을 수 있다. 따라서 초입 agent는 대화형으로 부족한 정보를 채우고, 충분해진 뒤 DB에 저장하는 방향이 맞다.
 
+### 3.1 큰 계획
+
+카드형 대화 수집 UI는 “사용자에게 질문을 여러 개 던지고, 답변을 구조화해서 메모리에 쌓은 뒤, 포트폴리오 분석으로 연결하는 초입 agent 화면”이다.
+
+```text
+카드형 질문
+-> 답변 수집
+-> 답변 유형 분류
+-> session_state 저장
+-> 보유 종목 수집
+-> 포트폴리오 요약 생성
+-> 사용자 질문 수신
+-> intent/category/urgency 분기
+-> 기존 multi-agent pipeline 실행
+```
+
+큰 목표는 다음 5개다.
+
+| 목표 | 설명 |
+|------|------|
+| 카드형 수집 UX | 뉴스 카드처럼 하나씩 읽히는 질문 카드로 유저 정보를 받는다. |
+| 메모리 우선 저장 | DB 확정 전까지 `st.session_state`에 `profile`, `portfolio`, `messages`를 저장한다. |
+| 보유 종목 자연어 입력 | `삼성전자 10주, SK하이닉스 3주` 같은 입력을 구조화한다. |
+| 질문 분기 | 이후 질문을 `intent`, `analysis_scope`, `urgency_reason`으로 나눈다. |
+| 다음 agent handoff | `UserProfile`, `Portfolio`, `UserRequest`, `CuratorResult`를 기존 pipeline에 넘긴다. |
+
+### 3.2 세부 계획
+
+#### Step 1. Session State 구조
+
+Streamlit 메모리는 다음 key를 사용한다.
+
+| key | 타입 | 설명 |
+|-----|------|------|
+| `intake_profile` | dict | 카드 질문으로 수집한 투자성향 |
+| `intake_portfolio` | dict/list | 보유 종목 입력 결과 |
+| `intake_messages` | list[dict] | 유저와 시스템 간 대화/카드 기록 |
+| `intake_stage` | string | 현재 단계: `profile`, `portfolio`, `ready`, `analysis` |
+| `analysis_output` | AnalysisOutput | 기존 pipeline 결과 |
+
+#### Step 2. 카드형 질문 구성
+
+1차 MVP 질문 카드는 다음 순서로 둔다.
+
+| 순서 | 카드 질문 | 저장 필드 |
+|------|-----------|-----------|
+| 1 | 투자성향은 안정형/중립형/공격형 중 어디에 가까운가요? | `risk_tolerance` |
+| 2 | 투자 기간은 어느 정도인가요? | `investment_horizon_months` |
+| 3 | 감내 가능한 손실 폭은 어느 정도인가요? | `max_drawdown_tolerance` |
+| 4 | 관심 산업은 반도체/금융 중 어디인가요? | `preferred_sectors` |
+| 5 | 보유 종목을 알려주세요. 예: 삼성전자 10주, SK하이닉스 3주 | `holdings` |
+| 6 | 이제 궁금한 점을 질문해 주세요. | `raw_query` |
+
+#### Step 3. 보유 종목 자연어 파싱
+
+1차 MVP에서는 정규식 기반으로 처리한다.
+
+입력 예시:
+
+```text
+삼성전자 10주, SK하이닉스 3주
+```
+
+출력 예시:
+
+```json
+[
+  {"corp_name": "삼성전자", "stock_code": "005930", "qty": 10, "sector": "반도체"},
+  {"corp_name": "SK하이닉스", "stock_code": "000660", "qty": 3, "sector": "반도체"}
+]
+```
+
+제한:
+
+- 평균 매수가는 사용자가 주지 않으면 mock 현재가를 기본값으로 둔다.
+- 종목 master는 현재 `_STOCK_OPTIONS` 또는 Curator alias와 맞춘다.
+- 파싱 실패한 항목은 warning으로 보여준다.
+
+#### Step 4. 포트폴리오 요약 카드
+
+보유 종목을 파싱하면 바로 다음 값을 보여준다.
+
+| 항목 | 계산 |
+|------|------|
+| 총 평가금액 | `sum(current_price * qty)` |
+| 종목별 비중 | `holding.market_value / total_market_value` |
+| 섹터 비중 | `Portfolio.sector_weights()` |
+| 현금 비중 | `cash_weight` |
+
+#### Step 5. 질문 분기
+
+유저 질문은 Curator에서 다음처럼 분기한다.
+
+| 예시 질문 | intent | urgency |
+|-----------|--------|---------|
+| `삼성전자 계속 가져가도 돼?` | `holding_review` | `general` |
+| `SK하이닉스 비중 괜찮아?` | `risk_review` | `general` |
+| `삼성전자 급락했는데 손절해야 해?` | `sell_decision` | `drop` |
+| `삼성전자 공시 이슈 확인해줘` | `holding_review` | `news` |
+| `내 포트폴리오 전체 봐줘` | `portfolio_review` | `general` |
+
+#### Step 6. DB 저장 전환 시점
+
+1차 MVP는 session memory만 사용한다. DB 연결은 다음 조건이 충족된 뒤 진행한다.
+
+| 조건 | 설명 |
+|------|------|
+| `users` schema 합의 | 프로필 저장 필드 확정 |
+| `holdings` schema 합의 | 보유 종목 원장 저장 필드 확정 |
+| 개인정보/민감정보 정책 합의 | 이메일, 이름, 투자성향 로그 처리 기준 |
+| 저장 UX 합의 | 자동 저장인지, 저장 버튼인지 결정 |
+
+### 3.3 1차 구현 범위
+
+이번 1차 구현은 너무 크게 가지 않고 다음만 포함한다.
+
+- [ ] 카드형 intake 화면을 Streamlit 메인 영역에 추가
+- [ ] `st.session_state`에 profile/portfolio/messages 저장
+- [ ] `삼성전자 10주, SK하이닉스 3주` 형태의 보유 종목 입력 파서 추가
+- [ ] 포트폴리오 요약 카드 추가
+- [ ] 질문 입력 시 기존 `run_phase1_analysis()` 연결
+- [ ] 기존 sidebar 입력은 fallback/debug 용도로 유지 또는 축소
+
+이번 1차 구현에서 제외한다.
+
+- [ ] 실제 DB 저장
+- [ ] 실제 GLM/LLM 호출
+- [ ] 실시간 가격 조회
+- [ ] 완전한 자유 채팅 파서
+- [ ] 포트폴리오 전체 종목별 loop 분석
+
+---
+
 권장 흐름:
 
 ```text
