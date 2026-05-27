@@ -47,13 +47,16 @@
 | RAG 저장소 | 방향 확정 | MVP 기본은 Postgres + pgvector, Chroma는 optional backend 후보 |
 | LangSmith | 준비 중 | 환경변수 placeholder만 반영, 실제 tracing 모듈은 후속 작업 |
 
-### 6 에이전트
-1. **Curator Agent** — 사용자 자연어 → 의도·종목 파싱 / 종목 미지정 시 후보 추천
-2. **Qual Worker Agent ★** — 뉴스·공시 RAG로 호재/악재 분석 (W1+W3 핵심)
-3. **Quant Worker Agent** — DART 재무 + pykrx 시세로 5y 밸류에이션 계산
-4. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교
-5. **Strategist & Synthesizer Agent** — 4 워커 종합 → BUY/HOLD/SELL 성격의 분석 신호 + PB 리포트
-6. **Guardrail & Evaluator Agent** — 위험 표현 차단 + RAGAS 자동 채점
+### 주요 에이전트
+1. **InvestorProfile Agent** — 온보딩 답변 → 투자성향·기간·손실감내·유동성 니즈 구조화
+2. **Curator Agent** — 사용자 자연어와 포트폴리오 → 분석 대상 종목/후보 큐레이션
+3. **RequestClassifier Agent** — 질문 → intent·scope·urgency 구조화
+4. **Qual Worker Agent ★** — 뉴스·공시 RAG로 호재/악재 분석 (현재 MVP mock)
+5. **Quant Worker Agent** — DART 재무 + pykrx 시세 기반 정량 분석 (현재 MVP mock)
+6. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교 (현재 MVP mock)
+7. **Strategist & Synthesizer Agent** — worker 결과와 포트폴리오 맥락 종합
+8. **InvestmentAnalyst Agent** — GLM으로 최종 분석 신호와 포트폴리오 적합도 보정
+9. **Guardrail & Evaluator Agent** — 위험 표현 차단 + 안전 문구 적용
 
 ### 11 사용자 기능
 
@@ -140,6 +143,42 @@ stock-agent/
 ---
 
 ## 🚀 빠른 시작
+
+### 로컬에서 단계형 투자성향/포트폴리오 분석 UI 확인
+
+현재 브랜치에서는 Streamlit으로 다음 흐름을 바로 확인할 수 있습니다.
+
+1. 투자성향 질문 카드에 답변
+2. 반도체/금융 후보 종목의 보유 수량과 평단가 입력
+3. 보유 현금 입력
+4. `투자성향 확인` 클릭
+5. `InvestorProfile → Curator → RequestClassifier → Quant/Qual/Competitor → Strategist → InvestmentAnalyst(GLM) → Guardrail` 실행 결과 확인
+6. 아래 `대화형 질문`에서 추가 질문 실행
+
+GLM key 없이도 local mock/rule-based fallback으로 화면 확인이 가능합니다.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+streamlit run streamlit_app.py --server.port 8501
+```
+
+브라우저에서 `http://127.0.0.1:8501`을 엽니다.
+
+GLM 기반 투자 분석기까지 확인하려면 key를 파일에 저장하지 말고, 실행 프로세스 환경변수로만 주입합니다.
+
+```bash
+GLM_API_KEY="glm:YOUR_LOCAL_KEY" \
+GLM_BASE_URL="https://api.z.ai/api/paas/v4" \
+GLM_MODEL="glm-4.5-flash" \
+streamlit run streamlit_app.py --server.port 8501
+```
+
+주의:
+- `.env`, API key, 개인 token은 커밋하지 않습니다.
+- GLM key가 없거나 호출에 실패하면 `InvestmentAnalyst Agent`는 기존 mock Strategist 결과로 fallback합니다.
+- 현재 데이터/정량/정성 worker는 MVP mock 데이터이며, 실제 DART/RAG/시세 연결은 후속 단계입니다.
 
 ### Docker 권장 실행
 
