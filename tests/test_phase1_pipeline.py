@@ -1,5 +1,11 @@
 from stock_agent.graph import run_phase1_analysis
-from stock_agent.intake import build_portfolio_from_text, parse_holdings_text
+from stock_agent.intake import (
+    ONBOARDING_CARDS,
+    build_portfolio_from_text,
+    infer_user_profile,
+    onboarding_card_count,
+    parse_holdings_text,
+)
 from stock_agent.schemas import Holding, Portfolio, UserProfile, UserRequest
 
 
@@ -78,6 +84,54 @@ def test_build_portfolio_from_text_returns_warnings_for_unknown_items() -> None:
     assert len(portfolio.holdings) == 1
     assert warnings
     assert "모르는종목" in warnings[0]
+
+
+def test_onboarding_cards_are_reasonable_count() -> None:
+    assert onboarding_card_count() == 7
+    assert [card["id"] for card in ONBOARDING_CARDS] == [
+        "investment_goal",
+        "investment_horizon_months",
+        "max_drawdown_tolerance",
+        "loss_reaction",
+        "liquidity_need_level",
+        "experience_level",
+        "preferred_sectors",
+    ]
+
+
+def test_infer_user_profile_returns_conservative_profile() -> None:
+    profile = infer_user_profile(
+        {
+            "investment_goal": "wealth_preservation",
+            "investment_horizon_months": 3,
+            "max_drawdown_tolerance": -0.05,
+            "loss_reaction": "reduce",
+            "liquidity_need_level": "high",
+            "experience_level": "beginner",
+            "preferred_sectors": ["금융"],
+        }
+    )
+
+    assert profile.risk_tolerance == "low"
+    assert profile.target_return_rate == 0.05
+    assert profile.preferred_sectors == ["금융"]
+
+
+def test_infer_user_profile_returns_aggressive_profile() -> None:
+    profile = infer_user_profile(
+        {
+            "investment_goal": "short_term_profit",
+            "investment_horizon_months": 36,
+            "max_drawdown_tolerance": -0.3,
+            "loss_reaction": "buy_more",
+            "liquidity_need_level": "low",
+            "experience_level": "advanced",
+            "preferred_sectors": ["반도체", "금융"],
+        }
+    )
+
+    assert profile.risk_tolerance == "high"
+    assert profile.target_return_rate == 0.2
 
 
 def test_user_request_keeps_raw_query_with_structured_context() -> None:
