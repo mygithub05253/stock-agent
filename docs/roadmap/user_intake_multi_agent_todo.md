@@ -173,11 +173,85 @@ DB schema는 팀 합의 후 별도 PR로 진행한다. Phase 0 기준 책임 범
 
 ### Phase 7. DB 연결 준비
 
-- [ ] `users` 테이블 최종 필드 검토
-- [ ] `holdings` 테이블 최종 필드 검토
-- [ ] `analysis_history` 저장 범위 검토
-- [ ] 기존 `db/init/001_create_raw_tables.sql`와 문서 ERD 차이 정리
-- [ ] DB schema 변경은 팀 합의 후 별도 PR로 진행
+- [x] `users` 테이블 최종 필드 검토
+- [x] `holdings` 테이블 최종 필드 검토
+- [x] `analysis_history` 저장 범위 검토
+- [x] 기존 `db/init/001_create_raw_tables.sql`와 문서 ERD 차이 정리
+- [x] DB schema 변경은 팀 합의 후 별도 PR로 진행
+
+### Phase 7 DB 연결 준비 결과
+
+이번 phase에서는 실제 DB schema를 변경하지 않는다. 이유는 `docs/architecture/erd.md`에도 `users`, `holdings`, `analysis_history`가 PM 추가 제안 테이블로 표시되어 있고, 현재 `db/init/001_create_raw_tables.sql`에는 아직 해당 테이블이 없기 때문이다. DB 변경은 데이터팀/백엔드 담당과 합의 후 별도 PR로 진행한다.
+
+#### 현재 SQL과 ERD 차이
+
+| 구분 | 문서 ERD | 현재 SQL | 판단 |
+|------|----------|----------|------|
+| `users` | 존재 | 없음 | 유저 초입 구현 전 필요 |
+| `holdings` | 존재 | 없음 | 포트폴리오 저장 전 필요 |
+| `analysis_history` | 존재 | 없음 | 분석 결과 캐시/이력 저장 전 필요 |
+| `financial_data` | 존재 | 없음 | 현재 SQL은 `financial_statement` 사용 |
+| `disclosure` | 존재 | 없음 | 현재 SQL은 `disclosure_report`, `disclosure_content` 분리 |
+
+#### `users` 제안 필드
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `user_id` | uuid/text | 사용자 식별자 |
+| `email` | text | 로그인 ID. unique 필요 |
+| `password_hash` | text | MVP 인증 구현 시 필요. 평문 저장 금지 |
+| `name` | text | 화면 표시명 |
+| `risk_tolerance` | text | `low`, `medium`, `high` |
+| `investment_horizon_months` | int | 투자 기간 |
+| `target_return_rate` | numeric | 목표 수익률 |
+| `max_drawdown_tolerance` | numeric | 허용 손실률 |
+| `investment_goal` | text | 투자 목적 |
+| `experience_level` | text | 투자 경험 |
+| `cash_source` | text | 투자자금 출처 |
+| `preferred_sectors` | jsonb/text[] | 관심 산업. MVP는 반도체/금융 |
+| `excluded_sectors` | jsonb/text[] | 제외 산업 |
+| `liquidity_need_level` | text | 현금 필요도 |
+| `created_at` | timestamptz | 생성 시각 |
+| `updated_at` | timestamptz | 수정 시각 |
+
+#### `holdings` 제안 필드
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `holding_id` | uuid/bigserial | 보유 종목 행 식별자 |
+| `user_id` | uuid/text | `users` FK |
+| `stock_code` | varchar(6) | `company.stock_code` FK |
+| `avg_price` | bigint/numeric | 평균 매수가 |
+| `qty` | int | 보유 수량 |
+| `bought_at` | date | 대표 매수일 |
+| `memo` | text | 사용자 메모 |
+| `source` | text | `manual`, `csv`, `demo` |
+| `created_at` | timestamptz | 생성 시각 |
+| `updated_at` | timestamptz | 수정 시각 |
+
+`weight`, `market_value`, `return_rate`는 저장보다 조회 시 계산을 우선한다. 단, 분석 재현성을 위해 `analysis_history`에는 당시 snapshot을 JSON으로 남길 수 있다.
+
+#### `analysis_history` 제안 필드
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `analysis_id` | uuid/bigserial | 분석 이력 식별자 |
+| `user_id` | uuid/text | 사용자 식별자 |
+| `request_snapshot` | jsonb | `UserRequest` 원문과 정규화 결과 |
+| `profile_snapshot` | jsonb | 분석 당시 `UserProfile` |
+| `portfolio_snapshot` | jsonb | 분석 당시 `Portfolio` |
+| `tier1_output` | jsonb | 최종 한 줄 결론 |
+| `tier2_output` | jsonb | 근거 카드 |
+| `warnings` | jsonb | 데이터 부족, guardrail, 지원 산업 제한 등 |
+| `created_at` | timestamptz | 분석 시각 |
+
+#### 별도 PR로 넘길 결정 사항
+
+- `user_id`를 uuid로 고정할지, MVP demo를 위해 text를 허용할지
+- `preferred_sectors`를 `jsonb`로 둘지 `text[]`로 둘지
+- `holdings.weight`를 저장할지, 조회 시 계산만 할지
+- `analysis_cache`와 `analysis_history`를 분리할지
+- `financial_data`와 현재 `financial_statement` 이름 차이를 정리할지
 
 ---
 
