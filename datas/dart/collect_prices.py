@@ -21,9 +21,9 @@ def collect_stock_prices():
         cursor.execute("""
             SELECT stock_code, corp_name 
             FROM company 
-            WHERE stock_code IS NOT NULL
-            ORDER BY stock_code
-            OFFSET 139;
+            WHERE stock_code IS NOT NULL 
+              AND stock_code >= '331920'
+            ORDER BY stock_code;
         """)
         companies = cursor.fetchall()
         
