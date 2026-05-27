@@ -57,8 +57,14 @@ class QualResult(BaseModel):
 class CompetitorResult(BaseModel):
     score: int = Field(ge=0, le=100)
     peer_summary: str
-    peers: list[dict[str, float | int | str]]
+    peers: list[dict[str, float | int | str | None]]
     evidence: list[str]
+    peer_selection_summary: str | None = None
+    metric_definitions: dict[str, str] = Field(default_factory=dict)
+    relative_position: dict[str, float | int | str | None] = Field(default_factory=dict)
+    data_quality_flags: list[str] = Field(default_factory=list)
+    a1_peer_multiple_payload: dict[str, float | int | str | None] | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class StrategistResult(BaseModel):
