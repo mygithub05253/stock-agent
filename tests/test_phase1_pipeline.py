@@ -1,5 +1,5 @@
 from stock_agent.graph import run_phase1_analysis
-from stock_agent.schemas import Holding, Portfolio, UserProfile
+from stock_agent.schemas import Holding, Portfolio, UserProfile, UserRequest
 
 
 def test_phase1_analysis_returns_guarded_tier1() -> None:
@@ -58,3 +58,26 @@ def test_portfolio_holding_calculates_basic_values() -> None:
     assert holding.market_value == 770000
     assert portfolio.total_market_value == 770000
     assert portfolio.sector_weights() == {"반도체": 1.0}
+
+
+def test_user_request_keeps_raw_query_with_structured_context() -> None:
+    request = UserRequest(
+        raw_query="삼성전자 급등했는데 안정형이면 어떻게 할까?",
+        intent="holding_review",
+        target_stock_code="005930",
+        target_corp_name="삼성전자",
+        analysis_scope="single_stock",
+        urgency_reason="surge",
+        requested_depth="summary",
+    )
+
+    assert request.raw_query.startswith("삼성전자")
+    assert request.intent == "holding_review"
+    assert request.urgency_reason == "surge"
+
+
+def test_phase1_analysis_attaches_user_request() -> None:
+    output = run_phase1_analysis("삼성전자 봐줘")
+
+    assert output.state.user_request is not None
+    assert output.state.user_request.raw_query == "삼성전자 봐줘"

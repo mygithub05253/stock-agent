@@ -11,6 +11,16 @@ RiskTolerance = Literal["low", "medium", "high"]
 InvestmentGoal = Literal["wealth_preservation", "growth", "short_term_profit", "dividend"]
 ExperienceLevel = Literal["beginner", "intermediate", "advanced"]
 LiquidityNeedLevel = Literal["low", "medium", "high"]
+RequestIntent = Literal[
+    "holding_review",
+    "new_recommendation",
+    "risk_review",
+    "sell_decision",
+    "portfolio_review",
+]
+AnalysisScope = Literal["single_stock", "portfolio", "sector"]
+UrgencyReason = Literal["surge", "drop", "earnings", "news", "general"]
+RequestedDepth = Literal["summary", "standard", "deep"]
 
 
 class Holding(BaseModel):
@@ -77,6 +87,16 @@ class Portfolio(BaseModel):
         return weights
 
 
+class UserRequest(BaseModel):
+    raw_query: str
+    intent: RequestIntent | None = None
+    target_stock_code: str | None = None
+    target_corp_name: str | None = None
+    analysis_scope: AnalysisScope | None = None
+    urgency_reason: UrgencyReason | None = None
+    requested_depth: RequestedDepth = "summary"
+
+
 class CuratorResult(BaseModel):
     intent: str
     corp_name: str
@@ -136,6 +156,7 @@ class Tier1Result(BaseModel):
 
 class AgentState(BaseModel):
     user_query: str
+    user_request: UserRequest | None = None
     user_profile: UserProfile
     portfolio: Portfolio
     curator: CuratorResult | None = None

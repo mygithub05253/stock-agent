@@ -135,13 +135,13 @@ DB schema는 팀 합의 후 별도 PR로 진행한다. Phase 0 기준 책임 범
 
 ### Phase 3. UserRequest 도입
 
-- [ ] `raw_query` 보관
-- [ ] `intent` 후보 정의: 보유 종목 점검, 신규 추천, 리스크 점검, 매도 판단, 포트폴리오 전체 점검
-- [ ] `target_stock_code` / `target_corp_name` 필드 정의
-- [ ] `analysis_scope` 정의: `single_stock`, `portfolio`, `sector`
-- [ ] `urgency_reason` 정의: 급등, 급락, 실적, 뉴스, 일반점검
-- [ ] `requested_depth` 정의: `summary`, `standard`, `deep`
-- [ ] 기존 `AgentState.user_query`와의 호환 방식 결정
+- [x] `raw_query` 보관
+- [x] `intent` 후보 정의: 보유 종목 점검, 신규 추천, 리스크 점검, 매도 판단, 포트폴리오 전체 점검
+- [x] `target_stock_code` / `target_corp_name` 필드 정의
+- [x] `analysis_scope` 정의: `single_stock`, `portfolio`, `sector`
+- [x] `urgency_reason` 정의: 급등, 급락, 실적, 뉴스, 일반점검
+- [x] `requested_depth` 정의: `summary`, `standard`, `deep`
+- [x] 기존 `AgentState.user_query`와의 호환 방식 결정
 
 ### Phase 4. Streamlit 초입 UI 개선
 

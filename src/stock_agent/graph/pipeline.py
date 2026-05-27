@@ -13,6 +13,7 @@ from stock_agent.schemas.analysis import (
     Portfolio,
     Tier1Result,
     UserProfile,
+    UserRequest,
 )
 
 
@@ -61,7 +62,12 @@ def run_phase1_analysis(
         user_profile = user_profile or demo_profile
         portfolio = portfolio or demo_portfolio
 
-    state = AgentState(user_query=user_query, user_profile=user_profile, portfolio=portfolio)
+    state = AgentState(
+        user_query=user_query,
+        user_request=UserRequest(raw_query=user_query),
+        user_profile=user_profile,
+        portfolio=portfolio,
+    )
     state = run_curator(state)
 
     # Phase 1 uses local mock workers. The contract mirrors the future LangGraph

@@ -1,6 +1,7 @@
 from stock_agent.schemas.analysis import (
     AgentState,
     AnalysisOutput,
+    AnalysisScope,
     CompetitorResult,
     CuratorResult,
     ExperienceLevel,
@@ -11,16 +12,21 @@ from stock_agent.schemas.analysis import (
     Portfolio,
     QualResult,
     QuantResult,
+    RequestIntent,
+    RequestedDepth,
     RiskTolerance,
     Signal,
     StrategistResult,
     Tier1Result,
     UserProfile,
+    UserRequest,
+    UrgencyReason,
 )
 
 __all__ = [
     "AgentState",
     "AnalysisOutput",
+    "AnalysisScope",
     "CompetitorResult",
     "CuratorResult",
     "ExperienceLevel",
@@ -31,9 +37,13 @@ __all__ = [
     "Portfolio",
     "QualResult",
     "QuantResult",
+    "RequestIntent",
+    "RequestedDepth",
     "RiskTolerance",
     "Signal",
     "StrategistResult",
     "Tier1Result",
     "UserProfile",
+    "UserRequest",
+    "UrgencyReason",
 ]
