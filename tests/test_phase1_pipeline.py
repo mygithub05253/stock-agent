@@ -1,4 +1,4 @@
-from stock_agent.agents import run_curator, run_request_classifier
+from stock_agent.agents import run_curator, run_investor_profile_agent, run_request_classifier
 from stock_agent.graph import build_demo_profile, run_phase1_analysis
 from stock_agent.intake import (
     ONBOARDING_CARDS,
@@ -82,10 +82,12 @@ def test_parse_holdings_text_extracts_supported_stocks() -> None:
 
 
 def test_build_holding_from_selection_uses_catalog_price() -> None:
-    holding = build_holding_from_selection("삼성전자", 10)
+    holding = build_holding_from_selection("삼성전자", 10, avg_price=70000)
 
     assert holding.stock_code == "005930"
     assert holding.qty == 10
+    assert holding.avg_price == 70000
+    assert holding.cost_basis == 700000
     assert holding.market_value == 780000
 
 
@@ -141,6 +143,20 @@ def test_infer_user_profile_returns_conservative_profile() -> None:
     assert profile.risk_tolerance == "low"
     assert profile.target_return_rate == 0.05
     assert profile.preferred_sectors == ["금융"]
+
+
+def test_investor_profile_agent_matches_intake_profile() -> None:
+    answers = {
+        "investment_goal": "wealth_preservation",
+        "investment_horizon_months": 3,
+        "max_drawdown_tolerance": -0.05,
+        "loss_reaction": "reduce",
+        "liquidity_need_level": "high",
+        "experience_level": "beginner",
+        "preferred_sectors": ["금융"],
+    }
+
+    assert run_investor_profile_agent(answers) == infer_user_profile(answers)
 
 
 def test_infer_user_profile_returns_aggressive_profile() -> None:

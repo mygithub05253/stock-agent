@@ -193,7 +193,8 @@ Streamlit 메모리는 다음 key를 사용한다.
 | 입력 | 방식 |
 |------|------|
 | 종목 | 후보 10개 고정 나열 |
-| 수량 | 종목별 number_input, 기본값 0 |
+| 수량 | 종목별 number_input, 대표 종목 일부 기본값 제공 |
+| 평단가 | 종목별 number_input, mock 현재가 기반 기본값 제공 |
 | 보유 현금 | number_input |
 
 보조 입력으로 자연어 파서도 유지한다. CLI demo나 후속 채팅형 입력에서 사용할 수 있다.
@@ -234,6 +235,8 @@ Streamlit 메모리는 다음 key를 사용한다.
 | 항목 | 계산 |
 |------|------|
 | 총 평가금액 | `sum(current_price * qty)` |
+| 총 매입금액 | `sum(avg_price * qty)` |
+| 종목별 손익률 | `(current_price - avg_price) / avg_price` |
 | 종목별 비중 | `holding.market_value / total_market_value` |
 | 섹터 비중 | `Portfolio.sector_weights()` |
 | 현금 비중 | `cash_amount / (total_market_value + cash_amount)` |

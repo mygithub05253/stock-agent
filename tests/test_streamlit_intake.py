@@ -17,12 +17,12 @@ def test_staged_intake_reaches_portfolio_step() -> None:
 
     _complete_onboarding(at)
 
-    assert any("분석된 투자 성향" in widget.value for widget in at.subheader)
+    assert any("투자 성향 분석 에이전트 결과" in widget.value for widget in at.subheader)
     assert any("후보 산업" in widget.label for widget in at.multiselect)
     assert any("SK하이닉스 수량" in widget.label for widget in at.number_input)
+    assert any("SK하이닉스 평단가" in widget.label for widget in at.number_input)
     assert any("삼성전자 수량" in widget.label for widget in at.number_input)
     assert any("보유 현금" in widget.label for widget in at.number_input)
-    assert any("보유 종목을 1개 이상 선택해 주세요." in widget.value for widget in at.info)
 
     qty_input = next(widget for widget in at.number_input if widget.label == "SK하이닉스 수량")
     qty_input.set_value(10)

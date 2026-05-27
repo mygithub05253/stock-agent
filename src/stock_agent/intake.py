@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from typing import Any
 
+import re
+
+from stock_agent.agents.investor_profile import run_investor_profile_agent
 from stock_agent.schemas import Holding, Portfolio, UserProfile
 
 
@@ -256,43 +258,8 @@ def onboarding_card_count() -> int:
     return len(ONBOARDING_CARDS)
 
 
-def _score_answers(answers: dict[str, Any]) -> int:
-    score = 0
-    for card in ONBOARDING_CARDS:
-        selected = answers.get(card["id"])
-        for option in card["options"]:
-            if option["value"] == selected:
-                score += int(option["score"])
-                break
-    return score
-
-
 def infer_user_profile(answers: dict[str, Any], user_id: str = "session-user") -> UserProfile:
-    score = _score_answers(answers)
-    risk_tolerance = "low" if score <= 5 else "medium" if score <= 9 else "high"
-
-    horizon = int(answers.get("investment_horizon_months", 12))
-    drawdown = float(answers.get("max_drawdown_tolerance", -0.1))
-    liquidity = str(answers.get("liquidity_need_level", "medium"))
-
-    if drawdown >= -0.05 and liquidity == "high":
-        risk_tolerance = "low"
-    elif horizon <= 3 and risk_tolerance == "high":
-        risk_tolerance = "medium"
-
-    target_return_rate = 0.05 if risk_tolerance == "low" else 0.1 if risk_tolerance == "medium" else 0.2
-
-    return UserProfile(
-        user_id=user_id,
-        risk_tolerance=risk_tolerance,
-        investment_horizon_months=horizon,
-        target_return_rate=target_return_rate,
-        max_drawdown_tolerance=drawdown,
-        investment_goal=answers.get("investment_goal", "growth"),
-        experience_level=answers.get("experience_level", "beginner"),
-        preferred_sectors=answers.get("preferred_sectors", ["반도체"]),
-        liquidity_need_level=liquidity,
-    )
+    return run_investor_profile_agent(answers, user_id=user_id)
 
 
 def parse_holdings_text(text: str) -> HoldingParseResult:
@@ -350,14 +317,14 @@ def build_holding_weights(holdings: list[Holding]) -> list[Holding]:
     ]
 
 
-def build_holding_from_selection(corp_name: str, qty: int) -> Holding:
+def build_holding_from_selection(corp_name: str, qty: int, avg_price: int | None = None) -> Holding:
     meta = STOCK_CATALOG[corp_name]
     current_price = int(meta["current_price"])
     return Holding(
         stock_code=str(meta["stock_code"]),
         corp_name=str(meta.get("corp_name", corp_name)),
         sector=str(meta["sector"]),
-        avg_price=current_price,
+        avg_price=avg_price if avg_price is not None else current_price,
         qty=qty,
         current_price=current_price,
     )

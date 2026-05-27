@@ -2,6 +2,7 @@ import streamlit as st
 
 from stock_agent.graph import run_phase1_analysis
 from stock_agent.intake import (
+    STOCK_CATALOG,
     build_holding_from_selection,
     build_holding_weights,
     get_stock_options,
@@ -10,6 +11,24 @@ from stock_agent.intake import (
     onboarding_card_count,
 )
 from stock_agent.schemas import Portfolio, UserProfile
+
+
+_DEFAULT_QTY_BY_CORP = {
+    "SK하이닉스": 2,
+    "삼성전자": 3,
+    "한미반도체": 2,
+    "KB금융": 5,
+    "신한지주": 5,
+}
+
+
+_DEFAULT_AVG_PRICE_RATIO_BY_CORP = {
+    "SK하이닉스": 0.92,
+    "삼성전자": 0.95,
+    "한미반도체": 0.9,
+    "KB금융": 0.94,
+    "신한지주": 0.96,
+}
 
 
 def _signal_badge(signal: str) -> str:
@@ -113,7 +132,7 @@ def _get_inferred_profile() -> UserProfile:
 
 
 def _render_profile_summary(user_profile: UserProfile) -> None:
-    st.subheader("2. 분석된 투자 성향")
+    st.subheader("2. 투자 성향 분석 에이전트 결과")
     col_risk, col_horizon, col_loss = st.columns(3)
     col_risk.metric("투자성향", _format_risk_label(user_profile.risk_tolerance))
     col_horizon.metric("투자 기간", f"{user_profile.investment_horizon_months}개월")
@@ -123,7 +142,10 @@ def _render_profile_summary(user_profile: UserProfile) -> None:
         else "미정"
     )
     col_loss.metric("손실 감내", loss_label)
-    st.caption("투자성향은 답변 점수와 보정 룰로 추론한 값입니다.")
+    with st.status("InvestorProfile Agent 완료", state="complete", expanded=False):
+        st.write("온보딩 답변 점수화")
+        st.write("투자 기간, 손실 감내, 유동성 필요도 보정")
+        st.write("최종 투자성향과 목표수익률 산출")
 
 
 def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
@@ -143,25 +165,42 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     stock_names = get_stock_options(selected_sectors, limit=10)
 
     selected_holdings = []
-    st.write("보유 수량")
+    st.write("보유 종목")
     for row_start in range(0, len(stock_names), 2):
         row_columns = st.columns(2, gap="medium")
         for column, corp_name in zip(row_columns, stock_names[row_start : row_start + 2], strict=False):
             with column:
-                name_col, qty_col = st.columns([1.8, 1])
+                current_price = int(STOCK_CATALOG[corp_name]["current_price"])
+                default_avg_price = int(
+                    current_price * _DEFAULT_AVG_PRICE_RATIO_BY_CORP.get(corp_name, 1.0)
+                )
+                name_col, qty_col, price_col = st.columns([1.35, 0.75, 1])
                 with name_col:
                     st.markdown(f"**{corp_name}**")
+                    st.caption(f"현재가 {current_price:,}원")
                 with qty_col:
                     qty = st.number_input(
                         f"{corp_name} 수량",
                         min_value=0,
-                        value=0,
+                        value=_DEFAULT_QTY_BY_CORP.get(corp_name, 0),
                         step=1,
-                        label_visibility="collapsed",
+                        label_visibility="visible",
                         key=f"stock_qty_{corp_name}",
                     )
+                with price_col:
+                    avg_price = st.number_input(
+                        f"{corp_name} 평단가",
+                        min_value=0,
+                        value=default_avg_price,
+                        step=1000,
+                        format="%d",
+                        label_visibility="visible",
+                        key=f"stock_avg_price_{corp_name}",
+                    )
                 if qty > 0:
-                    selected_holdings.append(build_holding_from_selection(corp_name, int(qty)))
+                    selected_holdings.append(
+                        build_holding_from_selection(corp_name, int(qty), avg_price=int(avg_price))
+                    )
 
     holdings_value = sum(holding.market_value or 0 for holding in selected_holdings)
     cash_amount = st.number_input(
@@ -216,7 +255,16 @@ def _render_portfolio_summary(portfolio: Portfolio) -> None:
     for holding in portfolio.holdings:
         weight_label = f"{holding.weight:.0%}" if holding.weight is not None else "계산 불가"
         market_value = holding.market_value or 0
-        st.write(f"- {holding.corp_name}: {holding.qty}주 / {market_value:,}원 / {weight_label}")
+        cost_basis = holding.cost_basis or 0
+        pnl_rate = (
+            (market_value - cost_basis) / cost_basis
+            if cost_basis > 0 and market_value > 0
+            else 0
+        )
+        st.write(
+            f"- {holding.corp_name}: {holding.qty}주 / 평단 {(holding.avg_price or 0):,}원 / "
+            f"평가 {market_value:,}원 / 손익률 {pnl_rate:.1%} / {weight_label}"
+        )
 
     sector_weights = portfolio.sector_weights()
     if sector_weights:
@@ -235,12 +283,18 @@ def _build_initial_query(portfolio: Portfolio) -> str:
 def _ensure_initial_analysis_output(user_profile: UserProfile, portfolio: Portfolio) -> None:
     if st.session_state.get("analysis_output") is not None:
         return
-    with st.spinner("저장된 포트폴리오를 먼저 분석하는 중..."):
+    with st.status("에이전트 파이프라인 실행 중", expanded=True) as status:
+        st.write("InvestorProfile Agent: 투자성향 context 준비")
+        st.write("Curator Agent: 분석 대상 종목/후보 탐색")
+        st.write("RequestClassifier Agent: 질문 intent/scope/urgency 분류")
         output = run_phase1_analysis(
             _build_initial_query(portfolio),
             user_profile=user_profile,
             portfolio=portfolio,
         )
+        st.write("Quant, Qual, Competitor Worker: mock 분석 실행")
+        st.write("Strategist, Guardrail: 최종 결과와 안전 문구 생성")
+        status.update(label="에이전트 파이프라인 완료", state="complete", expanded=False)
     st.session_state["analysis_output"] = output
 
 
@@ -328,6 +382,29 @@ def main() -> None:
         layout="wide",
     )
     _init_intake_state()
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: #f8fafc;
+            color: #0f172a;
+        }
+        div[data-testid="stMetric"],
+        div[data-testid="stStatus"] {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+        div[data-testid="stNumberInput"] label p,
+        div[data-testid="stMultiSelect"] label p {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.title("단계형 투자성향 수집")
     st.caption("질문 카드에 하나씩 답하면 투자성향을 추론하고, 보유 종목을 받아 분석합니다.")

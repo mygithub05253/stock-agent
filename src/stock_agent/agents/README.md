@@ -8,6 +8,7 @@
 
 | 파일 | 에이전트 | 한 줄 역할 | 강의 연계 |
 |------|----------|-----------|-----------|
+| `investor_profile.py` | Investor Profile Agent | 온보딩 답변을 투자성향, 투자기간, 손실감내, 유동성 니즈로 구조화 | W3 (Routing) |
 | `curator.py` | Curator Agent | 사용자 자연어와 포트폴리오를 보고 분석 대상 종목/후보 큐레이션 | W3 (ReAct) |
 | `request_classifier.py` | Request Classifier Agent | 질문을 intent, analysis_scope, urgency_reason으로 구조화 | W3 (Routing) |
 | `qual.py` ⭐ | Qual Worker Agent | 뉴스·공시 RAG + 호재/악재 센티먼트 분석 | **W1 + W3** (핵심) |
@@ -22,6 +23,7 @@
 
 | 에이전트 | 해야 하는 일 | 하지 않는 일 |
 |----------|--------------|--------------|
+| Investor Profile | 사용자 답변을 `UserProfile`로 구조화 | 종목 분석, 매수/매도 판단 |
 | Curator | 분석 대상 종목과 후보 확정 | 질문 intent 분류, 정량 계산, 최종 투자 판단 |
 | Request Classifier | 질문 intent, scope, urgency 분류 | 종목 lookup, 정량 계산, 최종 투자 판단 |
 | Quant | 재무·시세 계산과 정량 해석 | LLM으로 숫자 생성 |
@@ -36,6 +38,7 @@
 
 | 에이전트 | 사용자 성향 반영 | 기준 |
 |----------|------------------|------|
+| Investor Profile | 매우 높음 | 온보딩 답변을 기반으로 성향 자체를 산출 |
 | Curator | 높음 | 관심 섹터와 보유 종목을 보고 분석 대상/후보를 정함 |
 | Request Classifier | 중간 | 질문 표현과 Curator 결과를 보고 route를 정함 |
 | Quant | 낮음 | 수치 계산은 공통. 변동성 warning 정도만 다르게 표현 가능 |
