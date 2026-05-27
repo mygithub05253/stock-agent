@@ -8,12 +8,168 @@ from stock_agent.schemas import Holding, Portfolio, UserProfile
 
 
 STOCK_CATALOG = {
-    "삼성전자": {"stock_code": "005930", "sector": "반도체", "current_price": 78000},
-    "SK하이닉스": {"stock_code": "000660", "sector": "반도체", "current_price": 201000},
-    "하이닉스": {"stock_code": "000660", "corp_name": "SK하이닉스", "sector": "반도체", "current_price": 201000},
-    "KB금융": {"stock_code": "105560", "sector": "금융", "current_price": 82000},
-    "신한지주": {"stock_code": "055550", "sector": "금융", "current_price": 56000},
+    "SK하이닉스": {
+        "stock_code": "000660",
+        "sector": "반도체",
+        "current_price": 201000,
+        "market_cap_rank": 1,
+    },
+    "삼성전자": {
+        "stock_code": "005930",
+        "sector": "반도체",
+        "current_price": 78000,
+        "market_cap_rank": 2,
+    },
+    "한미반도체": {
+        "stock_code": "042700",
+        "sector": "반도체",
+        "current_price": 145000,
+        "market_cap_rank": 3,
+    },
+    "리노공업": {
+        "stock_code": "058470",
+        "sector": "반도체",
+        "current_price": 225000,
+        "market_cap_rank": 4,
+    },
+    "이오테크닉스": {
+        "stock_code": "039030",
+        "sector": "반도체",
+        "current_price": 175000,
+        "market_cap_rank": 5,
+    },
+    "DB하이텍": {
+        "stock_code": "000990",
+        "sector": "반도체",
+        "current_price": 52000,
+        "market_cap_rank": 6,
+    },
+    "HPSP": {
+        "stock_code": "403870",
+        "sector": "반도체",
+        "current_price": 43200,
+        "market_cap_rank": 7,
+    },
+    "ISC": {
+        "stock_code": "095340",
+        "sector": "반도체",
+        "current_price": 78000,
+        "market_cap_rank": 8,
+    },
+    "이수페타시스": {
+        "stock_code": "007660",
+        "sector": "반도체",
+        "current_price": 48000,
+        "market_cap_rank": 9,
+    },
+    "하나마이크론": {
+        "stock_code": "067310",
+        "sector": "반도체",
+        "current_price": 26000,
+        "market_cap_rank": 10,
+    },
+    "KB금융": {
+        "stock_code": "105560",
+        "sector": "금융",
+        "current_price": 82000,
+        "market_cap_rank": 1,
+    },
+    "신한지주": {
+        "stock_code": "055550",
+        "sector": "금융",
+        "current_price": 56000,
+        "market_cap_rank": 2,
+    },
+    "하나금융지주": {
+        "stock_code": "086790",
+        "sector": "금융",
+        "current_price": 68000,
+        "market_cap_rank": 3,
+    },
+    "우리금융지주": {
+        "stock_code": "316140",
+        "sector": "금융",
+        "current_price": 16500,
+        "market_cap_rank": 4,
+    },
+    "기업은행": {
+        "stock_code": "024110",
+        "sector": "금융",
+        "current_price": 15500,
+        "market_cap_rank": 5,
+    },
+    "카카오뱅크": {
+        "stock_code": "323410",
+        "sector": "금융",
+        "current_price": 24000,
+        "market_cap_rank": 6,
+    },
+    "한국금융지주": {
+        "stock_code": "071050",
+        "sector": "금융",
+        "current_price": 83000,
+        "market_cap_rank": 7,
+    },
+    "BNK금융지주": {
+        "stock_code": "138930",
+        "sector": "금융",
+        "current_price": 10500,
+        "market_cap_rank": 8,
+    },
+    "JB금융지주": {
+        "stock_code": "175330",
+        "sector": "금융",
+        "current_price": 16500,
+        "market_cap_rank": 9,
+    },
+    "iM금융지주": {
+        "stock_code": "139130",
+        "sector": "금융",
+        "current_price": 10500,
+        "market_cap_rank": 10,
+    },
+    "하이닉스": {
+        "stock_code": "000660",
+        "corp_name": "SK하이닉스",
+        "sector": "반도체",
+        "current_price": 201000,
+        "market_cap_rank": 1,
+    },
 }
+
+
+def get_stock_options(preferred_sectors: list[str] | None = None, limit: int = 10) -> list[str]:
+    sectors = preferred_sectors or ["반도체", "금융"]
+    canonical_items = [
+        (name, meta)
+        for name, meta in STOCK_CATALOG.items()
+        if "corp_name" not in meta and meta["sector"] in sectors
+    ]
+
+    if len(sectors) >= 2:
+        per_sector_limit = max(1, limit // len(sectors))
+        options: list[str] = []
+        for sector in sectors:
+            sector_items = sorted(
+                [item for item in canonical_items if item[1]["sector"] == sector],
+                key=lambda item: int(item[1].get("market_cap_rank", 999)),
+            )
+            options.extend(name for name, _ in sector_items[:per_sector_limit])
+        if len(options) < limit:
+            remaining = sorted(
+                [item for item in canonical_items if item[0] not in options],
+                key=lambda item: (str(item[1]["sector"]), int(item[1].get("market_cap_rank", 999))),
+            )
+            options.extend(name for name, _ in remaining[: limit - len(options)])
+        return options[:limit]
+
+    return [
+        name
+        for name, _ in sorted(
+            canonical_items,
+            key=lambda item: int(item[1].get("market_cap_rank", 999)),
+        )[:limit]
+    ]
 
 
 @dataclass(frozen=True)
