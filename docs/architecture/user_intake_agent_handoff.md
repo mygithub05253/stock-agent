@@ -513,3 +513,4 @@ PYTHONPATH=src python3 scripts/run_user_intake_demo.py
 | 날짜 | 변경 내용 |
 |------|-----------|
 | 2026-05-27 | User Intake / Curator output handoff 문서 작성 |
+| 2026-05-27 | 투자회사 questionnaire 참고 기반 단계형 카드 온보딩, 룰 기반 성향 추론, 포트폴리오 입력/질문 분석 흐름 반영 |
