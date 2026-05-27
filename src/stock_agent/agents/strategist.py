@@ -11,7 +11,7 @@ def run_strategist(state: AgentState) -> AgentState:
     holding_weight = 0.0
     if state.curator is not None:
         holding_weight = sum(
-            holding.weight
+            holding.weight or 0
             for holding in state.portfolio.holdings
             if holding.stock_code == state.curator.stock_code
         )

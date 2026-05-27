@@ -124,14 +124,14 @@ DB schema는 팀 합의 후 별도 PR로 진행한다. Phase 0 기준 책임 범
 
 ### Phase 2. Portfolio / Holding 확장
 
-- [ ] `Holding`에 `qty` 추가
-- [ ] `Holding`에 `sector` 추가
-- [ ] `Holding`에 `bought_at` 추가
-- [ ] `Holding`에 `current_price`를 계산/조회값으로 둘지 검토
-- [ ] `avg_price * qty` 기반 `cost_basis` 계산 helper 검토
-- [ ] `current_price * qty` 기반 `market_value` 계산 helper 검토
-- [ ] 포트폴리오 내 `weight`를 입력값으로 둘지 계산값으로 둘지 결정
-- [ ] 섹터별 비중 계산 helper 검토
+- [x] `Holding`에 `qty` 추가
+- [x] `Holding`에 `sector` 추가
+- [x] `Holding`에 `bought_at` 추가
+- [x] `Holding`에 `current_price`를 계산/조회값으로 둘지 검토
+- [x] `avg_price * qty` 기반 `cost_basis` 계산 helper 검토
+- [x] `current_price * qty` 기반 `market_value` 계산 helper 검토
+- [x] 포트폴리오 내 `weight`를 입력값으로 둘지 계산값으로 둘지 결정
+- [x] 섹터별 비중 계산 helper 검토
 
 ### Phase 3. UserRequest 도입
 
