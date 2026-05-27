@@ -98,12 +98,13 @@ User Intake / Curator 단계는 사용자 입력을 다음 agent들이 처리하
 
 ### 3.1 큰 계획
 
-카드형 대화 수집 UI는 “사용자에게 질문을 여러 개 던지고, 답변을 구조화해서 메모리에 쌓은 뒤, 포트폴리오 분석으로 연결하는 초입 agent 화면”이다.
+단계형 카드 수집 UI는 “질문 카드 1개를 보여주고, 사용자가 답하면 다음 카드로 넘어가며, 답변을 구조화해서 메모리에 쌓은 뒤 포트폴리오 분석으로 연결하는 초입 agent 화면”이다.
 
 ```text
-카드형 질문
+단계형 질문 카드 1개 표시
 -> 답변 수집
 -> 답변 유형 분류
+-> 룰 기반 투자성향 추론
 -> session_state 저장
 -> 보유 종목 수집
 -> 포트폴리오 요약 생성
@@ -116,8 +117,9 @@ User Intake / Curator 단계는 사용자 입력을 다음 agent들이 처리하
 
 | 목표 | 설명 |
 |------|------|
-| 카드형 수집 UX | 뉴스 카드처럼 하나씩 읽히는 질문 카드로 유저 정보를 받는다. |
+| 단계형 수집 UX | 뉴스 카드처럼 질문 하나를 읽고 답하면 다음 카드로 넘어간다. |
 | 메모리 우선 저장 | DB 확정 전까지 `st.session_state`에 `profile`, `portfolio`, `messages`를 저장한다. |
+| 성향 자동 추론 | 사용자가 직접 안정형/공격형을 고르지 않고, 답변 점수로 `risk_tolerance`를 추론한다. |
 | 보유 종목 자연어 입력 | `삼성전자 10주, SK하이닉스 3주` 같은 입력을 구조화한다. |
 | 질문 분기 | 이후 질문을 `intent`, `analysis_scope`, `urgency_reason`으로 나눈다. |
 | 다음 agent handoff | `UserProfile`, `Portfolio`, `UserRequest`, `CuratorResult`를 기존 pipeline에 넘긴다. |
@@ -133,21 +135,48 @@ Streamlit 메모리는 다음 key를 사용한다.
 | `intake_profile` | dict | 카드 질문으로 수집한 투자성향 |
 | `intake_portfolio` | dict/list | 보유 종목 입력 결과 |
 | `intake_messages` | list[dict] | 유저와 시스템 간 대화/카드 기록 |
-| `intake_stage` | string | 현재 단계: `profile`, `portfolio`, `ready`, `analysis` |
+| `onboarding_step` | int | 현재 질문 카드 index |
+| `onboarding_answers` | dict | 질문 카드별 유저 답변 |
+| `inferred_profile` | dict | 룰 기반으로 추론한 프로필 |
+| `intake_stage` | string | 현재 단계: `onboarding`, `portfolio`, `analysis` |
 | `analysis_output` | AnalysisOutput | 기존 pipeline 결과 |
 
 #### Step 2. 카드형 질문 구성
 
-1차 MVP 질문 카드는 다음 순서로 둔다.
+1차 MVP 질문 카드는 투자회사 questionnaire에서 공통적으로 쓰는 요소인 투자 목적, 투자 기간, 손실 감내도, 하락 반응, 자금 의존도, 투자 경험, 관심 산업을 기준으로 7개만 둔다.
 
 | 순서 | 카드 질문 | 저장 필드 |
 |------|-----------|-----------|
-| 1 | 투자성향은 안정형/중립형/공격형 중 어디에 가까운가요? | `risk_tolerance` |
+| 1 | 투자 목적은 무엇인가요? | `investment_goal` |
 | 2 | 투자 기간은 어느 정도인가요? | `investment_horizon_months` |
 | 3 | 감내 가능한 손실 폭은 어느 정도인가요? | `max_drawdown_tolerance` |
-| 4 | 관심 산업은 반도체/금융 중 어디인가요? | `preferred_sectors` |
-| 5 | 보유 종목을 알려주세요. 예: 삼성전자 10주, SK하이닉스 3주 | `holdings` |
-| 6 | 이제 궁금한 점을 질문해 주세요. | `raw_query` |
+| 4 | 한 달에 -10% 하락하면 어떻게 하시겠어요? | `loss_reaction` |
+| 5 | 이 투자금은 얼마나 빨리 필요할 수 있나요? | `liquidity_need_level` |
+| 6 | 투자 경험은 어느 정도인가요? | `experience_level` |
+| 7 | 관심 산업은 반도체/금융 중 어디인가요? | `preferred_sectors` |
+
+유저에게 직접 받지 않고 추론하는 값:
+
+| 추론 필드 | 방식 |
+|-----------|------|
+| `risk_tolerance` | 7개 카드 답변의 risk score 합산 + 보정 룰 |
+| `target_return_rate` | 투자 목적/손실 감내/기간 답변 기반 기본값 |
+
+점수 기준:
+
+| 총점 | 결과 |
+|------|------|
+| 0~5 | `low` 안정형 |
+| 6~9 | `medium` 중립형 |
+| 10 이상 | `high` 공격형 |
+
+보정 룰:
+
+| 조건 | 보정 |
+|------|------|
+| 손실 감내 -5% 이하 + 유동성 필요 높음 | 무조건 `low` |
+| 투자 기간 3개월 이하 | `high`가 나와도 `medium` 이하 |
+| 3년 이상 + 여유자금 + 하락 시 추가 매수 | `high` 가능 |
 
 #### Step 3. 보유 종목 자연어 파싱
 
@@ -210,16 +239,27 @@ Streamlit 메모리는 다음 key를 사용한다.
 
 ### 3.3 1차 구현 범위
 
-이번 1차 구현은 너무 크게 가지 않고 다음만 포함한다.
+전체 구현 phase는 다음 순서로 진행한다.
 
-- [ ] 카드형 intake 화면을 Streamlit 메인 영역에 추가
+| Phase | 목표 | 완료 기준 |
+|-------|------|-----------|
+| Phase 0 | 큰 계획/세부 계획 문서화 | 이 문서에 단계형 카드/추론/저장 전략 반영 |
+| Phase 1 | 카드 정의와 성향 추론 도메인 로직 | `infer_user_profile()` 테스트 통과 |
+| Phase 2 | 단계형 Streamlit 온보딩 UI | 한 번에 카드 하나만 렌더링 |
+| Phase 3 | 보유 종목 입력/요약 연결 | 자연어 보유 종목 파싱과 요약 카드 표시 |
+| Phase 4 | 질문 분류/분석 pipeline 연결 | 질문 실행 후 `UserRequest` 분류 표시 |
+| Phase 5 | 전체 검증/로컬 실행 | pytest, py_compile, AppTest, localhost 확인 |
+
+이번 구현은 다음을 포함한다.
+
+- [ ] 한 번에 하나씩 보이는 단계형 카드 UI 추가
+- [ ] 룰 기반 투자성향 추론 추가
 - [ ] `st.session_state`에 profile/portfolio/messages 저장
 - [ ] `삼성전자 10주, SK하이닉스 3주` 형태의 보유 종목 입력 파서 추가
 - [ ] 포트폴리오 요약 카드 추가
 - [ ] 질문 입력 시 기존 `run_phase1_analysis()` 연결
-- [ ] 기존 sidebar 입력은 fallback/debug 용도로 유지 또는 축소
 
-이번 1차 구현에서 제외한다.
+이번 구현에서 제외한다.
 
 - [ ] 실제 DB 저장
 - [ ] 실제 GLM/LLM 호출
