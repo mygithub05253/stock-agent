@@ -25,6 +25,7 @@ def _init_intake_state() -> None:
     st.session_state.setdefault("onboarding_answers", {})
     st.session_state.setdefault("inferred_profile", None)
     st.session_state.setdefault("holdings_text", "삼성전자 10주, SK하이닉스 3주")
+    st.session_state.setdefault("cash_weight", 0.2)
     st.session_state.setdefault("intake_portfolio", None)
     st.session_state.setdefault("intake_messages", [])
 
@@ -36,6 +37,7 @@ def _reset_intake() -> None:
         "onboarding_answers",
         "inferred_profile",
         "holdings_text",
+        "cash_weight",
         "intake_portfolio",
         "analysis_output",
         "intake_messages",
@@ -135,7 +137,15 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     )
     st.session_state["holdings_text"] = holdings_text
 
-    portfolio, warnings = build_portfolio_from_text(holdings_text)
+    cash_weight = st.slider(
+        "현금 비중",
+        min_value=0,
+        max_value=100,
+        value=round(st.session_state["cash_weight"] * 100),
+    ) / 100
+    st.session_state["cash_weight"] = cash_weight
+
+    portfolio, warnings = build_portfolio_from_text(holdings_text, cash_weight=cash_weight)
     if warnings:
         for warning in warnings:
             st.warning(warning)
