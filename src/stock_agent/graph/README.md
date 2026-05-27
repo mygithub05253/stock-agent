@@ -2,7 +2,7 @@
 
 본 폴더는 6개 에이전트를 **LangGraph StateGraph** 로 연결하는 코드를 담습니다.
 
-현재 Phase 1 구현은 `pipeline.py`에서 mock agent 함수를 순차 호출합니다. 목표 구현은 `Curator` 이후 `Quant`, `Qual`, `Competitor`를 병렬 fan-out으로 실행하고 `Strategist`에서 병합하는 supervisor graph입니다.
+현재 Phase 1 구현은 `pipeline.py`에서 mock agent 함수를 순차 호출합니다. 목표 구현은 `Curator`와 `RequestClassifier` 이후 `Quant`, `Qual`, `Competitor`를 병렬 fan-out으로 실행하고 `Strategist`에서 병합하는 supervisor graph입니다.
 
 ## 파일
 

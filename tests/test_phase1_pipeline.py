@@ -1,4 +1,5 @@
-from stock_agent.graph import run_phase1_analysis
+from stock_agent.agents import run_curator, run_request_classifier
+from stock_agent.graph import build_demo_profile, run_phase1_analysis
 from stock_agent.intake import (
     ONBOARDING_CARDS,
     build_holding_from_selection,
@@ -8,7 +9,7 @@ from stock_agent.intake import (
     onboarding_card_count,
     parse_holdings_text,
 )
-from stock_agent.schemas import Holding, Portfolio, UserProfile, UserRequest
+from stock_agent.schemas import AgentState, Holding, Portfolio, UserProfile, UserRequest
 
 
 def test_phase1_analysis_returns_guarded_tier1() -> None:
@@ -194,7 +195,7 @@ def test_curator_matches_non_samsung_holding_from_query() -> None:
     assert output.state.user_request.urgency_reason == "general"
 
 
-def test_curator_classifies_sell_decision_and_urgency() -> None:
+def test_request_classifier_classifies_sell_decision_and_urgency() -> None:
     output = run_phase1_analysis("삼성전자 급락했는데 손절해야 해?")
 
     assert output.state.user_request is not None
@@ -202,12 +203,32 @@ def test_curator_classifies_sell_decision_and_urgency() -> None:
     assert output.state.user_request.urgency_reason == "drop"
 
 
-def test_curator_classifies_news_urgency() -> None:
+def test_request_classifier_classifies_news_urgency() -> None:
     output = run_phase1_analysis("삼성전자 공시 이슈 확인해줘")
 
     assert output.state.user_request is not None
     assert output.state.user_request.intent == "holding_review"
     assert output.state.user_request.urgency_reason == "news"
+
+
+def test_curator_does_not_classify_user_request_before_classifier() -> None:
+    profile, portfolio = build_demo_profile()
+    state = AgentState(
+        user_query="삼성전자 급락했는데 손절해야 해?",
+        user_request=UserRequest(raw_query="삼성전자 급락했는데 손절해야 해?"),
+        user_profile=profile,
+        portfolio=portfolio,
+    )
+
+    curated_state = run_curator(state)
+    assert curated_state.curator is not None
+    assert curated_state.user_request is not None
+    assert curated_state.user_request.intent is None
+
+    classified_state = run_request_classifier(curated_state)
+    assert classified_state.user_request is not None
+    assert classified_state.user_request.intent == "sell_decision"
+    assert classified_state.user_request.target_corp_name == "삼성전자"
 
 
 def test_strategist_lowers_suitability_for_conservative_high_weight_user() -> None:

@@ -3,6 +3,7 @@ from stock_agent.agents.curator import run_curator
 from stock_agent.agents.guardrail import run_guardrail
 from stock_agent.agents.qual import run_qual
 from stock_agent.agents.quant import run_quant
+from stock_agent.agents.request_classifier import run_request_classifier
 from stock_agent.agents.strategist import run_strategist
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "run_guardrail",
     "run_qual",
     "run_quant",
+    "run_request_classifier",
     "run_strategist",
 ]

@@ -4,6 +4,7 @@ from stock_agent.agents import (
     run_guardrail,
     run_qual,
     run_quant,
+    run_request_classifier,
     run_strategist,
 )
 from stock_agent.schemas.analysis import (
@@ -69,6 +70,7 @@ def run_phase1_analysis(
         portfolio=portfolio,
     )
     state = run_curator(state)
+    state = run_request_classifier(state)
 
     # Phase 1 uses local mock workers. The contract mirrors the future LangGraph
     # fan-out: Quant, Qual, and Competitor only depend on Curator output.
