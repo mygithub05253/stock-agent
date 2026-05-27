@@ -3,6 +3,7 @@ from stock_agent.intake import (
     ONBOARDING_CARDS,
     build_holding_from_selection,
     build_portfolio_from_text,
+    get_stock_options,
     infer_user_profile,
     onboarding_card_count,
     parse_holdings_text,
@@ -85,6 +86,21 @@ def test_build_holding_from_selection_uses_catalog_price() -> None:
     assert holding.stock_code == "005930"
     assert holding.qty == 10
     assert holding.market_value == 780000
+
+
+def test_get_stock_options_returns_sector_shortlist() -> None:
+    options = get_stock_options(["금융"], limit=10)
+
+    assert len(options) == 10
+    assert options[:3] == ["KB금융", "신한지주", "하나금융지주"]
+
+
+def test_get_stock_options_balances_two_preferred_sectors() -> None:
+    options = get_stock_options(["반도체", "금융"], limit=10)
+
+    assert len(options) == 10
+    assert options[:5] == ["SK하이닉스", "삼성전자", "한미반도체", "리노공업", "이오테크닉스"]
+    assert options[5:] == ["KB금융", "신한지주", "하나금융지주", "우리금융지주", "기업은행"]
 
 
 def test_build_portfolio_from_text_returns_warnings_for_unknown_items() -> None:

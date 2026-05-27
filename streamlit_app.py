@@ -2,9 +2,9 @@ import streamlit as st
 
 from stock_agent.graph import run_phase1_analysis
 from stock_agent.intake import (
-    STOCK_CATALOG,
     build_holding_from_selection,
     build_holding_weights,
+    get_stock_options,
     get_onboarding_card,
     infer_user_profile,
     onboarding_card_count,
@@ -131,9 +131,9 @@ def _render_profile_summary(user_profile: UserProfile) -> None:
 def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     _render_profile_summary(user_profile)
     st.subheader("3. 보유 종목 입력")
-    st.caption("종목을 고르고 수량만 입력하면 현재 mock 가격 기준으로 평가금액과 비중을 계산합니다.")
+    st.caption("관심 산업의 시가총액 상위 후보 10개 안에서 종목을 고르고 수량만 입력해 주세요.")
 
-    stock_names = [name for name, meta in STOCK_CATALOG.items() if "corp_name" not in meta]
+    stock_names = get_stock_options(user_profile.preferred_sectors, limit=10)
     holding_count = st.number_input(
         "보유 종목 수",
         min_value=1,
