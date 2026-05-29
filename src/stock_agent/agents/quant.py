@@ -1,30 +1,86 @@
-from stock_agent.schemas.analysis import AgentState, QuantResult
+import os
+import psycopg2
+from dotenv import load_dotenv
 
+from stock_agent.schemas.analysis import AgentState, QuantResult
+from stock_agent.tools.price_tool import get_price_metrics
+from stock_agent.tools.financial_tool import get_financial_metrics
+
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def run_quant(state: AgentState) -> AgentState:
+    """
+    [Quant Agent] Curator가 확정한 종목에 대해 시세와 재무제표 툴을 호출하여 정량 분석을 수행합니다.
+    """
     if state.curator is None:
-        raise ValueError("curator result is required before quant analysis")
+        raise ValueError("Curator result is required before quant analysis")
 
+    stock_code = state.curator.stock_code
+    corp_code = state.curator.corp_code
+    
+    # 파이프라인에서 as_of_date를 주입하지 않았다면 오늘 날짜를 기본값으로 사용
+    as_of_date = getattr(state, "as_of_date", None)
+    if not as_of_date:
+        from datetime import datetime
+        as_of_date = datetime.now().strftime("%Y-%m-%d")
+
+    # DB 커넥션 오픈 및 Tool 호출
+    conn = psycopg2.connect(DATABASE_URL)
+    try:
+        price_metrics = get_price_metrics(conn, stock_code, as_of_date)
+        fin_metrics = get_financial_metrics(conn, corp_code, as_of_date)
+    finally:
+        conn.close()
+
+    # Tool 결과를 통합하여 metrics 생성
+    metrics = {
+        "per": price_metrics.get("per"),
+        "pbr": price_metrics.get("pbr"),
+        "roe": fin_metrics.get("roe"),
+        "revenue_growth_yoy": fin_metrics.get("revenue_growth_yoy"),
+        "operating_margin": fin_metrics.get("operating_margin"),
+        "debt_ratio": fin_metrics.get("debt_ratio"),
+        "close_price": price_metrics.get("close_price")
+    }
+
+    # 💡 [Calculation outside LLM] MVP 룰 기반 점수 및 시그널 산출
+    # 향후 이 부분은 LLM/GLM API에 metrics 딕셔너리를 던져 텍스트를 받아오는 로직으로 교체 가능
+    score = 50
+    reasons = []
+    risks = []
+    
+    roe = metrics["roe"] or 0
+    growth = metrics["revenue_growth_yoy"] or 0
+    debt = metrics["debt_ratio"] or 0
+
+    if roe > 10 and growth > 5:
+        score += 30
+        reasons.append(f"ROE({roe}%)와 매출 성장률({growth}%)이 견조하여 본업 경쟁력이 우수합니다.")
+    elif roe <= 0:
+        score -= 20
+        risks.append("수익성(ROE) 악화로 인해 기초 펀더멘털 리스크가 존재합니다.")
+        
+    if debt > 150:
+        score -= 10
+        risks.append(f"부채비율이 {debt}%로 다소 높아 재무 건전성 점검이 필요합니다.")
+    else:
+        reasons.append("부채비율이 안정적인 수준에서 관리되고 있습니다.")
+
+    if score >= 70:
+        valuation_signal = "BUY"
+    elif score >= 40:
+        valuation_signal = "HOLD"
+    else:
+        valuation_signal = "SELL"
+
+    # AgentState 갱신
     state.quant = QuantResult(
-        score=72,
-        valuation_signal="HOLD",
-        metrics={
-            "per": 18.4,
-            "pbr": 1.35,
-            "roe": 7.8,
-            "revenue_growth_yoy": 16.2,
-            "debt_ratio": 26.4,
-            "volatility_60d": 24.1,
-            "momentum_20d": 3.6,
-        },
-        reasons=[
-            "최근 매출 성장률과 20일 모멘텀이 개선되어 단기 회복 신호가 있습니다.",
-            "부채비율은 낮은 편이라 재무 안정성 리스크는 제한적입니다.",
-            "PER은 이익 회복 기대를 일부 반영해 저평가로 단정하기 어렵습니다.",
-        ],
-        risks=[
-            "메모리 업황 회복 속도가 둔화되면 이익 추정치가 낮아질 수 있습니다.",
-            "단기 변동성이 높아 추가 매수 시 분할 접근이 필요합니다.",
-        ],
+        score=score,
+        valuation_signal=valuation_signal,
+        metrics=metrics,
+        reasons=reasons if reasons else ["특별한 상승 모멘텀이 식별되지 않았습니다."],
+        risks=risks if risks else ["현재 눈에 띄는 정량적 재무 리스크는 없습니다."]
     )
+    
     return state

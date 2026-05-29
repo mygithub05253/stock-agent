@@ -166,6 +166,7 @@ class AgentState(BaseModel):
     user_request: UserRequest | None = None
     user_profile: UserProfile
     portfolio: Portfolio
+    as_of_date: str | None = None  # 백테스트 기준일
     curator: CuratorResult | None = None
     quant: QuantResult | None = None
     qual: QualResult | None = None
