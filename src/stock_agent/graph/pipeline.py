@@ -71,6 +71,7 @@ def run_phase1_analysis(
         portfolio=portfolio,
     )
     state = run_curator(state)
+    state.as_of_date = "2026-05-21"
     state = run_request_classifier(state)
 
     # Phase 1 uses local mock workers. The contract mirrors the future LangGraph
