@@ -1,0 +1,63 @@
+import os
+import sys
+
+# 💡 프로젝트 루트 및 src 폴더 경로를 파이썬 검색 경로에 주입
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, ".."))
+sys.path.insert(0, os.path.join(project_root, "src"))
+
+from stock_agent.schemas.analysis import AgentState
+from stock_agent.agents.qual import run_qual
+
+class MockCurator:
+    def __init__(self, stock_code, corp_code, corp_name):
+        self.stock_code = stock_code
+        self.corp_code = corp_code
+        self.corp_name = corp_name
+
+def test_qual_isolation():
+    print("🚀 [TEST] Qual Agent 공시 원문 데이터 마이닝 테스트 가동...")
+
+    # 삼성전자 타깃 오브젝트 모킹
+    mock_curator = MockCurator(
+        stock_code="005930",
+        corp_code="00126380",
+        corp_name="삼성전자"
+    )
+
+    state = AgentState.model_construct(
+        user_query="삼성전자 최신 공시 분석해줘",
+        user_profile=None,
+        portfolio=None
+    )
+    state.curator = mock_curator
+    
+    # 💡 5월 22일 분석을 위해 5월 21일로 시점 족쇄 채우기
+    state.as_of_date = "2026-05-21"  
+
+    try:
+        result_state = run_qual(state)
+        qual_res = result_state.qual
+
+        print("\n==================================================")
+        print("✅ [TEST SUCCESS] Qual Agent 정성 분석 연동 완료!")
+        print("==================================================")
+        print(f"📊 [공시 정성 점수] : {qual_res.score} 점")
+        print(f"🚦 [공시 센티멘트] : {qual_res.sentiment}")
+        print(f"🔍 [포착된 이벤트] : {qual_res.event_types}")
+        
+        print("\n🟢 [공시 원문 기반 호재 근거 (Evidence)]")
+        for ev in qual_res.evidence:
+            print(f"  - {ev}")
+            
+        print("\n🔴 [공시 원문 기반 리스크 (Risks)]")
+        for risk in qual_res.risks:
+            print(f"  - {risk}")
+        print("==================================================\n")
+
+    except Exception as e:
+        print(f"\n❌ 테스트 구동 실패: {e}")
+        raise e
+
+if __name__ == "__main__":
+    test_qual_isolation()
