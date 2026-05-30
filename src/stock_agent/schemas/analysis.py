@@ -92,6 +92,7 @@ class UserRequest(BaseModel):
     intent: RequestIntent | None = None
     target_stock_code: str | None = None
     target_corp_name: str | None = None
+    target_sector: str | None = None
     analysis_scope: AnalysisScope | None = None
     urgency_reason: UrgencyReason | None = None
     requested_depth: RequestedDepth = "summary"
