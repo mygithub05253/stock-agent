@@ -48,3 +48,25 @@ def test_competitor_result_keeps_existing_minimal_contract() -> None:
     assert result.data_quality_flags == []
     assert result.a1_peer_multiple_payload is None
     assert result.warnings == []
+    assert result.evidence_cards == []
+    assert result.bear_case is None
+
+
+def test_competitor_result_accepts_evidence_cards_and_bear_case() -> None:
+    result = CompetitorResult(
+        score=70,
+        peer_summary="LLM 요약",
+        peers=[],
+        evidence=["기본 근거"],
+        evidence_cards=[
+            {
+                "finding": "PER 저평가 구간",
+                "metric_basis": "PER 18.4x vs peer 중위 22.0x",
+                "confidence": "high",
+                "flag": "strength",
+            }
+        ],
+        bear_case="ROE 개선 전제 필요",
+    )
+    assert result.evidence_cards[0]["confidence"] == "high"
+    assert result.bear_case == "ROE 개선 전제 필요"

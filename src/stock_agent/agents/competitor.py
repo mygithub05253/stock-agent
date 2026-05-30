@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+import json
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from stock_agent.config import get_settings
+from stock_agent.llm.openrouter_client import ChatMessage, OpenRouterClientError, openrouter_chat_json
 from stock_agent.schemas.analysis import AgentState, CompetitorResult
 from stock_agent.tools.peer_tool import PeerComparison, build_peer_comparison
 
@@ -10,6 +19,10 @@ except ModuleNotFoundError as exc:
     def get_connection():
         raise RuntimeError("psycopg is required to connect to the DB.")
 
+
+_PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "competitor" / "system.md"
+
+_narrative_cache: dict[str, dict[str, Any]] = {}
 
 _DB_FALLBACK_MARKERS = (
     "authentication",
@@ -27,9 +40,92 @@ _DB_FALLBACK_MARKERS = (
 def _is_expected_fallback_error(exc: Exception) -> bool:
     if isinstance(exc, (ConnectionError, OSError, TimeoutError)):
         return True
-
     error_text = f"{exc.__class__.__name__}: {exc}".lower()
     return any(marker in error_text for marker in _DB_FALLBACK_MARKERS)
+
+
+def _load_system_prompt() -> str:
+    return _PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def _cache_key(stock_code: str) -> str:
+    return f"{stock_code}_{date.today().isoformat()}"
+
+
+def _comparison_payload(comparison: PeerComparison) -> str:
+    data: dict[str, Any] = {
+        "target": {
+            "corp_name": comparison.target.corp_name,
+            "stock_code": comparison.target.stock_code,
+            "sector": comparison.target.sector,
+            "per": comparison.target.per,
+            "pbr": comparison.target.pbr,
+            "roe": comparison.target.roe,
+            "revenue_growth": comparison.target.revenue_growth,
+            "operating_margin": comparison.target.operating_margin,
+            "debt_ratio": comparison.target.debt_ratio,
+            "data_quality_score": comparison.target.data_quality_score,
+        },
+        "peers": [
+            {
+                "corp_name": p.corp_name,
+                "per": p.per,
+                "pbr": p.pbr,
+                "roe": p.roe,
+                "revenue_growth": p.revenue_growth,
+                "operating_margin": p.operating_margin,
+                "debt_ratio": p.debt_ratio,
+            }
+            for p in comparison.peers
+        ],
+        "relative_position": comparison.relative_position,
+        "score": comparison.score,
+        "data_quality_flags": comparison.data_quality_flags,
+        "peer_count": len(comparison.peers),
+    }
+    return json.dumps(data, ensure_ascii=False, default=str)
+
+
+def _generate_narrative(comparison: PeerComparison) -> dict[str, Any] | None:
+    """OpenRouter LLM에서 narrative를 생성한다. key 없음·실패 시 None 반환."""
+    settings = get_settings()
+    if not settings.openrouter_api_key:
+        return None
+
+    key = _cache_key(comparison.target.stock_code)
+    if key in _narrative_cache:
+        return _narrative_cache[key]
+
+    try:
+        result = openrouter_chat_json(
+            [
+                ChatMessage(role="system", content=_load_system_prompt()),
+                ChatMessage(role="user", content=_comparison_payload(comparison)),
+            ],
+            max_tokens=800,
+        )
+        _narrative_cache[key] = result
+        return result
+    except Exception:
+        return None
+
+
+def _apply_narrative(base: CompetitorResult, narrative: dict[str, Any] | None) -> CompetitorResult:
+    """LLM narrative를 rule-based CompetitorResult에 merge한다. 수치 필드는 건드리지 않는다."""
+    if not narrative:
+        return base
+    updates: dict[str, Any] = {}
+    if isinstance(narrative.get("peer_summary"), str) and narrative["peer_summary"].strip():
+        updates["peer_summary"] = narrative["peer_summary"]
+    if isinstance(narrative.get("evidence_cards"), list):
+        updates["evidence_cards"] = narrative["evidence_cards"]
+    if isinstance(narrative.get("bear_case"), str) and narrative["bear_case"].strip():
+        updates["bear_case"] = narrative["bear_case"]
+    if isinstance(narrative.get("data_gaps"), list):
+        extra = [f"data_gap: {g}" for g in narrative["data_gaps"] if g and f"data_gap: {g}" not in base.warnings]
+        if extra:
+            updates["warnings"] = list(base.warnings) + extra
+    return base.model_copy(update=updates) if updates else base
 
 
 def _peer_row_to_dict(row) -> dict[str, float | int | str | None]:
@@ -175,7 +271,9 @@ def run_competitor(state: AgentState) -> AgentState:
                 stock_code=state.curator.stock_code,
                 sector=state.curator.sector,
             )
-        state.competitor = _result_from_comparison(comparison)
+        base_result = _result_from_comparison(comparison)
+        narrative = _generate_narrative(comparison)
+        state.competitor = _apply_narrative(base_result, narrative)
     except Exception as exc:
         if not _is_expected_fallback_error(exc):
             raise

@@ -492,26 +492,61 @@ def load_financial_snapshots(
     return result
 
 
+_MARKET_CAP_BAND_LOW = 0.25
+_MARKET_CAP_BAND_HIGH = 4.0
+
+
+def _mark_outliers(rows: list[PeerMetricRow], target_stock_code: str) -> list[PeerMetricRow]:
+    """peer 중앙값의 10배 초과 지표에 outlier_<metric> 플래그를 추가한다."""
+    metrics = ["per", "pbr", "roe", "revenue_growth", "operating_margin", "debt_ratio"]
+    peer_rows = [r for r in rows if r.stock_code != target_stock_code]
+
+    result: list[PeerMetricRow] = []
+    for row in rows:
+        flags = list(row.metric_flags)
+        for metric in metrics:
+            val = getattr(row, metric)
+            if val is None:
+                continue
+            others = [
+                getattr(p, metric)
+                for p in peer_rows
+                if p.stock_code != row.stock_code and getattr(p, metric) is not None
+            ]
+            med = median_or_none(others)
+            if med is not None and med != 0 and abs(val) > abs(med) * 10:
+                flag = f"outlier_{metric}"
+                if flag not in flags:
+                    flags.append(flag)
+        result.append(row if flags == row.metric_flags else row.model_copy(update={"metric_flags": flags}))
+    return result
+
+
 def select_peer_rows(
     target: PeerMetricRow,
     rows: list[PeerMetricRow],
     max_peer_count: int,
 ) -> list[PeerMetricRow]:
-    def market_cap_distance(row: PeerMetricRow) -> float:
-        if target.market_cap is None or row.market_cap is None:
-            return float("inf")
-        return abs(row.market_cap - target.market_cap)
+    candidates = [row for row in rows if row.stock_code != target.stock_code]
 
-    peers = [row for row in rows if row.stock_code != target.stock_code]
-    return sorted(
-        peers,
-        key=lambda row: (
-            -row.data_quality_score,
-            market_cap_distance(row),
-            row.corp_name,
-            row.stock_code,
-        ),
-    )[:max_peer_count]
+    if target.market_cap is not None:
+        lo = target.market_cap * _MARKET_CAP_BAND_LOW
+        hi = target.market_cap * _MARKET_CAP_BAND_HIGH
+        within_band = [
+            row for row in candidates
+            if row.market_cap is None or lo <= row.market_cap <= hi
+        ]
+        if len(within_band) >= 2:
+            candidates = within_band
+
+    def sort_key(row: PeerMetricRow) -> tuple[int, float]:
+        if target.market_cap and row.market_cap:
+            gap = abs(row.market_cap - target.market_cap) / target.market_cap
+        else:
+            gap = 9_999.0
+        return (-row.data_quality_score, gap)
+
+    return sorted(candidates, key=sort_key)[:max_peer_count]
 
 
 def build_peer_summary(
@@ -629,6 +664,8 @@ def build_peer_comparison(
             )
         )
 
+    target_row = metric_rows[0]
+    metric_rows = _mark_outliers(metric_rows, target_row.stock_code)
     target_row = metric_rows[0]
     selected_peers = select_peer_rows(target_row, metric_rows, max_peer_count=max_peer_count)
 

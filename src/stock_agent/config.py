@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     glm_model: str = "glm-4.5-flash"
     glm_timeout_seconds: int = 30
 
+    openrouter_api_key: str | None = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "google/gemini-flash-1.5"
+    openrouter_timeout_seconds: int = 30
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @property

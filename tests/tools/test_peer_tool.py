@@ -164,7 +164,7 @@ def test_select_peer_rows_excludes_target_and_prefers_quality_then_market_cap_pr
         stock_code="CCC001",
         corp_name="High Quality Far",
         sector="semiconductor",
-        market_cap=5_000,
+        market_cap=3_500,  # 3.5x — within 0.25x~4x band
         data_quality_score=90,
     )
     high_quality_close_peer = peer_tool.PeerMetricRow(
@@ -384,3 +384,75 @@ def test_build_peer_comparison_limits_score_when_no_peers(monkeypatch) -> None:
     assert "sector_missing" in comparison.warnings
     assert "peer_count_below_minimum" in comparison.warnings
     assert "no_comparable_peers" in comparison.data_quality_flags
+
+
+def test_select_peer_rows_filters_by_market_cap_band() -> None:
+    from stock_agent.tools.peer_tool import PeerMetricRow, select_peer_rows
+
+    target = PeerMetricRow(
+        corp_code="T", stock_code="TGT001", corp_name="Target",
+        sector="test", market_cap=1_000_000, data_quality_score=100,
+    )
+    within_band = PeerMetricRow(
+        corp_code="A", stock_code="AAA001", corp_name="WithinBand",
+        sector="test", market_cap=500_000,
+        data_quality_score=100,
+    )
+    outside_band = PeerMetricRow(
+        corp_code="B", stock_code="BBB001", corp_name="OutsideBand",
+        sector="test", market_cap=10_000,
+        data_quality_score=100,
+    )
+    no_market_cap = PeerMetricRow(
+        corp_code="C", stock_code="CCC001", corp_name="NoMarketCap",
+        sector="test", market_cap=None, data_quality_score=90,
+    )
+
+    rows = [target, within_band, outside_band, no_market_cap]
+    selected = select_peer_rows(target, rows, max_peer_count=10)
+
+    stock_codes = [r.stock_code for r in selected]
+    assert "AAA001" in stock_codes
+    assert "BBB001" not in stock_codes
+    assert "CCC001" in stock_codes
+
+
+def test_select_peer_rows_keeps_all_when_target_has_no_market_cap() -> None:
+    from stock_agent.tools.peer_tool import PeerMetricRow, select_peer_rows
+
+    target = PeerMetricRow(
+        corp_code="T", stock_code="TGT001", corp_name="Target",
+        sector="test", market_cap=None, data_quality_score=100,
+    )
+    peer_a = PeerMetricRow(
+        corp_code="A", stock_code="AAA001", corp_name="PeerA",
+        sector="test", market_cap=999, data_quality_score=100,
+    )
+    peer_b = PeerMetricRow(
+        corp_code="B", stock_code="BBB001", corp_name="PeerB",
+        sector="test", market_cap=1, data_quality_score=80,
+    )
+
+    selected = select_peer_rows(target, [target, peer_a, peer_b], max_peer_count=10)
+    assert len(selected) == 2
+
+
+def test_mark_outliers_flags_extreme_values() -> None:
+    from stock_agent.tools.peer_tool import PeerMetricRow, _mark_outliers
+
+    target = PeerMetricRow(
+        corp_code="T", stock_code="TGT001", corp_name="Target",
+        sector="test", data_quality_score=100, per=200.0,
+    )
+    peer_a = PeerMetricRow(
+        corp_code="A", stock_code="AAA001", corp_name="PeerA",
+        sector="test", data_quality_score=100, per=18.0,
+    )
+    peer_b = PeerMetricRow(
+        corp_code="B", stock_code="BBB001", corp_name="PeerB",
+        sector="test", data_quality_score=100, per=20.0,
+    )
+
+    result = _mark_outliers([target, peer_a, peer_b], "TGT001")
+    target_row = next(r for r in result if r.stock_code == "TGT001")
+    assert "outlier_per" in target_row.metric_flags

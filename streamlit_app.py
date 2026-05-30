@@ -330,6 +330,62 @@ def _default_analysis_query(target: str, portfolio: Portfolio) -> str:
 
 
 
+def _render_peer_tab(output) -> None:
+    competitor = output.state.competitor
+    if competitor is None:
+        for item in output.tier2.get("Peer 비교", []):
+            st.write(f"- {item}")
+        return
+
+    if competitor.peers:
+        import pandas as pd
+        rows = []
+        for p in competitor.peers:
+            rows.append(
+                {
+                    "종목명": p.get("corp_name", "N/A"),
+                    "PER": f"{p['per']:.1f}" if p.get("per") is not None else "N/A",
+                    "PBR": f"{p['pbr']:.2f}" if p.get("pbr") is not None else "N/A",
+                    "ROE": f"{p['roe'] * 100:.1f}%" if p.get("roe") is not None else "N/A",
+                    "영업이익률": (
+                        f"{p['operating_margin'] * 100:.1f}%"
+                        if p.get("operating_margin") is not None
+                        else "N/A"
+                    ),
+                    "매출성장률": (
+                        f"{p['revenue_growth'] * 100:.1f}%"
+                        if p.get("revenue_growth") is not None
+                        else "N/A"
+                    ),
+                }
+            )
+        st.caption("Peer 비교 지표 (DB 기준일 기반, 계산식: peer_tool.py 참고)")
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    if competitor.evidence_cards:
+        st.write("**분석 근거**")
+        for card in competitor.evidence_cards:
+            badge = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(card.get("confidence", "low"), "⚪")
+            flag_icon = {"strength": "💪", "risk": "⚠️", "neutral": "📊"}.get(card.get("flag", "neutral"), "📊")
+            st.write(f"{badge} {flag_icon} **{card.get('finding', '')}**")
+            if card.get("metric_basis"):
+                st.caption(card["metric_basis"])
+    else:
+        for item in competitor.evidence:
+            st.write(f"- {item}")
+
+    if competitor.bear_case:
+        st.warning(f"⚠️ **리스크 관점:** {competitor.bear_case}")
+
+    if competitor.peer_summary:
+        st.info(competitor.peer_summary)
+
+    if competitor.data_quality_flags:
+        with st.expander("데이터 품질 플래그"):
+            for flag in competitor.data_quality_flags:
+                st.caption(f"⚑ {flag}")
+
+
 def _render_output() -> None:
     output = st.session_state.get("analysis_output")
     if output is None:
@@ -350,10 +406,14 @@ def _render_output() -> None:
         st.json(output.state.user_request.model_dump(mode="json"), expanded=False)
 
     tabs = st.tabs(["정량", "정성", "Peer", "적합도", "리스크"])
-    for tab, key in zip(tabs, ["정량 근거", "정성 근거", "Peer 비교", "포트폴리오 적합도", "리스크"], strict=True):
+    plain_keys = ["정량 근거", "정성 근거", "", "포트폴리오 적합도", "리스크"]
+    for i, (tab, key) in enumerate(zip(tabs, plain_keys, strict=True)):
         with tab:
-            for item in output.tier2.get(key, []):
-                st.write(f"- {item}")
+            if i == 2:
+                _render_peer_tab(output)
+            else:
+                for item in output.tier2.get(key, []):
+                    st.write(f"- {item}")
 
     with st.expander("상세 상태 보기"):
         st.json(output.model_dump(mode="json"), expanded=False)

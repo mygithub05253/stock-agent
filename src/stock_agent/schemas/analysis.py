@@ -134,6 +134,8 @@ class CompetitorResult(BaseModel):
     relative_position: dict[str, float | int | str | None] = Field(default_factory=dict)
     data_quality_flags: list[str] = Field(default_factory=list)
     a1_peer_multiple_payload: dict[str, float | int | str | None] | None = None
+    evidence_cards: list[dict[str, str]] = Field(default_factory=list)
+    bear_case: str | None = None
     warnings: list[str] = Field(default_factory=list)
 
 
