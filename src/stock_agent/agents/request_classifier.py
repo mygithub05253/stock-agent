@@ -32,14 +32,13 @@ def run_request_classifier(state: AgentState) -> AgentState:
         raise ValueError("curator result is required before request classification")
 
     query = state.user_request.raw_query.lower()
+    analysis_scope = "portfolio" if state.curator.intent == "포트폴리오 전체 점검" else "single_stock"
     state.user_request = state.user_request.model_copy(
         update={
             "intent": _classify_request_intent(query, state.curator.intent),
-            "target_stock_code": state.curator.stock_code,
-            "target_corp_name": state.curator.corp_name,
-            "analysis_scope": (
-                "portfolio" if state.curator.intent == "포트폴리오 전체 점검" else "single_stock"
-            ),
+            "target_stock_code": None if analysis_scope == "portfolio" else state.curator.stock_code,
+            "target_corp_name": None if analysis_scope == "portfolio" else state.curator.corp_name,
+            "analysis_scope": analysis_scope,
             "urgency_reason": _detect_urgency_reason(query),
         }
     )

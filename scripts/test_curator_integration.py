@@ -21,4 +21,4 @@ def make_demo_state():
 if __name__ == "__main__":
     state = make_demo_state()
     state = run_curator(state)
-    print("Curator result:", state.curator.json(indent=2, ensure_ascii=False))
+    print("Curator result:", state.curator.model_dump_json(indent=2, ensure_ascii=False))

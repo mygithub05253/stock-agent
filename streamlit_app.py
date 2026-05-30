@@ -46,7 +46,6 @@ def _init_intake_state() -> None:
     st.session_state.setdefault("onboarding_answers", {})
     st.session_state.setdefault("inferred_profile", None)
     st.session_state.setdefault("cash_amount", 0)
-    st.session_state.setdefault("intake_portfolio", None)
     st.session_state.setdefault("intake_messages", [])
 
 
@@ -57,7 +56,6 @@ def _reset_intake() -> None:
         "onboarding_answers",
         "inferred_profile",
         "cash_amount",
-        "intake_portfolio",
         "analysis_output",
         "intake_messages",
     ]:
@@ -223,26 +221,62 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     else:
         st.info("보유 종목을 1개 이상 선택해 주세요.")
 
-    col_back, col_next = st.columns([1, 1])
-    with col_back:
-        if st.button("성향 질문으로 돌아가기"):
-            st.session_state["intake_stage"] = "onboarding"
-            st.rerun()
-    with col_next:
-        if st.button("투자성향 확인", type="primary", disabled=not portfolio.holdings):
-            st.session_state["intake_portfolio"] = portfolio.model_dump(mode="json")
-            st.session_state.pop("analysis_output", None)
-            st.session_state["intake_stage"] = "analysis"
-            st.rerun()
+    if portfolio.holdings:
+        st.subheader("4. 대화형 질문")
+        st.info("이제 바로 질문할 수 있습니다. 아래 입력창에 궁금한 종목이나 상황을 적어 주세요.")
+        if st.session_state["intake_messages"]:
+            for message in st.session_state["intake_messages"]:
+                with st.chat_message(message["role"]):
+                    st.write(message["content"])
+
+        analysis_targets = _analysis_target_options(portfolio)
+        selected_target = st.selectbox(
+            "분석 대상 선택",
+            options=analysis_targets,
+            index=0,
+            key="analysis_target",
+        )
+        default_query = _default_analysis_query(selected_target, portfolio)
+        if st.session_state.get("analysis_query_target") != selected_target:
+            st.session_state["analysis_query"] = default_query
+            st.session_state["analysis_query_target"] = selected_target
+
+        query = st.text_input(
+            "궁금한 점을 입력해 주세요",
+            value=default_query,
+            placeholder="예: SK하이닉스 비중 괜찮아?",
+            key="analysis_query",
+        )
+
+        col_run, col_edit = st.columns([1, 1])
+        with col_run:
+            if st.button("분석 실행", type="primary"):
+                st.session_state["intake_messages"] = [{"role": "user", "content": query}]
+                with st.spinner("에이전트 파이프라인 실행 중..."):
+                    output = run_phase1_analysis(query, user_profile=user_profile, portfolio=portfolio)
+                st.session_state["analysis_output"] = output
+                if output.state.user_request:
+                    st.session_state["intake_messages"].append(
+                        {
+                            "role": "assistant",
+                            "content": (
+                                f"질문 유형은 {output.state.user_request.intent}, "
+                                f"긴급도는 {output.state.user_request.urgency_reason}로 분류했어요."
+                            ),
+                        }
+                    )
+                st.rerun()
+        with col_edit:
+            if st.button("포트폴리오 다시 입력"):
+                st.session_state.pop("analysis_output", None)
+                st.session_state.pop("analysis_target", None)
+                st.session_state.pop("analysis_query", None)
+                st.session_state.pop("analysis_query_target", None)
+                st.rerun()
+
+        _render_output()
 
     return portfolio
-
-
-def _get_saved_portfolio() -> Portfolio | None:
-    portfolio_data = st.session_state.get("intake_portfolio")
-    if not portfolio_data:
-        return None
-    return Portfolio(**portfolio_data)
 
 
 def _render_portfolio_summary(portfolio: Portfolio) -> None:
@@ -280,71 +314,20 @@ def _build_initial_query(portfolio: Portfolio) -> str:
     return "현재 포트폴리오를 투자성향 기준으로 먼저 점검해줘"
 
 
-def _ensure_initial_analysis_output(user_profile: UserProfile, portfolio: Portfolio) -> None:
-    if st.session_state.get("analysis_output") is not None:
-        return
-    with st.status("에이전트 파이프라인 실행 중", expanded=True) as status:
-        st.write("InvestorProfile Agent: 투자성향 context 준비")
-        st.write("Curator Agent: 분석 대상 종목/후보 탐색")
-        st.write("RequestClassifier Agent: 질문 intent/scope/urgency 분류")
-        st.write("Quant, Qual, Competitor Worker: 기초 분석 생성")
-        st.write("InvestmentAnalyst Agent: GLM 기반 투자 분석 보정")
-        st.write("Strategist, Guardrail: 최종 결과와 안전 문구 생성")
-        output = run_phase1_analysis(
-            _build_initial_query(portfolio),
-            user_profile=user_profile,
-            portfolio=portfolio,
-        )
-        status.update(label="에이전트 파이프라인 완료", state="complete", expanded=False)
-    st.session_state["analysis_output"] = output
+def _analysis_target_options(portfolio: Portfolio) -> list[str]:
+    options = ["전체 보유 종목"]
+    options.extend(holding.corp_name for holding in portfolio.holdings)
+    return options
 
 
-def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> None:
-    _render_profile_summary(user_profile)
-    st.success(
-        f"답변을 바탕으로 현재 투자성향은 {_format_risk_label(user_profile.risk_tolerance)}으로 추론했습니다."
-    )
-    st.subheader("3. 저장된 포트폴리오")
-    _render_portfolio_summary(portfolio)
+def _default_analysis_query(target: str, portfolio: Portfolio) -> str:
+    if target == "전체 보유 종목":
+        holding_names = ", ".join(holding.corp_name for holding in portfolio.holdings[:3])
+        if holding_names:
+            return f"내 보유 종목 전체({holding_names})를 분석해줘"
+        return "내 보유 종목 전체를 분석해줘"
+    return f"{target} 급등했는데 어떻게 할까?"
 
-    _ensure_initial_analysis_output(user_profile, portfolio)
-    _render_output()
-
-    st.subheader("4. 대화형 질문")
-    if st.session_state["intake_messages"]:
-        for message in st.session_state["intake_messages"]:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
-
-    query = st.text_input(
-        "궁금한 점을 입력해 주세요",
-        value="삼성전자 급등했는데 안정형이면 어떻게 할까?",
-        placeholder="예: SK하이닉스 비중 괜찮아?",
-    )
-
-    col_run, col_edit = st.columns([1, 1])
-    with col_run:
-        if st.button("분석 실행", type="primary"):
-            st.session_state["intake_messages"].append({"role": "user", "content": query})
-            with st.spinner("에이전트 파이프라인 실행 중..."):
-                output = run_phase1_analysis(query, user_profile=user_profile, portfolio=portfolio)
-            st.session_state["analysis_output"] = output
-            if output.state.user_request:
-                st.session_state["intake_messages"].append(
-                    {
-                        "role": "assistant",
-                        "content": (
-                            f"질문 유형은 {output.state.user_request.intent}, "
-                            f"긴급도는 {output.state.user_request.urgency_reason}로 분류했어요."
-                        ),
-                    }
-                )
-            st.rerun()
-    with col_edit:
-        if st.button("포트폴리오 다시 입력"):
-            st.session_state["intake_stage"] = "portfolio"
-            st.session_state.pop("analysis_output", None)
-            st.rerun()
 
 
 def _render_output() -> None:
@@ -413,16 +396,9 @@ def main() -> None:
     stage = st.session_state["intake_stage"]
     if stage == "onboarding":
         _render_onboarding_step()
-    elif stage == "portfolio":
-        user_profile = _get_inferred_profile()
-        _render_portfolio_step(user_profile)
     else:
         user_profile = _get_inferred_profile()
-        portfolio = _get_saved_portfolio()
-        if portfolio is None:
-            st.session_state["intake_stage"] = "portfolio"
-            st.rerun()
-        _render_analysis_step(user_profile, portfolio)
+        _render_portfolio_step(user_profile)
 
 
 if __name__ == "__main__":

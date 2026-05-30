@@ -1,6 +1,7 @@
 import os
 import json
 import psycopg2
+from psycopg2 import OperationalError
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -33,11 +34,17 @@ def run_qual(state: AgentState) -> AgentState:
     end_date = as_of_date_str
 
     # 1. DB에서 공시 원문 로드
-    conn = psycopg2.connect(DATABASE_URL)
+    disclosure_docs = None
+    db_fallback_reason = None
     try:
-        disclosure_docs = get_disclosure_context(conn, corp_code, start_date, end_date)
-    finally:
-        conn.close()
+        conn = psycopg2.connect(DATABASE_URL)
+    except (OperationalError, Exception) as exc:
+        db_fallback_reason = f"{exc.__class__.__name__}: {exc}"
+    else:
+        try:
+            disclosure_docs = get_disclosure_context(conn, corp_code, start_date, end_date)
+        finally:
+            conn.close()
 
     # 텍스트 조립 및 컨텍스트 길이 방어 (상위 3000자 슬라이싱)
     context_str = ""
@@ -45,6 +52,11 @@ def run_qual(state: AgentState) -> AgentState:
         for doc in disclosure_docs:
             context_str += f"\n\n[공시명: {doc['report_nm']} / 공시일: {doc['rcept_dt']}]\n"
             context_str += doc['content'][:3000]
+    elif db_fallback_reason:
+        context_str = (
+            "DB 연결 실패로 실제 공시를 읽지 못했습니다. "
+            "데모용 정성 분석을 위해 fallback 컨텍스트를 사용합니다."
+        )
     else:
         context_str = "해당 기간 내에 발행된 공시 보고서 원문이 없습니다."
 
