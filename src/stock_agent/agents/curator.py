@@ -1,3 +1,7 @@
+from pathlib import Path
+
+from stock_agent.config import get_settings
+from stock_agent.llm.glm_client import ChatMessage, GLMClientError, chat_completion_json
 from stock_agent.schemas.analysis import AgentState, CuratorResult
 
 
@@ -44,6 +48,73 @@ _COMPANY_ALIASES = {
 
 def run_curator(state: AgentState) -> AgentState:
     query = (state.user_request.raw_query if state.user_request else state.user_query).lower()
+    # If a GLM key is configured, attempt to ask the GLM for a suggested selection first.
+    try:
+        settings = get_settings()
+        if settings.glm_api_key:
+            # load system prompt if present
+            prompt_path = Path(__file__).resolve().parents[1] / "prompts" / "curator" / "system.md"
+            try:
+                system_prompt = prompt_path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                system_prompt = (
+                    "You are a curator assistant. Given the user query, user profile and portfolio, "
+                    "return a JSON object with keys: corp_name, stock_code, corp_code (nullable), sector, intent, "
+                    "candidates (list), warnings (list)."
+                )
+
+            # build user context
+            holdings = [
+                {
+                    "corp_name": h.corp_name,
+                    "stock_code": h.stock_code,
+                    "sector": h.sector,
+                    "weight": h.weight,
+                }
+                for h in state.portfolio.holdings
+            ]
+            user_message = (
+                f"user_query: {state.user_request.raw_query if state.user_request else state.user_query}\n"
+                f"user_profile: {state.user_profile.model_dump(mode='json')}\n"
+                f"portfolio_holdings: {holdings}\n"
+            )
+
+            try:
+                parsed = chat_completion_json(
+                    [
+                        ChatMessage(role="system", content=system_prompt),
+                        ChatMessage(role="user", content=user_message),
+                    ],
+                    temperature=0.0,
+                )
+                # expect parsed to be a dict with selection keys
+                if isinstance(parsed, dict) and parsed.get("stock_code") and parsed.get("corp_name"):
+                    selected = {
+                        "corp_name": parsed.get("corp_name"),
+                        "stock_code": parsed.get("stock_code"),
+                        "corp_code": parsed.get("corp_code"),
+                        "sector": parsed.get("sector") or "미분류",
+                    }
+                    candidates = parsed.get("candidates", [])
+                    warnings = parsed.get("warnings", [])
+                    intent = parsed.get("intent", "신규 관심 종목 점검")
+
+                    state.curator = CuratorResult(
+                        intent=intent,
+                        corp_name=selected["corp_name"],
+                        stock_code=selected["stock_code"],
+                        corp_code=selected.get("corp_code"),
+                        sector=selected["sector"],
+                        candidates=list(candidates),
+                        warnings=list(warnings),
+                    )
+                    return state
+            except (GLMClientError, Exception):
+                # fall back to rule-based selection below on any GLM error
+                pass
+    except Exception:
+        # if settings cannot be loaded for any reason, ignore and proceed with rule base
+        pass
     selected = None
     for alias, company in _COMPANY_ALIASES.items():
         if alias.lower() in query or company["stock_code"] in query:
