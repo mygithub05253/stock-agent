@@ -18,6 +18,80 @@ client = OpenAI(
     base_url=os.getenv("GLM_BASE_URL") or os.getenv("LLM_BASE_URL") or "https://api.openai.com/v1"
 )
 
+def classify_event_types(texts: list[str]) -> list[str]:
+    joined_text = " ".join(texts)
+
+    event_types = []
+
+    if any(keyword in joined_text for keyword in ["실적", "매출", "영업이익", "순이익", "이익률"]):
+        event_types.append("실적")
+
+    if any(keyword in joined_text for keyword in ["AI", "반도체", "수요", "업황", "산업", "사이클"]):
+        event_types.append("산업 트렌드")
+
+    if any(keyword in joined_text for keyword in ["신사업", "투자", "인수", "합병", "M&A", "고대역폭", "선단 공정"]):
+        event_types.append("신사업")
+
+    if any(keyword in joined_text for keyword in ["규제", "소송", "제재", "리스크", "불확실성"]):
+        event_types.append("규제/리스크")
+
+    if any(keyword in joined_text for keyword in ["환율", "금리", "물가", "경기", "거시"]):
+        event_types.append("매크로")
+
+    return event_types or ["기타"]
+
+
+def classify_sentiment(evidence: list[str], risks: list[str]) -> str:
+    if len(evidence) > len(risks):
+        return "positive"
+    if len(evidence) < len(risks):
+        return "negative"
+    return "neutral"
+
+
+def calculate_qual_score(sentiment: str, evidence: list[str], risks: list[str]) -> int:
+    base_score = 50
+
+    if sentiment == "positive":
+        base_score += 15
+    elif sentiment == "negative":
+        base_score -= 15
+
+    base_score += min(len(evidence) * 3, 15)
+    base_score -= min(len(risks) * 4, 20)
+
+    return max(0, min(100, base_score))
+
+
+def is_risk_text(text: str) -> bool:
+    risk_keywords = [
+        "리스크",
+        "불확실",
+        "감소",
+        "둔화",
+        "제한적",
+        "악화",
+        "부진",
+        "하락",
+        "규제",
+        "소송",
+        "적자",
+    ]
+
+    return any(keyword in text for keyword in risk_keywords)
+
+
+def format_doc_as_evidence(doc: dict) -> str:
+    title = doc.get("title") or doc.get("report_nm") or "제목 없음"
+    body = doc.get("body", "")
+    source = doc.get("publisher") or doc.get("source_url") or ""
+
+    if source:
+        return f"{title}: {body} (출처: {source})"
+
+    return f"{title}: {body}"
+
+
 def run_qual(state: AgentState) -> AgentState:
     """
     [Qual Agent] 기준일 이전 1주일간의 공시 원문을 수집하고 LLM을 통해 정성 센티멘트를 분석합니다.
