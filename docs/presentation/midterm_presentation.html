@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDAI 12기 — 멀티에이전트 주식 분석 시스템 중간 발표</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --warn: #f78166;
+    --gold: #e3b341;
+    --purple: #bc8cff;
+    --cyan: #39d353;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── 슬라이드 컨테이너 ── */
+  .deck { position: relative; width: 100vw; height: 100vh; }
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    padding: 48px 80px;
+    opacity: 0; pointer-events: none;
+    transition: opacity .35s ease;
+  }
+  .slide.active { opacity: 1; pointer-events: all; }
+
+  /* ── 공통 타이포 ── */
+  h1 { font-size: 2.8rem; font-weight: 700; line-height: 1.2; text-align: center; }
+  h2 { font-size: 2rem; font-weight: 700; margin-bottom: 28px; }
+  h3 { font-size: 1.4rem; font-weight: 600; margin-bottom: 16px; color: var(--accent); }
+  p  { font-size: 1.1rem; line-height: 1.7; color: var(--text-muted); }
+  .sub { font-size: 1.15rem; color: var(--text-muted); margin-top: 12px; text-align: center; }
+  .tag {
+    display: inline-block; padding: 4px 12px; border-radius: 20px;
+    font-size: .85rem; font-weight: 600; margin: 4px;
+  }
+
+  /* ── 섹션 헤더 배지 ── */
+  .section-badge {
+    font-size: .8rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 4px;
+    padding: 4px 12px; margin-bottom: 20px;
+  }
+
+  /* ── 네비게이션 ── */
+  #nav {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 16px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 40px; padding: 10px 24px; z-index: 999;
+  }
+  #nav button {
+    background: none; border: none; color: var(--text); font-size: 1.2rem;
+    cursor: pointer; padding: 4px 8px; border-radius: 6px;
+    transition: background .2s;
+  }
+  #nav button:hover { background: var(--border); }
+  #counter { font-size: .9rem; color: var(--text-muted); min-width: 60px; text-align: center; }
+  #appendix-btn {
+    font-size: .75rem; color: var(--text-muted); background: none; border: 1px solid var(--border);
+    border-radius: 4px; cursor: pointer; padding: 4px 10px;
+  }
+  #appendix-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── 섹션 바 ── */
+  #section-bar {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 4px; display: flex; z-index: 999;
+  }
+  .sec-seg {
+    height: 100%; flex: 1; background: var(--border);
+    transition: background .3s;
+  }
+  .sec-seg.done { background: var(--accent); }
+  .sec-seg.active { background: var(--gold); }
+
+  /* ── 카드 그리드 ── */
+  .grid { display: grid; gap: 20px; width: 100%; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px;
+  }
+  .card.accent-border { border-color: var(--accent); }
+  .card.warn-border  { border-color: var(--warn); }
+  .card.gold-border  { border-color: var(--gold); }
+  .card.green-border { border-color: var(--accent2); }
+
+  /* ── 큰 숫자 ── */
+  .big-number {
+    font-size: 5rem; font-weight: 800; line-height: 1;
+    background: linear-gradient(135deg, var(--warn), #ff6b6b);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .big-label { font-size: 1.3rem; color: var(--text-muted); margin-top: 8px; }
+
+  /* ── 플로우 다이어그램 ── */
+  .flow {
+    display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+    justify-content: center; width: 100%;
+  }
+  .flow-box {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 12px 18px; font-size: .95rem; font-weight: 600;
+    text-align: center; min-width: 110px;
+  }
+  .flow-arrow { color: var(--accent); font-size: 1.4rem; margin: 0 6px; }
+  .flow-parallel {
+    display: flex; flex-direction: column; gap: 10px; align-items: center;
+  }
+  .flow-fan {
+    display: flex; gap: 10px;
+  }
+  .flow-box.highlight { border-color: var(--accent); color: var(--accent); }
+  .flow-box.gold      { border-color: var(--gold);   color: var(--gold);   }
+  .flow-box.green     { border-color: var(--accent2); color: var(--accent2); }
+  .flow-box.warn      { border-color: var(--warn);   color: var(--warn);   }
+  .flow-box.purple    { border-color: var(--purple); color: var(--purple); }
+
+  /* ── 에이전트 테이블 ── */
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th { background: var(--surface2); color: var(--text-muted); padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* ── 체크리스트 ── */
+  .checklist { list-style: none; width: 100%; }
+  .checklist li {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+    font-size: 1rem;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── 코드 블록 ── */
+  pre {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 18px; font-size: .82rem;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    overflow-x: auto; width: 100%; line-height: 1.6;
+    color: #a5d6ff;
+  }
+  .kw { color: #ff7b72; } /* keyword */
+  .fn { color: #d2a8ff; } /* function */
+  .cm { color: #8b949e; } /* comment */
+  .st { color: #a5d6ff; } /* string */
+  .nm { color: #79c0ff; } /* name */
+
+  /* ── 시그널 배지 ── */
+  .signal-buy  { color: var(--accent2); font-weight: 800; font-size: 2rem; }
+  .signal-hold { color: var(--gold);    font-weight: 800; font-size: 2rem; }
+  .signal-sell { color: var(--warn);    font-weight: 800; font-size: 2rem; }
+
+  /* ── 타이틀 슬라이드 ── */
+  .title-slide { background: radial-gradient(ellipse at 60% 40%, #0d2137 0%, #0d1117 70%); }
+  .title-logo { font-size: 3.5rem; font-weight: 900; letter-spacing: -2px; }
+  .title-logo span { color: var(--accent); }
+  .title-sub { font-size: 1.5rem; color: var(--text-muted); margin-top: 16px; }
+  .title-meta { margin-top: 40px; font-size: .95rem; color: var(--text-muted); }
+  .divider { width: 80px; height: 3px; background: var(--accent); border-radius: 2px; margin: 28px auto; }
+
+  /* ── 비교 카드 ── */
+  .vs-wrap { display: flex; gap: 32px; width: 100%; align-items: stretch; }
+  .vs-card { flex: 1; }
+  .vs-label { text-align: center; font-size: .85rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 14px; }
+
+  /* ── 스택 배지 ── */
+  .stack-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 16px; }
+  .stack-item {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 20px; text-align: center; min-width: 130px;
+  }
+  .stack-item .stack-name { font-size: 1rem; font-weight: 700; }
+  .stack-item .stack-desc { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── appendix 표시 ── */
+  .appendix-label {
+    position: fixed; top: 12px; right: 20px;
+    background: var(--warn); color: #000; font-size: .75rem; font-weight: 700;
+    padding: 3px 10px; border-radius: 4px; z-index: 999;
+    display: none;
+  }
+  body.in-appendix .appendix-label { display: block; }
+
+  /* ── 진행 퍼센트 바 ── */
+  .prog-bar {
+    height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden;
+    margin-top: 10px;
+  }
+  .prog-fill { height: 100%; border-radius: 4px; transition: width .5s; }
+
+  /* ── 슬라이드별 배경 강조 ── */
+  .slide-dark { background: #090d13; }
+</style>
+</head>
+<body>
+
+<div id="section-bar">
+  <div class="sec-seg" data-from="0"  data-to="3"></div>
+  <div class="sec-seg" data-from="4"  data-to="6"></div>
+  <div class="sec-seg" data-from="7"  data-to="12"></div>
+  <div class="sec-seg" data-from="13" data-to="16"></div>
+  <div class="sec-seg" data-from="17" data-to="19"></div>
+  <div class="sec-seg" data-from="20" data-to="22"></div>
+  <div class="sec-seg" data-from="23" data-to="25"></div>
+</div>
+
+<div class="appendix-label">APPENDIX</div>
+
+<div class="deck" id="deck">
+
+<!-- ══════════════════════════════════════
+     SLIDE 1 — 타이틀
+══════════════════════════════════════ -->
+<div class="slide title-slide active" data-index="0">
+  <div class="title-logo">Stock<span>Agent</span></div>
+  <div class="title-sub">한국 주식 투자자 의사결정 지원<br>멀티에이전트 시스템</div>
+  <div class="divider"></div>
+  <div style="font-size:1rem; color:var(--text-muted); text-align:center;">
+    BUY / HOLD / SELL 분석 신호를 근거와 함께 60초 안에<br>
+    포트폴리오·투자성향에 맞춰 자동으로 제공합니다
+  </div>
+  <div class="title-meta">BDAI 12기 팀 프로젝트 · 중간 발표 · 2026.05</div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 2 — 충격 통계
+══════════════════════════════════════ -->
+<div class="slide slide-dark" data-index="1">
+  <div class="section-badge">문제 인식</div>
+  <h2 style="text-align:center;">개인투자자는 왜 손실을 보는가</h2>
+  <div class="grid grid-3" style="margin-top:32px;">
+    <div class="card warn-border" style="text-align:center;">
+      <div class="big-number">1,410<span style="font-size:2.5rem;">만</span></div>
+      <div class="big-label">국내 주식 투자자 수</div>
+    </div>
+    <div class="card warn-border" style="text-align:center;">
+      <div class="big-number" style="background:linear-gradient(135deg,#f78166,#ff4500);-webkit-background-clip:text;">-16.77%</div>
+      <div class="big-label">2024년 개인투자자 평균 수익률</div>
+    </div>
+    <div class="card warn-border" style="text-align:center;">
+      <div class="big-number" style="font-size:3.2rem;background:linear-gradient(135deg,#f78166,#ff9944);-webkit-background-clip:text;">1,677만원</div>
+      <div class="big-label">3.6억 투자 시 평균 손실액</div>
+    </div>
+  </div>
+  <p style="margin-top:28px;text-align:center;font-size:1.05rem;">
+    자산을 불리려고 시작한 투자가 오히려 손실로 이어지고 있습니다.
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 3 — 왜 실패하는가
+══════════════════════════════════════ -->
+<div class="slide" data-index="2">
+  <div class="section-badge">문제 인식</div>
+  <h2 style="text-align:center;">왜 실패하는가 — 3가지 근본 원인</h2>
+  <div class="grid grid-3" style="margin-top:32px;">
+    <div class="card">
+      <div style="font-size:2.2rem; margin-bottom:12px;">🎲</div>
+      <h3>근거 없는 결정</h3>
+      <p>유튜브·커뮤니티 소문에 의존, 재무·업황 데이터를 직접 분석하지 않음</p>
+    </div>
+    <div class="card">
+      <div style="font-size:2.2rem; margin-bottom:12px;">🌊</div>
+      <h3>정보 과부하</h3>
+      <p>뉴스·공시·리포트·차트가 산재. 무엇이 중요한지 필터링이 불가능</p>
+    </div>
+    <div class="card">
+      <div style="font-size:2.2rem; margin-bottom:12px;">🎭</div>
+      <h3>포트폴리오 컨텍스트 무시</h3>
+      <p>자신의 투자성향·보유 비중과 무관하게 "좋아 보이는 종목"을 추가 매수</p>
+    </div>
+  </div>
+  <div class="card" style="margin-top:24px; text-align:center; border-color: var(--accent);">
+    <p style="color:var(--text); font-size:1.05rem;">
+      개인투자자에게는 <strong style="color:var(--accent);">PB(Private Banker) 수준의 근거 기반 분석</strong>이 필요하지만,<br>
+      PB 서비스는 고액 자산가에게만 제공됩니다.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 4 — 우리의 해답
+══════════════════════════════════════ -->
+<div class="slide" data-index="3">
+  <div class="section-badge">솔루션</div>
+  <h2 style="text-align:center;">우리의 해답</h2>
+  <div style="text-align:center; margin-top:24px;">
+    <div style="font-size:1.5rem; color:var(--text-muted);">
+      포트폴리오·투자성향에 맞춰<br>정량·정성·경쟁사 데이터를 종합하고
+    </div>
+    <div style="font-size:2.8rem; font-weight:800; margin:20px 0; line-height:1.3;">
+      <span class="signal-buy">BUY</span> · <span class="signal-hold">HOLD</span> · <span class="signal-sell">SELL</span>
+    </div>
+    <div style="font-size:1.5rem; color:var(--text-muted);">
+      근거와 출처를 붙여 60초 안에 제공하는<br>
+      <strong style="color:var(--text);">멀티에이전트 AI 분석 시스템</strong>
+    </div>
+  </div>
+  <div class="grid grid-3" style="margin-top:36px;">
+    <div class="card" style="text-align:center;">
+      <div style="font-size:1.8rem;">⚡</div>
+      <div style="font-weight:700; margin-top:8px;">60초</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">종합 분석 응답</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:1.8rem;">📎</div>
+      <div style="font-weight:700; margin-top:8px;">95%+</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">출처 부착률 목표</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:1.8rem;">💰</div>
+      <div style="font-weight:700; margin-top:8px;">월 5만원</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">LLM 비용 상한</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 5 — 시스템 흐름도
+══════════════════════════════════════ -->
+<div class="slide" data-index="4">
+  <div class="section-badge">시스템 아키텍처</div>
+  <h2 style="text-align:center;">시스템 전체 흐름</h2>
+  <div style="margin-top:32px; width:100%;">
+    <div class="flow" style="gap:8px; flex-wrap:nowrap; justify-content:center; align-items:center;">
+      <div style="text-align:center;">
+        <div class="flow-box" style="background:var(--surface2);">
+          👤 사용자<br><small style="color:var(--text-muted);">질문 + 포트폴리오</small>
+        </div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box highlight">Curator<br><small>종목 확정</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box highlight">Classifier<br><small>의도 분류</small></div>
+      <div class="flow-arrow">→</div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center;">
+        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:2px;">병렬 분석</div>
+        <div style="display:flex;gap:8px;">
+          <div class="flow-box gold">Quant<br><small>정량</small></div>
+          <div class="flow-box green">Qual<br><small>정성</small></div>
+          <div class="flow-box purple">Competitor<br><small>Peer비교</small></div>
+        </div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box" style="border-color:var(--cyan);color:var(--cyan);">Strategist<br><small>종합 신호</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box warn">Guardrail<br><small>안전 검증</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-box" style="background:var(--surface2); text-align:center;">
+        📊 결과<br><small style="color:var(--text-muted);">BUY/HOLD/SELL<br>+ 근거 + 출처</small>
+      </div>
+    </div>
+    <div class="grid grid-3" style="margin-top:32px;">
+      <div class="card" style="text-align:center; padding:16px;">
+        <div style="color:var(--accent); font-weight:700; font-size:.9rem;">INPUT</div>
+        <div style="font-size:.85rem; color:var(--text-muted); margin-top:6px;">사용자 질문<br>보유 포트폴리오<br>투자성향 프로필</div>
+      </div>
+      <div class="card" style="text-align:center; padding:16px;">
+        <div style="color:var(--gold); font-weight:700; font-size:.9rem;">PROCESSING</div>
+        <div style="font-size:.85rem; color:var(--text-muted); margin-top:6px;">9개 전문 에이전트<br>LangGraph 오케스트레이션<br>DB + RAG + LLM</div>
+      </div>
+      <div class="card" style="text-align:center; padding:16px;">
+        <div style="color:var(--accent2); font-weight:700; font-size:.9rem;">OUTPUT</div>
+        <div style="font-size:.85rem; color:var(--text-muted); margin-top:6px;">Tier1: 분석 신호<br>Tier2: 근거 + 출처<br>Tier3: 리포트 (예정)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 6 — 멀티에이전트란?
+══════════════════════════════════════ -->
+<div class="slide" data-index="5">
+  <div class="section-badge">시스템 아키텍처</div>
+  <h2 style="text-align:center;">"9명의 전문가 팀"</h2>
+  <p style="text-align:center; margin-bottom:28px;">하나의 AI가 모든 것을 결정하는 것이 아니라, 각 분야의 전문 에이전트가 협업합니다</p>
+  <div class="grid grid-3" style="gap:16px;">
+    <div class="card accent-border">
+      <div style="font-size:1.5rem; margin-bottom:8px;">📋</div>
+      <div style="font-weight:700; color:var(--accent);">Curator</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">질문에서 분석 대상 종목과 의도를 확정하는 접수 담당</div>
+    </div>
+    <div class="card" style="border-color:var(--gold);">
+      <div style="font-size:1.5rem; margin-bottom:8px;">📈</div>
+      <div style="font-weight:700; color:var(--gold);">Quant</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">PER·PBR·ROE·부채비율 등 재무지표를 분석하는 재무분석가</div>
+    </div>
+    <div class="card" style="border-color:var(--accent2);">
+      <div style="font-size:1.5rem; margin-bottom:8px;">📰</div>
+      <div style="font-weight:700; color:var(--accent2);">Qual</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">공시·뉴스 원문에서 호재·악재를 분석하는 뉴스분석가</div>
+    </div>
+    <div class="card" style="border-color:var(--purple);">
+      <div style="font-size:1.5rem; margin-bottom:8px;">🏢</div>
+      <div style="font-weight:700; color:var(--purple);">Competitor</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">동종업계 경쟁사와 비교해 상대적 위치를 파악하는 업종분석가</div>
+    </div>
+    <div class="card" style="border-color:var(--cyan);">
+      <div style="font-size:1.5rem; margin-bottom:8px;">🧠</div>
+      <div style="font-weight:700; color:var(--cyan);">Strategist</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">3개 분석을 종합해 최종 투자 신호를 생성하는 전략가</div>
+    </div>
+    <div class="card" style="border-color:var(--warn);">
+      <div style="font-size:1.5rem; margin-bottom:8px;">🛡️</div>
+      <div style="font-weight:700; color:var(--warn);">Guardrail</div>
+      <div style="font-size:.85rem; color:var(--text-muted);">투자권유성 표현을 제거하고 면책조항을 적용하는 준법감시인</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px; text-align:center; padding:14px;">
+    <span style="color:var(--text-muted); font-size:.9rem;">+ InvestorProfile (성향 진단) · RequestClassifier (의도 분류) · InvestmentAnalyst (고급 분석) 3개 지원 에이전트</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 7 — 개인화 경계
+══════════════════════════════════════ -->
+<div class="slide" data-index="6">
+  <div class="section-badge">시스템 아키텍처</div>
+  <h2 style="text-align:center;">같은 종목, 다른 신호 — 개인화 경계</h2>
+  <p style="text-align:center; margin-bottom:28px;">
+    객관 분석(Quant/Qual)은 동일하게 수행되지만, 최종 신호는 투자성향에 따라 달라집니다
+  </p>
+  <div class="vs-wrap">
+    <div class="card vs-card" style="border-color:var(--accent2);">
+      <div class="vs-label" style="color:var(--accent2);">👤 공격형 투자자 (위험 선호)</div>
+      <div style="font-size:.9rem; color:var(--text-muted); line-height:2;">
+        · 위험허용 수준: HIGH<br>
+        · 투자 기간: 1년 이상<br>
+        · 손실 감내: -30% 이상
+      </div>
+      <div style="margin-top:16px; text-align:center;">
+        <div style="font-size:2.5rem; font-weight:800; color:var(--accent2);">BUY</div>
+        <div style="font-size:.85rem; color:var(--text-muted);">신호 적합도 82점</div>
+        <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">"성장성 지표 우수, 보유 비중 확대 가능"</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; font-size:2rem; color:var(--border);">⟷</div>
+    <div style="text-align:center; padding:0 12px;">
+      <div style="font-size:.85rem; color:var(--text-muted); margin-bottom:12px;">동일 분석 결과</div>
+      <div class="card" style="padding:14px; min-width:160px;">
+        <div style="font-size:.8rem; color:var(--text-muted);">Quant 점수</div>
+        <div style="font-weight:700; color:var(--gold);">72점</div>
+        <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">Qual 점수</div>
+        <div style="font-weight:700; color:var(--gold);">68점</div>
+        <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">종합 점수</div>
+        <div style="font-weight:700; color:var(--accent);">71점</div>
+      </div>
+      <div style="font-size:.85rem; color:var(--text-muted); margin-top:12px;">삼성전자 (예시)</div>
+    </div>
+    <div style="display:flex; align-items:center; font-size:2rem; color:var(--border);">⟷</div>
+    <div class="card vs-card" style="border-color:var(--gold);">
+      <div class="vs-label" style="color:var(--gold);">👤 안정형 투자자 (위험 회피)</div>
+      <div style="font-size:.9rem; color:var(--text-muted); line-height:2;">
+        · 위험허용 수준: LOW<br>
+        · 투자 기간: 6개월 미만<br>
+        · 손실 감내: -8% 이내
+      </div>
+      <div style="margin-top:16px; text-align:center;">
+        <div style="font-size:2.5rem; font-weight:800; color:var(--gold);">HOLD</div>
+        <div style="font-size:.85rem; color:var(--text-muted);">신호 적합도 54점</div>
+        <div style="font-size:.8rem; color:var(--text-muted); margin-top:8px;">"현 비중 유지, 신규 매수보다 관망 권고"</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 8 — 전체 에이전트 맵
+══════════════════════════════════════ -->
+<div class="slide" data-index="7">
+  <div class="section-badge">에이전트 상세</div>
+  <h2 style="text-align:center;">전체 에이전트 맵</h2>
+  <table style="margin-top:20px; font-size:.85rem;">
+    <thead>
+      <tr>
+        <th>에이전트</th>
+        <th>역할</th>
+        <th>주요 입력</th>
+        <th>출력 / 스키마</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>🧾 InvestorProfile</td><td>온보딩 설문 → 위험성향 점수</td><td>6개 질문 응답</td><td>UserProfile (risk_tolerance)</td></tr>
+      <tr><td>📋 Curator</td><td>자연어 질문 → 종목 확정</td><td>user_query, portfolio</td><td>CuratorResult (stock_code, corp_code)</td></tr>
+      <tr><td>🔍 RequestClassifier</td><td>요청 의도·긴급도 분류</td><td>Curator 결과</td><td>UserRequest (intent, urgency_reason)</td></tr>
+      <tr><td style="color:var(--gold);">📈 Quant</td><td>재무지표 계산 + 점수화</td><td>DB: 시세·재무제표</td><td>QuantResult (score, valuation_signal, PER/PBR/ROE)</td></tr>
+      <tr><td style="color:var(--accent2);">📰 Qual</td><td>공시 RAG + LLM 센티멘트</td><td>DB: 공시 원문 (1주)</td><td>QualResult (score, sentiment, evidence)</td></tr>
+      <tr><td style="color:var(--purple);">🏢 Competitor</td><td>동종사 Peer 비교</td><td>DB: 산업 peer 정보</td><td>CompetitorResult (score, peer_summary)</td></tr>
+      <tr><td style="color:var(--cyan);">🧠 Strategist</td><td>3개 분석 종합 + 성향 반영</td><td>Quant·Qual·Competitor + UserProfile</td><td>StrategistResult (signal, suitability)</td></tr>
+      <tr><td>🤖 InvestmentAnalyst</td><td>GLM LLM 고급 분석 (선택)</td><td>Strategist 결과</td><td>텍스트 심화 해석</td></tr>
+      <tr><td style="color:var(--warn);">🛡️ Guardrail</td><td>투자권유 표현 제거</td><td>최종 결과</td><td>GuardrailResult (warnings, revised_headline)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 9 — Curator + Classifier
+══════════════════════════════════════ -->
+<div class="slide" data-index="8">
+  <div class="section-badge">에이전트 상세</div>
+  <h2>Curator + RequestClassifier</h2>
+  <div class="grid grid-2" style="margin-top:24px;">
+    <div>
+      <h3>📋 Curator — 종목 확정</h3>
+      <div class="card">
+        <p style="font-size:.9rem; margin-bottom:12px; color:var(--text);">사용자의 자연어 질문과 포트폴리오를 분석해 어떤 종목을 분석할지 확정합니다</p>
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:2;">
+          INPUT: <code style="color:var(--accent);">"삼성전자 지금 사도 될까요?"</code><br>
+          OUTPUT: <code style="color:var(--accent2);">stock_code="005930", corp_code="00126380"</code>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px;">
+        <h3 style="margin-bottom:10px;">🔍 RequestClassifier — 의도 분류</h3>
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:2;">
+          INPUT: Curator 결과 + 원문 질문<br>
+          OUTPUT: intent=<code style="color:var(--gold);">"buy_inquiry"</code><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; urgency_reason=<code style="color:var(--warn);">"surge"</code> (급등/급락 감지)
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:var(--text-muted); margin-bottom:12px;">AgentState — 에이전트 간 데이터 계약</h3>
+      <pre><span class="kw">class</span> <span class="fn">AgentState</span>(BaseModel):
+    user_query: <span class="nm">str</span>
+    user_profile: <span class="nm">UserProfile</span>
+    portfolio: <span class="nm">Portfolio</span>
+
+    <span class="cm"># 각 에이전트가 채워 넣는 결과</span>
+    curator:    <span class="nm">CuratorResult</span>    | <span class="kw">None</span>
+    classifier: <span class="nm">UserRequest</span>      | <span class="kw">None</span>
+    quant:      <span class="nm">QuantResult</span>      | <span class="kw">None</span>
+    qual:       <span class="nm">QualResult</span>       | <span class="kw">None</span>
+    competitor: <span class="nm">CompetitorResult</span> | <span class="kw">None</span>
+    strategist: <span class="nm">StrategistResult</span> | <span class="kw">None</span></pre>
+      <p style="font-size:.8rem; margin-top:10px;">Pydantic 강타입 스키마로 에이전트 간 데이터 계약 보장</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 10 — Quant Agent
+══════════════════════════════════════ -->
+<div class="slide" data-index="9">
+  <div class="section-badge">에이전트 상세</div>
+  <h2>📈 Quant Agent — 정량 분석</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <div>
+      <h3>분석 지표</h3>
+      <table style="font-size:.85rem;">
+        <thead><tr><th>지표</th><th>의미</th><th>산식</th></tr></thead>
+        <tbody>
+          <tr><td>PER</td><td>주가 수익 배수</td><td>주가 ÷ EPS</td></tr>
+          <tr><td>PBR</td><td>순자산 배수</td><td>주가 ÷ BPS</td></tr>
+          <tr><td>ROE</td><td>자기자본 수익률</td><td>순이익 ÷ 자본</td></tr>
+          <tr><td>부채비율</td><td>재무 건전성</td><td>총부채 ÷ 자본</td></tr>
+          <tr><td>매출성장률</td><td>성장세</td><td>YoY % 변화</td></tr>
+          <tr><td>영업이익률</td><td>수익성</td><td>영업이익 ÷ 매출</td></tr>
+        </tbody>
+      </table>
+      <div class="card" style="margin-top:14px; padding:14px;">
+        <div style="font-size:.85rem; color:var(--gold); font-weight:700; margin-bottom:6px;">💡 Calculation Outside LLM 원칙</div>
+        <div style="font-size:.82rem; color:var(--text-muted);">
+          모든 수치 계산은 Python/DB에서 수행<br>
+          LLM은 해석 텍스트 생성에만 사용<br>
+          → 정확성 보장 + 비용 절감
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:var(--text-muted);">점수화 로직</h3>
+      <pre><span class="cm"># 룰 기반 점수 산출 (MVP)</span>
+score = 50  <span class="cm"># 기본 점수</span>
+
+<span class="kw">if</span> roe > 10 <span class="kw">and</span> growth > 5:
+    score += 30
+    reasons.append(<span class="st">"ROE·성장률 우수"</span>)
+<span class="kw">elif</span> roe <= 0:
+    score -= 20
+    risks.append(<span class="st">"ROE 악화 리스크"</span>)
+
+<span class="kw">if</span> debt > 150:
+    score -= 10
+    risks.append(<span class="st">"부채비율 주의"</span>)
+
+<span class="cm"># 신호 결정</span>
+<span class="kw">if</span>   score >= 70: signal = <span class="st">"BUY"</span>
+<span class="kw">elif</span> score >= 40: signal = <span class="st">"HOLD"</span>
+<span class="kw">else</span>:             signal = <span class="st">"SELL"</span></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 11 — Qual Agent
+══════════════════════════════════════ -->
+<div class="slide" data-index="10">
+  <div class="section-badge">에이전트 상세</div>
+  <h2>📰 Qual Agent — 공시·뉴스 정성 분석</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <div>
+      <h3>RAG 파이프라인</h3>
+      <div class="flow" style="flex-direction:column; gap:10px; align-items:flex-start;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="flow-box" style="min-width:140px;">DART 공시 원문<br><small>최근 7일</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box green" style="min-width:120px;">pgvector<br><small>유사도 검색</small></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="flow-box" style="min-width:140px;">관련 청크 추출<br><small>상위 3,000자</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box green" style="min-width:120px;">GLM LLM<br><small>센티멘트 분석</small></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="flow-box" style="min-width:140px;">호재/악재 분류<br><small>+ 출처 부착</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box green" style="min-width:120px;">QualResult<br><small>score + evidence</small></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:var(--text-muted);">출력 예시</h3>
+      <pre>{
+  <span class="st">"score"</span>: 72,
+  <span class="st">"sentiment"</span>: <span class="st">"positive"</span>,
+  <span class="st">"event_types"</span>: [<span class="st">"실적 개선"</span>, <span class="st">"신제품 출시"</span>],
+  <span class="st">"evidence"</span>: [
+    {
+      <span class="st">"content"</span>: <span class="st">"HBM3E 공급 계약 체결..."</span>,
+      <span class="st">"source"</span>: <span class="st">"[공시] 2026-05-15"</span>,
+      <span class="st">"report_nm"</span>: <span class="st">"주요사항보고서"</span>
+    }
+  ]
+}</pre>
+      <div class="card" style="margin-top:12px; padding:12px; border-color:var(--accent2);">
+        <div style="font-size:.82rem; color:var(--accent2); font-weight:700;">📎 Evidence-first 원칙</div>
+        <div style="font-size:.8rem; color:var(--text-muted); margin-top:6px;">
+          모든 정성 판단에 DART 공시 날짜·제목을 출처로 명시<br>
+          "실적 개선"이라고 주장할 때 반드시 근거 문서 첨부
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 12 — Competitor Agent
+══════════════════════════════════════ -->
+<div class="slide" data-index="11">
+  <div class="section-badge">에이전트 상세</div>
+  <h2>🏢 Competitor Agent — Peer 비교 분석</h2>
+  <div class="grid grid-2" style="margin-top:24px;">
+    <div>
+      <h3>역할</h3>
+      <p style="margin-bottom:16px;">동종업계 경쟁사와의 상대적 위치를 분석해 종목의 업종 내 경쟁력을 평가합니다</p>
+      <div class="card">
+        <div style="font-size:.9rem; line-height:2.2;">
+          📥 입력: 대상 종목 + 섹터 정보<br>
+          🔍 처리: 동일 섹터 Peer 추출<br>
+          📊 비교: PER·PBR·ROE 횡비교<br>
+          📤 출력: CompetitorResult (score, peer_list)
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px; border-color:var(--purple);">
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:1.8;">
+          <strong style="color:var(--purple);">예시 — 반도체 섹터</strong><br>
+          대상: 삼성전자 | Peer: SK하이닉스, 마이크론<br>
+          삼성전자 PER 15x → 섹터 평균 22x 대비 저평가<br>
+          → Peer 점수 65점 (상대적 저평가 우위)
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3 style="color:var(--text-muted);">출력 스키마</h3>
+      <pre>{
+  <span class="st">"score"</span>: 65,
+  <span class="st">"peer_summary"</span>: <span class="st">"삼성전자는 섹터 내
+    PER 기준 저평가 구간"</span>,
+  <span class="st">"peer_list"</span>: [
+    {
+      <span class="st">"name"</span>: <span class="st">"SK하이닉스"</span>,
+      <span class="st">"per"</span>: 24.5,
+      <span class="st">"pbr"</span>: 2.1,
+      <span class="st">"roe"</span>: 18.3
+    },
+    ...
+  ]
+}</pre>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 13 — Strategist + Guardrail
+══════════════════════════════════════ -->
+<div class="slide" data-index="12">
+  <div class="section-badge">에이전트 상세</div>
+  <h2>🧠 Strategist + 🛡️ Guardrail</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <div>
+      <h3>Strategist — 종합 신호 생성</h3>
+      <div class="card" style="border-color:var(--cyan);">
+        <div style="font-size:.9rem; margin-bottom:12px;">가중치 기반 종합 점수 산출</div>
+        <div style="display:flex; gap:12px; margin-bottom:16px;">
+          <div style="flex:45; background:var(--gold); border-radius:4px; padding:8px; text-align:center; font-size:.82rem; color:#000; font-weight:700;">Quant<br>45%</div>
+          <div style="flex:30; background:var(--accent2); border-radius:4px; padding:8px; text-align:center; font-size:.82rem; color:#000; font-weight:700;">Qual<br>30%</div>
+          <div style="flex:25; background:var(--purple); border-radius:4px; padding:8px; text-align:center; font-size:.82rem; color:#000; font-weight:700;">Competitor<br>25%</div>
+        </div>
+        <pre style="font-size:.78rem; padding:12px;">score = (quant.score * 0.45
+       + qual.score  * 0.30
+       + comp.score  * 0.25)
+
+<span class="cm"># 투자성향 보정</span>
+<span class="kw">if</span> risk_tolerance == <span class="st">"low"</span>:
+    suitability -= 8
+
+signal = (<span class="st">"BUY"</span>  <span class="kw">if</span> score >= 76
+     <span class="kw">else</span> <span class="st">"SELL"</span> <span class="kw">if</span> score <= 44
+     <span class="kw">else</span> <span class="st">"HOLD"</span>)</pre>
+      </div>
+    </div>
+    <div>
+      <h3>Guardrail — 안전 필터</h3>
+      <div class="card" style="border-color:var(--warn); margin-bottom:14px;">
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:2;">
+          <span style="color:var(--warn); font-weight:700;">차단 대상 표현</span><br>
+          ❌ "지금 당장 매수하세요"<br>
+          ❌ "무조건 오릅니다"<br>
+          ❌ "손실이 없을 것입니다"
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--accent2);">
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:2;">
+          <span style="color:var(--accent2); font-weight:700;">변환 후</span><br>
+          ✅ "매수 우위 신호로 판단됩니다"<br>
+          ✅ "상승 가능성이 높아 보입니다"<br>
+          ✅ "리스크 요인을 고려해 판단하세요"
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px; padding:12px; text-align:center;">
+        <div style="font-size:.8rem; color:var(--text-muted);">+ 투자 권유가 아님 면책조항 자동 삽입</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 14 — 데이터 흐름
+══════════════════════════════════════ -->
+<div class="slide" data-index="13">
+  <div class="section-badge">데이터 & 기술 스택</div>
+  <h2>데이터 파이프라인</h2>
+  <div class="grid grid-3" style="margin-top:24px;">
+    <div>
+      <h3>📥 수집 데이터</h3>
+      <ul class="checklist">
+        <li><span class="check-icon">📊</span><div><strong>DART 재무제표</strong><br><small style="color:var(--text-muted);">금감원 전자공시 — 분기/연간 재무 데이터</small></div></li>
+        <li><span class="check-icon">📄</span><div><strong>DART 공시 원문</strong><br><small style="color:var(--text-muted);">주요사항보고서·실적발표 원문 텍스트</small></div></li>
+        <li><span class="check-icon">📈</span><div><strong>pykrx 시세</strong><br><small style="color:var(--text-muted);">KOSPI/KOSDAQ 일별 종가·거래량·시총</small></div></li>
+        <li><span class="check-icon">📰</span><div><strong>뉴스 크롤링</strong><br><small style="color:var(--text-muted);">네이버·한경 등 금융 뉴스</small></div></li>
+      </ul>
+    </div>
+    <div>
+      <h3>🗄️ 저장소</h3>
+      <div class="card" style="margin-bottom:12px; border-color:var(--accent);">
+        <div style="font-weight:700; color:var(--accent); margin-bottom:8px;">Postgres (정형 데이터)</div>
+        <div style="font-size:.82rem; color:var(--text-muted); line-height:1.8;">
+          company · stock_price<br>
+          financial_statement<br>
+          disclosure_report · raw_news
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--accent2);">
+        <div style="font-weight:700; color:var(--accent2); margin-bottom:8px;">pgvector (임베딩)</div>
+        <div style="font-size:.82rem; color:var(--text-muted); line-height:1.8;">
+          rag_documents (원문 단위)<br>
+          rag_chunks (vector 1024차원)<br>
+          → 유사도 검색으로 Qual 지원
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>🔄 데이터 원칙</h3>
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:1.9;">
+          <strong style="color:var(--text);">DB 단일화</strong><br>
+          Postgres 1개로 정형 + 벡터 통합<br>
+          별도 벡터DB(Chroma 등) 미사용
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:1.9;">
+          <strong style="color:var(--text);">저장 금지</strong><br>
+          Excel·PDF·DOCX는 DB 저장 X<br>
+          사용자 다운로드 후 임시 삭제<br>
+          (Streamlit Cloud 1GB 제한 대응)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 15 — RAG 파이프라인
+══════════════════════════════════════ -->
+<div class="slide" data-index="14">
+  <div class="section-badge">데이터 & 기술 스택</div>
+  <h2>RAG 파이프라인 — 공시 원문 검색</h2>
+  <p style="text-align:center; margin-bottom:28px;">RAG(Retrieval-Augmented Generation): 문서를 검색해서 그 결과를 바탕으로 LLM이 답변하는 방식</p>
+  <div class="flow" style="gap:0; flex-wrap:nowrap; width:100%; justify-content:center;">
+    <div style="text-align:center;">
+      <div class="flow-box" style="padding:16px 12px;">
+        📄 DART 공시 원문<br>
+        <small style="color:var(--text-muted);">원문 텍스트</small>
+      </div>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="padding:16px 12px;">
+      ✂️ 청킹<br>
+      <small style="color:var(--text-muted);">문서 분할</small>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box green" style="padding:16px 12px;">
+      🔢 임베딩<br>
+      <small style="color:var(--text-muted);">1024차원 벡터</small>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box green" style="padding:16px 12px;">
+      🔍 pgvector<br>
+      <small style="color:var(--text-muted);">유사도 검색</small>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box highlight" style="padding:16px 12px;">
+      🤖 LLM 해석<br>
+      <small style="color:var(--text-muted);">센티멘트 분석</small>
+    </div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box" style="padding:16px 12px; background:var(--surface2);">
+      📎 출처 부착<br>
+      <small style="color:var(--text-muted);">공시일·제목 명시</small>
+    </div>
+  </div>
+  <div class="grid grid-2" style="margin-top:28px;">
+    <div class="card accent-border">
+      <div style="font-size:.85rem; color:var(--text-muted); line-height:1.8;">
+        <strong style="color:var(--accent);">왜 RAG가 필요한가?</strong><br>
+        LLM은 학습 데이터 기준의 정보만 알고 있음<br>
+        최신 공시·뉴스는 LLM이 모름<br>
+        → 실시간 문서 검색 후 LLM에 주입해야 정확한 분석 가능
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--accent2);">
+      <div style="font-size:.85rem; color:var(--text-muted); line-height:1.8;">
+        <strong style="color:var(--accent2);">Hybrid Search (목표)</strong><br>
+        키워드 검색 (BM25) + 벡터 검색 병행<br>
+        Re-ranker로 최종 순위 결정<br>
+        → 검색 품질 대폭 향상
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 16 — 기술 스택
+══════════════════════════════════════ -->
+<div class="slide" data-index="15">
+  <div class="section-badge">데이터 & 기술 스택</div>
+  <h2 style="text-align:center;">기술 스택</h2>
+  <div class="stack-grid" style="margin-top:28px;">
+    <div class="stack-item" style="border-color:var(--accent);">
+      <div style="font-size:1.6rem;">🔗</div>
+      <div class="stack-name" style="color:var(--accent);">LangGraph</div>
+      <div class="stack-desc">에이전트 오케스트레이션<br>병렬 Fan-out 구조</div>
+    </div>
+    <div class="stack-item" style="border-color:#ff4b4b;">
+      <div style="font-size:1.6rem;">🖥️</div>
+      <div class="stack-name" style="color:#ff4b4b;">Streamlit</div>
+      <div class="stack-desc">웹 UI<br>Cloud 배포 예정</div>
+    </div>
+    <div class="stack-item" style="border-color:#336791;">
+      <div style="font-size:1.6rem;">🐘</div>
+      <div class="stack-name" style="color:#99c0ff;">PostgreSQL</div>
+      <div class="stack-desc">정형 데이터 DB<br>Docker 기반 운영</div>
+    </div>
+    <div class="stack-item" style="border-color:var(--accent2);">
+      <div style="font-size:1.6rem;">🔢</div>
+      <div class="stack-name" style="color:var(--accent2);">pgvector</div>
+      <div class="stack-desc">벡터 임베딩 저장<br>유사도 검색</div>
+    </div>
+    <div class="stack-item" style="border-color:var(--gold);">
+      <div style="font-size:1.6rem;">✅</div>
+      <div class="stack-name" style="color:var(--gold);">Pydantic</div>
+      <div class="stack-desc">에이전트 간<br>데이터 계약 강타입</div>
+    </div>
+    <div class="stack-item" style="border-color:var(--purple);">
+      <div style="font-size:1.6rem;">🤖</div>
+      <div class="stack-name" style="color:var(--purple);">GLM / Solar LLM</div>
+      <div class="stack-desc">OpenAI 호환 API<br>주요 추론 모델</div>
+    </div>
+    <div class="stack-item">
+      <div style="font-size:1.6rem;">📊</div>
+      <div class="stack-name">pykrx</div>
+      <div class="stack-desc">KOSPI/KOSDAQ<br>시세 수집</div>
+    </div>
+    <div class="stack-item">
+      <div style="font-size:1.6rem;">📋</div>
+      <div class="stack-name">DART API</div>
+      <div class="stack-desc">금감원 전자공시<br>재무·공시 데이터</div>
+    </div>
+    <div class="stack-item">
+      <div style="font-size:1.6rem;">🐍</div>
+      <div class="stack-name">Python 3.11+</div>
+      <div class="stack-desc">런타임<br>ruff 린팅</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 17 — LLM 비용 전략
+══════════════════════════════════════ -->
+<div class="slide" data-index="16">
+  <div class="section-badge">데이터 & 기술 스택</div>
+  <h2>LLM 비용 전략 — 월 5만원 상한</h2>
+  <div class="grid grid-2" style="margin-top:24px; align-items:start;">
+    <div>
+      <h3>핵심 절감 패턴 4가지</h3>
+      <ul class="checklist">
+        <li>
+          <span class="check-icon">🏷️</span>
+          <div>
+            <strong>모델 라우팅</strong><br>
+            <small style="color:var(--text-muted);">단순 분류(Curator·Classifier)는 작은 모델<br>복잡 추론(Strategist)만 큰 모델 사용</small>
+          </div>
+        </li>
+        <li>
+          <span class="check-icon">💾</span>
+          <div>
+            <strong>응답 캐싱</strong><br>
+            <small style="color:var(--text-muted);">같은 종목 24시간 내 재분석 시 DB 캐시 사용<br>API 호출 횟수 대폭 감소</small>
+          </div>
+        </li>
+        <li>
+          <span class="check-icon">🎓</span>
+          <div>
+            <strong>부트캠프 무료 크레딧</strong><br>
+            <small style="color:var(--text-muted);">Solar API 부트캠프 크레딧 우선 사용</small>
+          </div>
+        </li>
+        <li>
+          <span class="check-icon">🔢</span>
+          <div>
+            <strong>계산 Outside LLM</strong><br>
+            <small style="color:var(--text-muted);">PER·PBR·ROE 등 수치 계산은 Python/DB<br>LLM 토큰 소비 없이 정확도 보장</small>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div>
+      <div class="card gold-border" style="text-align:center; margin-bottom:16px;">
+        <div style="font-size:3rem; font-weight:800; color:var(--gold);">₩50,000</div>
+        <div style="color:var(--text-muted); margin-top:4px;">월 LLM 비용 상한 (PRD Non-goal 명시)</div>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-size:.85rem; line-height:1.9;">
+          <strong>Self-Consistency</strong>: N=3 (5→3 축소)<br>
+          동일 쿼리 3회 실행 후 다수결 → 안정성 확보
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:1.9;">
+          자세한 비용 계산: <code>docs/operations/llm_cost_guide.md</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 18 — 왜 멀티에이전트인가
+══════════════════════════════════════ -->
+<div class="slide" data-index="17">
+  <div class="section-badge">핵심 설계 결정</div>
+  <h2>왜 멀티에이전트인가?</h2>
+  <div class="grid grid-2" style="margin-top:24px;">
+    <div class="card warn-border">
+      <h3 style="color:var(--warn);">단일 LLM 방식의 한계</h3>
+      <ul style="list-style:none; font-size:.9rem; line-height:2.2; color:var(--text-muted); margin-top:8px;">
+        <li>❌ "왜 이 신호인가?" 추적 불가</li>
+        <li>❌ 재무·뉴스·경쟁사 분석이 혼재</li>
+        <li>❌ 성향에 따른 개인화 경계 불명확</li>
+        <li>❌ 긴 컨텍스트 → 높은 비용</li>
+        <li>❌ 한 부분 수정 시 전체 재실행</li>
+      </ul>
+    </div>
+    <div class="card accent-border">
+      <h3 style="color:var(--accent);">멀티에이전트 방식의 장점</h3>
+      <ul style="list-style:none; font-size:.9rem; line-height:2.2; color:var(--text-muted); margin-top:8px;">
+        <li>✅ 에이전트별 책임 추적 가능</li>
+        <li>✅ 전문화 분리 → 각자 고품질</li>
+        <li>✅ 개인화는 Strategist만 담당</li>
+        <li>✅ 병렬 실행 → 60초 목표</li>
+        <li>✅ 에이전트 단위 교체·개선 가능</li>
+      </ul>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px; text-align:center; border-color:var(--gold);">
+    <p style="font-size:1rem; color:var(--text);">
+      ADR-003: <strong style="color:var(--gold);">6-에이전트 구조 채택 이유</strong> —
+      Supervisor Pattern으로 Strategist가 전체를 종합하되,<br>
+      각 Specialist는 자신의 영역에서만 판단함으로써 책임을 명확히 분리
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 19 — 왜 Postgres+pgvector
+══════════════════════════════════════ -->
+<div class="slide" data-index="18">
+  <div class="section-badge">핵심 설계 결정</div>
+  <h2>왜 Postgres + pgvector인가?</h2>
+  <div class="grid grid-2" style="margin-top:24px; align-items:start;">
+    <div>
+      <h3>선택 배경 (ADR-001)</h3>
+      <div class="card" style="margin-bottom:14px;">
+        <div style="font-size:.9rem; line-height:2; color:var(--text-muted);">
+          <strong style="color:var(--text);">후보 1: Postgres + pgvector ✅</strong><br>
+          정형 + 벡터 데이터를 DB 1개로 통합<br>
+          JOIN 쿼리로 재무·임베딩 동시 조회 가능<br>
+          운영 복잡도 최소화
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:.9rem; line-height:2; color:var(--text-muted);">
+          <strong style="color:var(--text);">후보 2: Chroma 별도 운영</strong><br>
+          벡터 검색 성능은 우수하지만<br>
+          DB 2개 운영 → 동기화 복잡도 증가<br>
+          Streamlit Cloud 1GB 한계와 충돌
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>핵심 테이블 구조</h3>
+      <table style="font-size:.82rem;">
+        <thead><tr><th>테이블</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td>company</td><td>종목명·코드·섹터 마스터</td></tr>
+          <tr><td>stock_price</td><td>일별 종가·시총·거래량</td></tr>
+          <tr><td>financial_statement</td><td>DART 재무제표 계정별 수치</td></tr>
+          <tr><td>disclosure_report</td><td>DART 공시 메타 정보</td></tr>
+          <tr><td>disclosure_content</td><td>공시 원문 텍스트</td></tr>
+          <tr><td style="color:var(--accent2);">rag_documents</td><td>RAG 원문 단위</td></tr>
+          <tr><td style="color:var(--accent2);">rag_chunks</td><td>청크 + vector(1024) 임베딩</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 20 — Evidence-first
+══════════════════════════════════════ -->
+<div class="slide" data-index="19">
+  <div class="section-badge">핵심 설계 결정</div>
+  <h2>Evidence-first 원칙</h2>
+  <p style="text-align:center; margin-bottom:24px;">모든 정성 판단에는 반드시 출처를 부착합니다. 근거 없는 주장은 허용하지 않습니다.</p>
+  <div class="vs-wrap">
+    <div class="card warn-border">
+      <div class="vs-label" style="color:var(--warn);">❌ Evidence 없는 분석</div>
+      <div style="font-size:.9rem; color:var(--text-muted); line-height:2; margin-top:12px;">
+        "삼성전자는 실적이 개선되고 있으며<br>
+        HBM 수요 증가로 긍정적 전망입니다."<br><br>
+        → 어디서 온 정보인가?<br>
+        → LLM 환각(hallucination) 가능성<br>
+        → 투자자가 검증 불가
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; font-size:2rem; color:var(--border);">→</div>
+    <div class="card accent-border">
+      <div class="vs-label" style="color:var(--accent2);">✅ Evidence-first 분석</div>
+      <div style="font-size:.88rem; color:var(--text-muted); line-height:1.9; margin-top:12px;">
+        "삼성전자는 실적이 개선되고 있으며<br>
+        HBM 수요 증가로 긍정적 전망입니다."<br><br>
+        <strong style="color:var(--accent2);">📎 출처:</strong><br>
+        [공시] 2026-05-15 주요사항보고서<br>
+        "HBM3E 공급 계약 체결 발표..."<br><br>
+        → 투자자가 원문 직접 확인 가능
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px; text-align:center;">
+    <p style="font-size:.9rem; color:var(--text-muted);">
+      출처 부착률 <strong style="color:var(--accent);">95% 이상</strong>을 Phase 2 성공 지표로 설정 (PRD v0.6 명시)
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 21 — Phase 체크리스트
+══════════════════════════════════════ -->
+<div class="slide" data-index="20">
+  <div class="section-badge">현재 구현 현황</div>
+  <h2 style="text-align:center;">구현 현황 — Phase 체크리스트</h2>
+  <div class="grid grid-3" style="margin-top:28px;">
+    <div>
+      <h3 style="color:var(--accent2);">✅ 완료</h3>
+      <ul class="checklist">
+        <li><span class="check-icon">✅</span><div>9개 에이전트 함수 구현</div></li>
+        <li><span class="check-icon">✅</span><div>Quant 재무지표 계산 (PER·PBR·ROE·부채비율)</div></li>
+        <li><span class="check-icon">✅</span><div>Qual 공시 원문 RAG 연결</div></li>
+        <li><span class="check-icon">✅</span><div>LLM 센티멘트 분석 (GLM)</div></li>
+        <li><span class="check-icon">✅</span><div>Guardrail 투자권유 필터</div></li>
+        <li><span class="check-icon">✅</span><div>Streamlit 온보딩 UI</div></li>
+        <li><span class="check-icon">✅</span><div>Postgres + pgvector DB 구성</div></li>
+        <li><span class="check-icon">✅</span><div>Docker Compose 개발환경</div></li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="color:var(--gold);">🔄 진행 중</h3>
+      <ul class="checklist">
+        <li><span class="check-icon">🔄</span><div>LangGraph StateGraph 병렬화<br><small style="color:var(--text-muted);">현재: 순차 실행 → 목표: Quant/Qual/Competitor 병렬</small></div></li>
+        <li><span class="check-icon">🔄</span><div>전체 RAG 파이프라인 통합<br><small style="color:var(--text-muted);">Qual에 부분 연결, 뉴스·Hybrid Search 미연결</small></div></li>
+        <li><span class="check-icon">🔄</span><div>프롬프트 분리<br><small style="color:var(--text-muted);">prompts/*.md 파일로 코드와 분리 진행 중</small></div></li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="color:var(--text-muted);">⏳ 예정 (Phase 2)</h3>
+      <ul class="checklist">
+        <li><span class="check-icon">⏳</span><div>Streamlit Cloud 배포</div></li>
+        <li><span class="check-icon">⏳</span><div>60초 E2E 응답 검증</div></li>
+        <li><span class="check-icon">⏳</span><div>5개 종목 골든셋 통과</div></li>
+        <li><span class="check-icon">⏳</span><div>출처 부착률 95% 검증</div></li>
+        <li><span class="check-icon">⏳</span><div>PB 리포트 PDF 다운로드</div></li>
+        <li><span class="check-icon">⏳</span><div>LangSmith 트레이싱</div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 22 — 완료 상세
+══════════════════════════════════════ -->
+<div class="slide" data-index="21">
+  <div class="section-badge">현재 구현 현황</div>
+  <h2>완료된 구현 — 상세</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <div>
+      <h3>E2E 분석 파이프라인</h3>
+      <div class="flow" style="flex-direction:column; gap:8px; align-items:flex-start;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box" style="min-width:160px; font-size:.85rem;">① 온보딩 설문 (6문항)</div>
+          <small style="color:var(--accent2);">✅</small>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box" style="min-width:160px; font-size:.85rem;">② 포트폴리오 구성</div>
+          <small style="color:var(--accent2);">✅</small>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box" style="min-width:160px; font-size:.85rem;">③ Curator → 종목 확정</div>
+          <small style="color:var(--accent2);">✅</small>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box gold" style="min-width:160px; font-size:.85rem;">④ Quant 재무 분석</div>
+          <small style="color:var(--accent2);">✅ DB 연결</small>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box green" style="min-width:160px; font-size:.85rem;">⑤ Qual 공시 RAG</div>
+          <small style="color:var(--accent2);">✅ 부분 연결</small>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box" style="min-width:160px; font-size:.85rem; border-color:var(--purple); color:var(--purple);">⑥ Competitor 분석</div>
+          <small style="color:var(--gold);">🔄 Mock</small>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box" style="min-width:160px; font-size:.85rem; border-color:var(--cyan); color:var(--cyan);">⑦ Strategist 종합</div>
+          <small style="color:var(--accent2);">✅</small>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="flow-box warn" style="min-width:160px; font-size:.85rem;">⑧ Guardrail 필터</div>
+          <small style="color:var(--accent2);">✅</small>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>최근 커밋 하이라이트</h3>
+      <table style="font-size:.82rem;">
+        <thead><tr><th>커밋</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td style="color:var(--accent2);">Qual #28</td><td>공시 원문 RAG 연결 완료</td></tr>
+          <tr><td>Quant 수정</td><td>부채비율 계산 로직 정확도 개선</td></tr>
+          <tr><td style="color:var(--accent2);">Qual #27</td><td>LLM 센티멘트 분석 추가</td></tr>
+          <tr><td>Quant #26</td><td>정량 분석 로직 + 단위 테스트</td></tr>
+          <tr><td>GLM 추가</td><td>OpenAI 호환 클라이언트 바인딩</td></tr>
+          <tr><td>온보딩</td><td>투자자 성향 진단 에이전트</td></tr>
+          <tr><td>Classifier</td><td>RequestClassifier 에이전트 분리</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 23 — 진행 중
+══════════════════════════════════════ -->
+<div class="slide" data-index="22">
+  <div class="section-badge">현재 구현 현황</div>
+  <h2>진행 중 — 다음 단계</h2>
+  <div class="grid grid-3" style="margin-top:24px;">
+    <div class="card gold-border">
+      <h3 style="color:var(--gold);">🔄 LangGraph 병렬화</h3>
+      <p style="margin-top:10px;">현재 순차 실행 중인 Quant/Qual/Competitor를 LangGraph StateGraph로 병렬 Fan-out 전환</p>
+      <div class="prog-bar" style="margin-top:14px;">
+        <div class="prog-fill" style="width:35%; background:var(--gold);"></div>
+      </div>
+      <div style="font-size:.8rem; color:var(--text-muted); margin-top:6px;">진행률 35%</div>
+      <div style="font-size:.82rem; color:var(--text-muted); margin-top:10px; line-height:1.7;">
+        완료 시: 60초 응답 목표 달성 가능<br>
+        3개 에이전트 동시 실행 → 직렬 대비 3배 속도
+      </div>
+    </div>
+    <div class="card" style="border-color:var(--accent2);">
+      <h3 style="color:var(--accent2);">🔄 전체 RAG 파이프라인</h3>
+      <p style="margin-top:10px;">Qual에 연결된 공시 RAG를 뉴스·매크로 데이터까지 확장하고 Hybrid Search 적용</p>
+      <div class="prog-bar" style="margin-top:14px;">
+        <div class="prog-fill" style="width:50%; background:var(--accent2);"></div>
+      </div>
+      <div style="font-size:.8rem; color:var(--text-muted); margin-top:6px;">진행률 50%</div>
+      <div style="font-size:.82rem; color:var(--text-muted); margin-top:10px; line-height:1.7;">
+        완료 시: Qual 분석 품질 대폭 향상<br>
+        뉴스 + 공시 통합 센티멘트 분석
+      </div>
+    </div>
+    <div class="card">
+      <h3>🔄 프롬프트 분리</h3>
+      <p style="margin-top:10px;">현재 코드(.py)에 혼재된 LLM 프롬프트를 prompts/*.md 파일로 분리</p>
+      <div class="prog-bar" style="margin-top:14px;">
+        <div class="prog-fill" style="width:20%; background:var(--accent);"></div>
+      </div>
+      <div style="font-size:.8rem; color:var(--text-muted); margin-top:6px;">진행률 20%</div>
+      <div style="font-size:.82rem; color:var(--text-muted); margin-top:10px; line-height:1.7;">
+        완료 시: PM·기획자도 프롬프트 수정 가능<br>
+        코드 재배포 없이 분석 품질 개선
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 24 — 데모 영상
+══════════════════════════════════════ -->
+<div class="slide" data-index="23">
+  <div class="section-badge">데모</div>
+  <h2 style="text-align:center;">라이브 데모</h2>
+  <div style="text-align:center; margin-top:24px;">
+    <div style="background:var(--surface); border:2px dashed var(--border); border-radius:16px; padding:60px 40px; display:inline-block; min-width:480px;">
+      <div style="font-size:3rem; margin-bottom:16px;">🎬</div>
+      <div style="font-size:1.3rem; font-weight:700; margin-bottom:12px;">데모 영상 재생</div>
+      <div style="font-size:.95rem; color:var(--text-muted); line-height:2;">
+        1. 투자성향 설문 (6문항 응답)<br>
+        2. 포트폴리오 구성 (종목·수량·평단가)<br>
+        3. 분석 실행<br>
+        4. BUY / HOLD / SELL 신호 + 근거 + 출처 확인
+      </div>
+    </div>
+  </div>
+  <p style="text-align:center; margin-top:20px; font-size:.9rem; color:var(--text-muted);">
+    Streamlit 기반 웹 앱 · 로컬 실행: <code>streamlit run streamlit_app.py</code>
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 25 — 향후 계획
+══════════════════════════════════════ -->
+<div class="slide" data-index="24">
+  <div class="section-badge">향후 계획</div>
+  <h2>Phase 2 — 향후 계획</h2>
+  <div class="grid grid-2" style="margin-top:24px;">
+    <div>
+      <h3>기술 목표</h3>
+      <ul class="checklist">
+        <li><span class="check-icon">⚡</span><div><strong>LangGraph 병렬 실행</strong><br><small style="color:var(--text-muted);">Quant/Qual/Competitor 동시 처리 → 60초 목표</small></div></li>
+        <li><span class="check-icon">🔍</span><div><strong>전체 RAG 통합</strong><br><small style="color:var(--text-muted);">뉴스+공시 Hybrid Search + Re-ranker 적용</small></div></li>
+        <li><span class="check-icon">☁️</span><div><strong>Streamlit Cloud 배포</strong><br><small style="color:var(--text-muted);">외부 접근 가능한 서비스 배포</small></div></li>
+        <li><span class="check-icon">📊</span><div><strong>LangSmith 트레이싱</strong><br><small style="color:var(--text-muted);">에이전트 호출 추적·디버깅·성능 모니터링</small></div></li>
+      </ul>
+    </div>
+    <div>
+      <h3>품질 목표</h3>
+      <div class="card" style="margin-bottom:12px; border-color:var(--accent);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>E2E 5개 종목 통과</span>
+          <span style="color:var(--accent); font-weight:700;">⏳</span>
+        </div>
+        <div class="prog-bar" style="margin-top:8px;">
+          <div class="prog-fill" style="width:20%; background:var(--accent);"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px; border-color:var(--accent2);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>출처 부착률 95%+</span>
+          <span style="color:var(--accent2); font-weight:700;">⏳</span>
+        </div>
+        <div class="prog-bar" style="margin-top:8px;">
+          <div class="prog-fill" style="width:50%; background:var(--accent2);"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px; border-color:var(--gold);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>60초 응답 (Live)</span>
+          <span style="color:var(--gold); font-weight:700;">⏳</span>
+        </div>
+        <div class="prog-bar" style="margin-top:8px;">
+          <div class="prog-fill" style="width:30%; background:var(--gold);"></div>
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--purple);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span>PB 리포트 PDF 출력</span>
+          <span style="color:var(--purple); font-weight:700;">⏳</span>
+        </div>
+        <div class="prog-bar" style="margin-top:8px;">
+          <div class="prog-fill" style="width:5%; background:var(--purple);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     SLIDE 26 — Q&A
+══════════════════════════════════════ -->
+<div class="slide title-slide" data-index="25">
+  <div class="title-logo">Q<span>&</span>A</div>
+  <div class="divider"></div>
+  <div class="grid grid-3" style="margin-top:24px; max-width:800px;">
+    <div class="card" style="text-align:center; padding:16px;">
+      <div style="font-size:1.4rem;">🧠</div>
+      <div style="font-size:.85rem; color:var(--text-muted); margin-top:6px;">에이전트 설계·구조</div>
+    </div>
+    <div class="card" style="text-align:center; padding:16px;">
+      <div style="font-size:1.4rem;">🗄️</div>
+      <div style="font-size:.85rem; color:var(--text-muted); margin-top:6px;">데이터·DB 아키텍처</div>
+    </div>
+    <div class="card" style="text-align:center; padding:16px;">
+      <div style="font-size:1.4rem;">💰</div>
+      <div style="font-size:.85rem; color:var(--text-muted); margin-top:6px;">LLM 비용·운영</div>
+    </div>
+  </div>
+  <div class="title-meta" style="margin-top:32px;">
+    BDAI 12기 팀 프로젝트 · 감사합니다
+  </div>
+  <div style="font-size:.8rem; color:var(--text-muted); margin-top:12px;">
+    * 심화 질문은 키보드 A 키를 눌러 Appendix 슬라이드에서 확인하실 수 있습니다
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     APPENDIX A1 — AgentState
+══════════════════════════════════════ -->
+<div class="slide" data-index="26" data-appendix="true">
+  <div class="section-badge" style="color:var(--warn); border-color:var(--warn);">APPENDIX A1</div>
+  <h2>AgentState — 에이전트 간 데이터 계약</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <pre><span class="kw">class</span> <span class="fn">AgentState</span>(BaseModel):
+    <span class="cm"># 초기 입력</span>
+    user_query:   <span class="nm">str</span>
+    user_profile: <span class="nm">UserProfile</span>
+    portfolio:    <span class="nm">Portfolio</span>
+    as_of_date:   <span class="nm">str</span> | <span class="kw">None</span>
+
+    <span class="cm"># 에이전트가 순서대로 채움</span>
+    curator:    <span class="nm">CuratorResult</span>    | <span class="kw">None</span>
+    user_request: <span class="nm">UserRequest</span>    | <span class="kw">None</span>
+    quant:      <span class="nm">QuantResult</span>      | <span class="kw">None</span>
+    qual:       <span class="nm">QualResult</span>       | <span class="kw">None</span>
+    competitor: <span class="nm">CompetitorResult</span> | <span class="kw">None</span>
+    strategist: <span class="nm">StrategistResult</span> | <span class="kw">None</span>
+    guardrail:  <span class="nm">GuardrailResult</span>  | <span class="kw">None</span></pre>
+    <div>
+      <h3>설계 원칙</h3>
+      <ul class="checklist">
+        <li><span class="check-icon">🔒</span><div>Pydantic 강타입으로 에이전트 간 계약 강제</div></li>
+        <li><span class="check-icon">📌</span><div>None 체크로 실행 순서 보장 (Curator 없으면 Quant 실행 불가)</div></li>
+        <li><span class="check-icon">🔄</span><div>LangGraph StateGraph에서 단일 상태 객체로 공유</div></li>
+        <li><span class="check-icon">🧪</span><div>각 에이전트 단독 테스트 시 AgentState Mock 주입</div></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     APPENDIX A2 — Quant 산식
+══════════════════════════════════════ -->
+<div class="slide" data-index="27" data-appendix="true">
+  <div class="section-badge" style="color:var(--warn); border-color:var(--warn);">APPENDIX A2</div>
+  <h2>Quant 지표 산식 상세</h2>
+  <table style="margin-top:20px;">
+    <thead>
+      <tr><th>지표</th><th>산식</th><th>소스</th><th>판단 기준 (MVP)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>PER</td><td>시가총액 ÷ 당기순이익</td><td>pykrx + DART</td><td>섹터 평균 대비 저/고평가</td></tr>
+      <tr><td>PBR</td><td>시가총액 ÷ 순자산</td><td>pykrx + DART</td><td>1.0 미만: 자산 대비 저평가</td></tr>
+      <tr><td>ROE</td><td>당기순이익 ÷ 자기자본 × 100</td><td>DART 재무제표</td><td>&gt;10%: 수익성 우수</td></tr>
+      <tr><td>부채비율</td><td>총부채 ÷ 자기자본 × 100</td><td>DART 재무제표</td><td>&lt;150%: 안정, &gt;150%: 주의</td></tr>
+      <tr><td>매출성장률</td><td>(당기매출 - 전기매출) ÷ 전기매출 × 100</td><td>DART 재무제표</td><td>&gt;5%: 성장세 양호</td></tr>
+      <tr><td>영업이익률</td><td>영업이익 ÷ 매출액 × 100</td><td>DART 재무제표</td><td>섹터 평균 대비 비교</td></tr>
+    </tbody>
+  </table>
+  <div class="card" style="margin-top:20px; padding:14px;">
+    <div style="font-size:.85rem; color:var(--text-muted);">
+      MVP 단계에서는 룰 기반 점수화, Phase 2에서 LLM에 metrics 딕셔너리를 전달해 텍스트 해석 생성으로 전환 예정
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     APPENDIX A3 — LangGraph 병렬
+══════════════════════════════════════ -->
+<div class="slide" data-index="28" data-appendix="true">
+  <div class="section-badge" style="color:var(--warn); border-color:var(--warn);">APPENDIX A3</div>
+  <h2>LangGraph 병렬 팬아웃 구조 (목표)</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <div>
+      <h3 style="color:var(--warn);">현재: 순차 실행 (pipeline.py)</h3>
+      <pre><span class="cm"># 현재 구현</span>
+state = run_curator(state)
+state = run_classifier(state)
+state = run_quant(state)     <span class="cm"># 직렬</span>
+state = run_qual(state)      <span class="cm"># 직렬</span>
+state = run_competitor(state) <span class="cm"># 직렬</span>
+state = run_strategist(state)
+state = run_guardrail(state)</pre>
+      <div style="font-size:.85rem; color:var(--text-muted); margin-top:12px;">
+        ⏱️ 예상 시간: 각 에이전트 5~10초 × 순차 = 40~60초+
+      </div>
+    </div>
+    <div>
+      <h3 style="color:var(--accent2);">목표: LangGraph StateGraph</h3>
+      <pre><span class="kw">from</span> langgraph.graph <span class="kw">import</span> StateGraph
+
+graph = StateGraph(AgentState)
+graph.add_node(<span class="st">"curator"</span>,    run_curator)
+graph.add_node(<span class="st">"classifier"</span>, run_classifier)
+graph.add_node(<span class="st">"quant"</span>,     run_quant)
+graph.add_node(<span class="st">"qual"</span>,      run_qual)
+graph.add_node(<span class="st">"competitor"</span>,run_competitor)
+graph.add_node(<span class="st">"strategist"</span>,run_strategist)
+
+<span class="cm"># 병렬 Fan-out</span>
+graph.add_edge(<span class="st">"classifier"</span>, [
+    <span class="st">"quant"</span>, <span class="st">"qual"</span>, <span class="st">"competitor"</span>
+])</pre>
+      <div style="font-size:.85rem; color:var(--text-muted); margin-top:12px;">
+        ⚡ 예상 시간: 병렬 실행 → 가장 느린 에이전트 시간 ≈ 15~20초
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     APPENDIX A4 — 비용 상세
+══════════════════════════════════════ -->
+<div class="slide" data-index="29" data-appendix="true">
+  <div class="section-badge" style="color:var(--warn); border-color:var(--warn);">APPENDIX A4</div>
+  <h2>LLM 비용 계산 상세</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <div>
+      <h3>비용 절감 구조</h3>
+      <table style="font-size:.85rem;">
+        <thead><tr><th>에이전트</th><th>모델</th><th>이유</th></tr></thead>
+        <tbody>
+          <tr><td>Curator</td><td>Small LLM</td><td>단순 분류 작업</td></tr>
+          <tr><td>Classifier</td><td>Small LLM</td><td>intent 분류만</td></tr>
+          <tr><td>Quant</td><td>Python 계산</td><td>LLM 불필요</td></tr>
+          <tr><td>Qual</td><td>GLM/Solar</td><td>센티멘트 분석</td></tr>
+          <tr><td>Competitor</td><td>Python + DB</td><td>비교 계산만</td></tr>
+          <tr><td>Strategist</td><td>GLM (큰 모델)</td><td>복잡한 종합 추론</td></tr>
+          <tr><td>Guardrail</td><td>Rule-based</td><td>패턴 매칭</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>월 비용 추산</h3>
+      <div class="card gold-border" style="margin-bottom:12px;">
+        <div style="font-size:.9rem; line-height:2;">
+          일 50회 분석 × 30일 = 1,500회/월<br>
+          1회당 평균 약 3,000 토큰 소비<br>
+          합계: 4,500,000 토큰/월<br>
+          Solar 기준 약 ₩22,500/월
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:.85rem; color:var(--text-muted); line-height:1.8;">
+          + 캐시 적중률 60% 가정 시 → ₩9,000/월<br>
+          부트캠프 크레딧 차감 시 → 거의 무료<br>
+          <strong style="color:var(--accent2);">→ 월 5만원 상한 충분히 달성 가능</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     APPENDIX A5 — 투자자 페르소나
+══════════════════════════════════════ -->
+<div class="slide" data-index="30" data-appendix="true">
+  <div class="section-badge" style="color:var(--warn); border-color:var(--warn);">APPENDIX A5</div>
+  <h2>MVP 타깃 페르소나</h2>
+  <div class="grid grid-2" style="margin-top:20px;">
+    <div class="card accent-border">
+      <div style="font-size:2rem; margin-bottom:12px;">👨‍💼</div>
+      <h3>박민호 (28세, IT PM)</h3>
+      <div style="font-size:.9rem; color:var(--text-muted); line-height:2.2; margin-top:10px;">
+        <strong style="color:var(--text);">성향:</strong> 균형형 (Medium Risk)<br>
+        <strong style="color:var(--text);">포트폴리오:</strong> 반도체 35% + 금융 20% + 현금 20%<br>
+        <strong style="color:var(--text);">투자 기간:</strong> 1~3년<br>
+        <strong style="color:var(--text);">손실 감내:</strong> -15%<br>
+        <strong style="color:var(--text);">경험:</strong> 2년 (스스로 재무제표 분석 어려움)
+      </div>
+    </div>
+    <div>
+      <h3>페르소나가 겪는 문제</h3>
+      <ul class="checklist" style="margin-top:8px;">
+        <li><span class="check-icon">😓</span><div>유튜브 보고 SK하이닉스 샀다가 -23% 손실</div></li>
+        <li><span class="check-icon">😓</span><div>재무제표는 열어봤지만 해석 방법 모름</div></li>
+        <li><span class="check-icon">😓</span><div>삼성전자 지금 사야 하는지 매번 고민</div></li>
+        <li><span class="check-icon">😓</span><div>포트폴리오 비중이 반도체에 너무 치우침</div></li>
+      </ul>
+      <div class="card" style="margin-top:16px; border-color:var(--accent2);">
+        <div style="font-size:.85rem; color:var(--text-muted);">
+          우리 시스템 사용 시 → "현재 보유 비중(35%)이 높아 신규 매수보다 관망을 권고합니다. [근거: 반도체 업황 둔화 DART 공시 2026-05-10]"
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- ══════════════════ 네비게이션 ══════════════════ -->
+<div id="nav">
+  <button onclick="prevSlide()" title="이전 (←)">&#8592;</button>
+  <span id="counter">1 / 26</span>
+  <button onclick="nextSlide()" title="다음 (→)">&#8594;</button>
+  <button id="appendix-btn" onclick="goToAppendix()">Appendix</button>
+</div>
+
+<script>
+  const MAIN_COUNT = 26;
+  const TOTAL_COUNT = 31; // 26 main + 5 appendix
+
+  let current = 0;
+  const slides = document.querySelectorAll('.slide');
+  const counter = document.getElementById('counter');
+  const segments = document.querySelectorAll('.sec-seg');
+
+  // 섹션 범위 (0-indexed)
+  const SECTIONS = [
+    [0, 3],   // 도입
+    [4, 6],   // 아키텍처
+    [7, 12],  // 에이전트
+    [13, 16], // 데이터
+    [17, 19], // 설계결정
+    [20, 22], // 현황
+    [23, 25], // 클로징
+  ];
+
+  function isAppendix(idx) {
+    return idx >= MAIN_COUNT;
+  }
+
+  function updateSlide() {
+    slides.forEach((s, i) => {
+      s.classList.toggle('active', i === current);
+    });
+
+    const inAppendix = isAppendix(current);
+    document.body.classList.toggle('in-appendix', inAppendix);
+
+    if (inAppendix) {
+      counter.textContent = `A${current - MAIN_COUNT + 1} / A5`;
+    } else {
+      counter.textContent = `${current + 1} / ${MAIN_COUNT}`;
+    }
+
+    // 섹션 바 업데이트
+    segments.forEach((seg, si) => {
+      const [from, to] = SECTIONS[si];
+      if (current > to) {
+        seg.className = 'sec-seg done';
+      } else if (current >= from && current <= to) {
+        seg.className = 'sec-seg active';
+      } else {
+        seg.className = 'sec-seg';
+      }
+    });
+  }
+
+  function nextSlide() {
+    if (current < TOTAL_COUNT - 1) {
+      current++;
+      updateSlide();
+    }
+  }
+
+  function prevSlide() {
+    if (current > 0) {
+      current--;
+      updateSlide();
+    }
+  }
+
+  function goToAppendix() {
+    current = MAIN_COUNT;
+    updateSlide();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault();
+      nextSlide();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      prevSlide();
+    } else if (e.key === 'a' || e.key === 'A') {
+      goToAppendix();
+    } else if (e.key === 'Home') {
+      current = 0;
+      updateSlide();
+    } else if (e.key === 'End') {
+      current = MAIN_COUNT - 1;
+      updateSlide();
+    }
+  });
+
+  // 터치 스와이프 지원
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  document.addEventListener('touchend', (e) => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) {
+      diff > 0 ? nextSlide() : prevSlide();
+    }
+  });
+
+  updateSlide();
+</script>
+</body>
+</html>

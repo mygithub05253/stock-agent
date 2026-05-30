@@ -337,7 +337,7 @@
 | `docs/architecture/agent_design.md` | 6 에이전트 상세 설계 | 7주차 진입 전 |
 | `docs/operations/llm_cost_guide.md` | LLM 비용 절감 가이드 (쉬운 설명) | 본 PRD 직후 |
 | `docs/decisions/ADR-001 ~ ADR-004` | 4 의사결정 기록 | 본 PRD 직후 |
-| `docs/functional-spec/functional_spec_v0.1.md` | 11개 기능 상세 명세 | 본 PRD 승인 직후 |
+| `docs/functional-spec/README.md` | 기능별 상세 명세 인덱스 및 작성 규칙 | 본 PRD 승인 직후 |
 | `docs/glossary.md` | 비전공자용 용어집 | 본 PRD 직후 |
 
 ---

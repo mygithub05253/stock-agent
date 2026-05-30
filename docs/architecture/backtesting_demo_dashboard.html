@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>백테스팅 AI 예측 검증 대시보드</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #cbd5e1;
+      --bg: #f8fafc;
+      --paper: #ffffff;
+      --blue: #2563eb;
+      --green: #059669;
+      --amber: #d97706;
+      --rose: #e11d48;
+      --violet: #7c3aed;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Pretendard, "Noto Sans KR", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: 0;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(10px);
+    }
+    .wrap { max-width: 1440px; margin: 0 auto; padding: 22px 28px; }
+    .nav { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--ink);
+      color: white;
+      font-weight: 800;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(26px, 3vw, 44px); line-height: 1.14; letter-spacing: 0; }
+    h2 { font-size: 24px; line-height: 1.22; }
+    h3 { font-size: 17px; line-height: 1.25; }
+    .eyebrow { color: var(--blue); font-weight: 800; font-size: 14px; }
+    .muted { color: var(--muted); line-height: 1.68; }
+    .grid { display: grid; gap: 16px; }
+    .hero { grid-template-columns: minmax(0, 1.22fr) minmax(320px, 0.78fr); align-items: stretch; }
+    .panel {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 22px; }
+    .metric {
+      border: 1px solid #dbeafe;
+      background: #eff6ff;
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 100px;
+    }
+    .metric:nth-child(2) { border-color: #bbf7d0; background: #ecfdf5; }
+    .metric:nth-child(3) { border-color: #fde68a; background: #fffbeb; }
+    .metric strong { display: block; font-size: 28px; margin-top: 6px; }
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      position: relative;
+      margin-top: 24px;
+    }
+    .timeline::before {
+      content: "";
+      position: absolute;
+      top: 30px;
+      left: 8%;
+      right: 8%;
+      height: 4px;
+      background: #94a3b8;
+    }
+    .timepoint { position: relative; padding-top: 62px; text-align: center; }
+    .dot {
+      position: absolute;
+      top: 20px;
+      left: calc(50% - 11px);
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      background: var(--blue);
+      border: 4px solid white;
+      box-shadow: 0 0 0 1px var(--line);
+    }
+    .timepoint:nth-child(2) .dot { background: var(--amber); }
+    .timepoint:nth-child(3) .dot { background: var(--rose); }
+    .timepoint:nth-child(4) .dot { background: var(--ink); }
+    .arch {
+      overflow: auto;
+      padding: 0;
+      background: white;
+    }
+    .arch svg { display: block; min-width: 1180px; width: 100%; height: auto; }
+    .columns { grid-template-columns: repeat(5, minmax(220px, 1fr)); }
+    .lane {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+      min-height: 290px;
+    }
+    .lane h3 { margin-bottom: 12px; }
+    .item {
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      padding: 12px;
+      margin-top: 10px;
+      min-height: 68px;
+    }
+    .item small { color: var(--muted); display: block; margin-top: 5px; line-height: 1.45; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 13px;
+      background: white;
+      color: var(--ink);
+      font-weight: 800;
+      cursor: pointer;
+      min-height: 40px;
+    }
+    button[aria-selected="true"] { background: var(--ink); color: white; border-color: var(--ink); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 12px; text-align: left; vertical-align: top; line-height: 1.5; }
+    th { background: #f1f5f9; font-size: 13px; color: #334155; }
+    .flow-steps { grid-template-columns: repeat(3, 1fr); }
+    .step {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      background: white;
+      min-height: 150px;
+    }
+    .step strong { color: var(--blue); display: block; margin-bottom: 8px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 800;
+      background: white;
+      margin: 4px 4px 0 0;
+    }
+    @media (max-width: 980px) {
+      .hero, .columns, .flow-steps, .metric-grid { grid-template-columns: 1fr; }
+      .timeline { grid-template-columns: 1fr; text-align: left; }
+      .timeline::before { display: none; }
+      .timepoint { padding: 10px 0 10px 44px; text-align: left; }
+      .dot { top: 12px; left: 8px; }
+      .wrap { padding: 18px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <div class="brand">
+        <div class="mark">BT</div>
+        <div>
+          <strong>Backtesting Demo Architecture</strong>
+          <p class="muted">AI 입력 데이터와 실제 정답을 분리해 예측 신뢰성을 증명</p>
+        </div>
+      </div>
+      <div>
+        <span class="badge">Target 2026-05-22</span>
+        <span class="badge">Mask 2026-05-21 23:59</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="grid hero">
+      <div class="panel">
+        <p class="eyebrow">중간 시연용 검증 프로세스</p>
+        <h1 style="margin-top: 12px;">백테스팅으로 AI 예측 성능을 즉석에서 증명하는 구조</h1>
+        <p class="muted" style="margin-top: 16px; max-width: 920px;">
+          AI는 2026년 5월 21일 23:59 이전 데이터만 보고 5월 22일의 삼성전자 판단을 생성한다.
+          시연 화면은 AI 판단과 실제 5월 22일 결과를 분리해 보여주며, 데이터 누수 방지 기준을 함께 표시한다.
+        </p>
+        <div class="grid metric-grid">
+          <div class="metric"><span class="eyebrow">Data Window</span><strong>1/2/4주</strong><p class="muted">라디오 박스로 분석 호흡 전환</p></div>
+          <div class="metric"><span class="eyebrow">Source Range</span><strong>6개월</strong><p class="muted">DART·매크로 원천 수집 범위</p></div>
+          <div class="metric"><span class="eyebrow">Vector DB</span><strong>Supabase</strong><p class="muted">개인 DB 검증 후 공용 DB 테스트</p></div>
+        </div>
+      </div>
+      <aside class="panel">
+        <p class="eyebrow">시연 스토리</p>
+        <div class="grid" style="margin-top: 16px;">
+          <div class="item"><b>1. 종목/기간 설정</b><small>삼성전자, 1주일 단위 분석 선택</small></div>
+          <div class="item"><b>2. AI 판단 확인</b><small>5월 15일~21일 데이터만 보고 BUY/HOLD/SELL 판단</small></div>
+          <div class="item"><b>3. 실제 결과 대조</b><small>5월 22일 실제 종가와 수익률로 검증</small></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel" style="margin-top: 18px;">
+      <p class="eyebrow">Data Slipping & Masking</p>
+      <h2 style="margin-top: 6px;">AI가 모르는 미래를 시연자가 검증한다</h2>
+      <div class="timeline">
+        <div class="timepoint"><span class="dot"></span><b>5월 15일</b><p class="muted">1주 분석 시작</p></div>
+        <div class="timepoint"><span class="dot"></span><b>5월 21일 23:59</b><p class="muted">AI 입력 데이터 마감</p></div>
+        <div class="timepoint"><span class="dot"></span><b>5월 22일</b><p class="muted">타깃 예측일, AI에게 숨김</p></div>
+        <div class="timepoint"><span class="dot"></span><b>5월 23일</b><p class="muted">시연 및 정답 대조</p></div>
+      </div>
+    </section>
+
+    <section class="panel arch" style="margin-top: 18px;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="650" viewBox="0 0 1500 650" role="img" aria-label="백테스팅 아키텍처 상세 구성도">
+        <defs>
+          <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="4" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L10,4 L0,8 Z" fill="#475569"></path>
+          </marker>
+          <style>
+            .sbox { fill: #fff; stroke: #cbd5e1; stroke-width: 2; rx: 12; }
+            .stitle { font: 800 20px Pretendard, Arial; fill: #0f172a; }
+            .slabel { font: 700 15px Pretendard, Arial; fill: #0f172a; }
+            .snote { font: 500 12px Pretendard, Arial; fill: #475569; }
+            .arr { stroke: #475569; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+          </style>
+        </defs>
+        <rect width="1500" height="650" fill="#ffffff"></rect>
+        <g transform="translate(30 30)">
+          <rect class="sbox" width="250" height="520" fill="#eff6ff"></rect>
+          <text class="stitle" x="24" y="42">Streamlit UI</text>
+          <rect class="sbox" x="24" y="76" width="202" height="82" fill="#f8fafc"></rect>
+          <text class="slabel" x="44" y="108">종목 선택</text><text class="snote" x="44" y="132">삼성전자 005930</text>
+          <rect class="sbox" x="24" y="180" width="202" height="100" fill="#f8fafc"></rect>
+          <text class="slabel" x="44" y="212">분석 단위</text><text class="snote" x="44" y="236">1주 · 2주 · 4주 라디오</text><text class="snote" x="44" y="258">기간별 자동 슬라이싱</text>
+          <rect class="sbox" x="24" y="302" width="202" height="82" fill="#f8fafc"></rect>
+          <text class="slabel" x="44" y="334">AI 판단 카드</text><text class="snote" x="44" y="358">BUY/HOLD/SELL</text>
+          <rect class="sbox" x="24" y="406" width="202" height="82" fill="#f8fafc"></rect>
+          <text class="slabel" x="44" y="438">정답 대조</text><text class="snote" x="44" y="462">5/22 실제 수익률</text>
+        </g>
+        <g transform="translate(330 30)">
+          <rect class="sbox" width="270" height="520" fill="#fffbeb"></rect>
+          <text class="stitle" x="24" y="42">Backtest Controller</text>
+          <rect class="sbox" x="24" y="76" width="222" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="108">BacktestConfig</text><text class="snote" x="44" y="132">target_date, lookback_days</text>
+          <rect class="sbox" x="24" y="180" width="222" height="100" fill="#fff"></rect>
+          <text class="slabel" x="44" y="212">Data Slicer</text><text class="snote" x="44" y="236">5/21 23:59 이전만 조회</text><text class="snote" x="44" y="258">5/22 이후 레코드 제외</text>
+          <rect class="sbox" x="24" y="302" width="222" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="334">Prompt Builder</text><text class="snote" x="44" y="358">시간 페르소나 삽입</text>
+          <rect class="sbox" x="24" y="406" width="222" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="438">Leakage Guard</text><text class="snote" x="44" y="462">포함/제외 건수 기록</text>
+        </g>
+        <g transform="translate(650 30)">
+          <rect class="sbox" width="260" height="520" fill="#ecfdf5"></rect>
+          <text class="stitle" x="24" y="42">Supabase</text>
+          <rect class="sbox" x="24" y="76" width="212" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="108">stock_price</text><text class="snote" x="44" y="132">6개월 OHLCV</text>
+          <rect class="sbox" x="24" y="180" width="212" height="100" fill="#fff"></rect>
+          <text class="slabel" x="44" y="212">RAG tables</text><text class="snote" x="44" y="236">rag_documents</text><text class="snote" x="44" y="258">rag_chunks + vector</text>
+          <rect class="sbox" x="24" y="302" width="212" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="334">raw_macro</text><text class="snote" x="44" y="358">금리·환율·지수</text>
+          <rect class="sbox" x="24" y="406" width="212" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="438">analysis_history</text><text class="snote" x="44" y="462">예측·정답·오차</text>
+        </g>
+        <g transform="translate(960 30)">
+          <rect class="sbox" width="250" height="520" fill="#f5f3ff"></rect>
+          <text class="stitle" x="24" y="42">AI Agent Skeleton</text>
+          <rect class="sbox" x="24" y="76" width="202" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="108">Quant Worker</text><text class="snote" x="44" y="132">가격·거래량 근거</text>
+          <rect class="sbox" x="24" y="180" width="202" height="100" fill="#fff"></rect>
+          <text class="slabel" x="44" y="212">Qual Worker</text><text class="snote" x="44" y="236">뉴스·공시 RAG</text>
+          <rect class="sbox" x="24" y="302" width="202" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="334">Strategist</text><text class="snote" x="44" y="358">최종 판단 생성</text>
+          <rect class="sbox" x="24" y="406" width="202" height="82" fill="#fff"></rect>
+          <text class="slabel" x="44" y="438">Guardrail</text><text class="snote" x="44" y="462">누수·표현 검증</text>
+        </g>
+        <g transform="translate(1260 30)">
+          <rect class="sbox" width="210" height="520" fill="#fff1f2"></rect>
+          <text class="stitle" x="24" y="42">Ground Truth</text>
+          <rect class="sbox" x="24" y="122" width="162" height="120" fill="#fff"></rect>
+          <text class="slabel" x="44" y="160">5/22 실제 결과</text><text class="snote" x="44" y="184">OHLCV · 종가</text><text class="snote" x="44" y="206">전일 대비 수익률</text>
+          <rect class="sbox" x="24" y="284" width="162" height="120" fill="#fff"></rect>
+          <text class="slabel" x="44" y="322">대조 컴포넌트</text><text class="snote" x="44" y="346">방향 적중 여부</text><text class="snote" x="44" y="368">예측 신뢰성 증명</text>
+        </g>
+        <path class="arr" d="M280 290 C305 290 304 115 330 115"></path>
+        <path class="arr" d="M600 230 C625 230 625 115 650 115"></path>
+        <path class="arr" d="M910 230 C940 230 930 115 960 115"></path>
+        <path class="arr" d="M910 230 C940 230 930 230 960 230"></path>
+        <path class="arr" d="M1210 330 C1240 330 1230 182 1260 182"></path>
+        <path class="arr" d="M1260 345 C1190 610 410 610 250 448"></path>
+      </svg>
+    </section>
+
+    <section class="grid columns" style="margin-top: 18px;">
+      <div class="lane"><h3>UI</h3><div class="item">라디오 박스<small>1주, 2주, 4주 분석 단위</small></div><div class="item">시연 배지<small>타깃일과 마스킹 기준 표시</small></div></div>
+      <div class="lane"><h3>Controller</h3><div class="item">BacktestConfig<small>날짜/종목/기간 표준화</small></div><div class="item">Data Slicer<small>미래 데이터 자동 제외</small></div></div>
+      <div class="lane"><h3>Storage</h3><div class="item">Supabase 단일 DB<small>개인 DB 검증 후 공용 DB 반영</small></div><div class="item">pgvector<small>뉴스·공시 RAG 검색</small></div></div>
+      <div class="lane"><h3>Agent</h3><div class="item">Skeleton 우선<small>중간 시연용 최소 흐름</small></div><div class="item">OpenRouter 보류<small>시연 이후 팀 회의로 결정</small></div></div>
+      <div class="lane"><h3>Validation</h3><div class="item">실제 5/22 결과<small>AI 생성 후에만 표시</small></div><div class="item">누수 검증<small>최신 입력 시각과 제외 건수</small></div></div>
+    </section>
+
+    <section class="panel" style="margin-top: 18px;">
+      <p class="eyebrow">Functional Behavior</p>
+      <h2 style="margin-top: 6px;">분석 단위별 마스킹 기준</h2>
+      <table style="margin-top: 16px;">
+        <thead><tr><th>UI 옵션</th><th>AI 입력 시작</th><th>AI 입력 종료</th><th>타깃 예측일</th><th>정답 대조</th></tr></thead>
+        <tbody>
+          <tr><td>1주일 단위 분석</td><td>2026-05-15</td><td>2026-05-21 23:59</td><td>2026-05-22</td><td>5월 22일 종가/수익률</td></tr>
+          <tr><td>2주일 단위 분석</td><td>2026-05-08</td><td>2026-05-21 23:59</td><td>2026-05-22</td><td>5월 22일 종가/수익률</td></tr>
+          <tr><td>4주일 단위 분석</td><td>2026-04-24</td><td>2026-05-21 23:59</td><td>2026-05-22</td><td>5월 22일 종가/수익률</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel" style="margin-top: 18px;">
+      <p class="eyebrow">Demo Tabs</p>
+      <h2 style="margin-top: 6px;">시연자가 설명할 핵심 포인트</h2>
+      <div class="tabs" role="tablist" aria-label="demo tabs">
+        <button type="button" aria-selected="true" data-tab="story">시연 흐름</button>
+        <button type="button" aria-selected="false" data-tab="prompt">프롬프트 마스킹</button>
+        <button type="button" aria-selected="false" data-tab="roles">팀 역할</button>
+      </div>
+      <div id="story" class="tab-panel active">
+        <div class="grid flow-steps">
+          <div class="step"><strong>1단계</strong><h3>삼성전자 + 1주 분석 선택</h3><p class="muted">과거 데이터만으로 다음 날 판단을 생성한다고 설명한다.</p></div>
+          <div class="step"><strong>2단계</strong><h3>AI 판단과 근거 확인</h3><p class="muted">5월 15일~21일 가격/뉴스/공시만 사용했음을 강조한다.</p></div>
+          <div class="step"><strong>3단계</strong><h3>5월 22일 실제 결과 대조</h3><p class="muted">AI에게 숨겼던 실제 주가 결과를 별도 컴포넌트로 공개한다.</p></div>
+        </div>
+      </div>
+      <div id="prompt" class="tab-panel">
+        <div class="panel" style="background:#f8fafc;">
+          <p class="muted">너는 현재 2026년 5월 21일 23:59에 서 있는 금융 분석가이다. 너에게 제공된 데이터는 2026년 5월 15일부터 2026년 5월 21일 23:59까지의 삼성전자 주가, 뉴스, DART 공시, 매크로 데이터뿐이다. 2026년 5월 22일 및 그 이후의 실제 시장 결과는 알 수 없다고 가정한다.</p>
+        </div>
+      </div>
+      <div id="roles" class="tab-panel">
+        <table>
+          <thead><tr><th>역할</th><th>작업</th></tr></thead>
+          <tbody>
+            <tr><td>PM 2명</td><td>기능 재정의 명세, 아키텍처 재검토, README/HTML 시각화, PR 리뷰</td></tr>
+            <tr><td>개발자 1</td><td>DART/가격/매크로 최근 6개월 수집 및 Supabase 적재</td></tr>
+            <tr><td>개발자 2</td><td>BacktestConfig, 슬라이서, 실제 결과 대조 로직</td></tr>
+            <tr><td>개발자 3</td><td>Streamlit UI, AI 판단 카드, 에이전트 skeleton 연결</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    document.querySelectorAll("[data-tab]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("[data-tab]").forEach((item) => item.setAttribute("aria-selected", "false"));
+        document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
+        button.setAttribute("aria-selected", "true");
+        document.getElementById(button.dataset.tab).classList.add("active");
+      });
+    });
+  </script>
+</body>
+</html>

@@ -9,7 +9,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 DART_API_KEY = os.getenv("DART_API_KEY")
 
 def collect_financial_statements():
-    print("전체 재무제표 수집 및 파생 비율 연산 파이프라인 시작...")
+    print("전체 재무제표 수집 파이프라인 시작 (팬젠부터 완벽하게 이어하기)...\n")
     
     if not DART_API_KEY:
         print("DART_API_KEY 누락")
@@ -19,15 +19,26 @@ def collect_financial_statements():
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
+        # 💡 [핵심 복구 1] 정렬(ORDER BY)을 완전히 빼서 선생님이 처음 돌리셨던 그 401개 순서 그대로 복구합니다.
         cursor.execute("SELECT corp_code, corp_name FROM company;")
         companies = cursor.fetchall()
+        
+        if not companies:
+            print("DB에 저장된 기업(company) 데이터가 없습니다. 1탄 스크립트를 먼저 실행해주세요.")
+            return
     except Exception as e:
         print(f"DB 연결 및 조회 실패: {e}")
         return
 
-    target_years = [2023, 2024, 2025]
-    report_code = "11011" #사업보고서(1년 결산 보고서)고유코드. 1분기 보고서는 11013, 반기보고서는 11012, 3분기 보고서는 11014
-    url = "https://opendart.fss.or.kr/api/fnlttAcntAll.json" # 재무제표 전체 행 조회 API
+    explicit_targets = [
+        (2025, "11013"), # 25년 1분기
+        (2025, "11012"), # 25년 반기
+        (2025, "11014"), # 25년 3분기
+        (2025, "11011"), # 25년 사업보고서
+        (2026, "11013")  # 26년 1분기
+    ]
+    
+    url = "https://opendart.fss.or.kr/api/fnlttSinglAcntAll.json"
 
     fs_insert = """
         INSERT INTO financial_statement (corp_code, bsns_year, reprt_code, fs_div, account_nm, amount)
@@ -40,19 +51,40 @@ def collect_financial_statements():
         DO UPDATE SET debt_ratio = EXCLUDED.debt_ratio, roe = EXCLUDED.roe;
     """
 
-    for corp_code, corp_name in companies:
-        for year in target_years:
-            time.sleep(0.5)
+    total_companies = len(companies)
+    start_processing = False # 이어하기 스위치
+    
+    for idx, (corp_code, corp_name) in enumerate(companies, 1):
+        
+        # 💡 [핵심 복구 2] 루프를 돌다가 선생님이 멈췄던 '팬젠'의 고유코드를 만나면 스위치를 켭니다.
+        # [232/401] 휴온스글로벌(00228059) 재무제표 확인 중... 시작
+        if corp_code == "00228059":
+            start_processing = True
+
+        # 스위치가 켜지기 전(1~141번)까지는 아무것도 안 하고 0.001초 만에 스킵합니다.
+        if not start_processing:
+            continue
+            
+        print(f"\n[{idx}/{total_companies}] {corp_name}({corp_code}) 재무제표 확인 중...")
+        
+        for year, report_code in explicit_targets:
+            time.sleep(0.5) 
             params = {"crtfc_key": DART_API_KEY, "corp_code": corp_code, "bsns_year": str(year), "reprt_code": report_code, "fs_div": "CFS"}
             
             try:
                 res = requests.get(url, params=params)
                 data = res.json()
-                if data.get("status") != "000":
+                status = data.get("status")
+                
+                if status != "000":
                     params["fs_div"] = "OFS"
                     res = requests.get(url, params=params)
                     data = res.json()
-                    if data.get("status") != "000":
+                    status = data.get("status")
+                    
+                    if status != "000":
+                        msg = data.get("message", "데이터 없음")
+                        print(f"  -> {year}년 보고서({report_code}) 패스: {msg} (코드: {status})")
                         continue
 
                 account_list = data.get("list", [])
@@ -64,13 +96,18 @@ def collect_financial_statements():
                 total_liabilities = 0
                 total_equity = 0
                 net_income = 0
+                valid_data_found = False
 
                 for acnt in account_list:
                     account_nm = acnt.get("account_nm", "").strip()
                     clean_nm = account_nm.replace(" ", "")
                     
                     raw_val = acnt.get("thstrm_amount", "").replace(",", "").strip()
-                    amount = int(raw_val) if raw_val and raw_val != "-" else 0
+                    
+                    try:
+                        amount = int(float(raw_val)) if raw_val and raw_val != "-" else 0
+                    except ValueError:
+                        amount = 0
 
                     is_target = False
                     if "자산총계" in clean_nm: total_assets = amount; is_target = True
@@ -85,6 +122,11 @@ def collect_financial_statements():
 
                     if is_target:
                         cursor.execute(fs_insert, (corp_code, year, report_code, fs_div, account_nm, amount))
+                        valid_data_found = True
+
+                if not valid_data_found:
+                    print(f"  -> {year}년 보고서({report_code}): 타겟 계정과목(자산, 자본 등)을 찾을 수 없음")
+                    continue
 
                 debt_ratio = None
                 roe = None
@@ -94,14 +136,16 @@ def collect_financial_statements():
 
                 cursor.execute(ratio_upsert, (corp_code, year, report_code, fs_div, debt_ratio, roe))
                 conn.commit()
-                print(f"[{corp_name}] {year}년 전체 제표 적재 및 파생 비율 연산 완료")
+                
+                print(f"  ✅ {year}년({report_code}) 제표 적재 및 비율 연산 완료 (부채비율: {debt_ratio}%, ROE: {roe}%)")
                 
             except Exception as e:
-                print(f"[{corp_name}] 수집 실패 패스: {e}")
+                print(f"  ❌ 수집 실패 에러: {e}")
                 conn.rollback()
 
     cursor.close()
     conn.close()
+    print("\n🎉 모든 기업의 재무제표 수집이 완료되었습니다!")
 
 if __name__ == "__main__":
     collect_financial_statements()

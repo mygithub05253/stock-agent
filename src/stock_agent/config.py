@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     langsmith_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: str | None = None
     langsmith_project: str = "stock-agent-local"
+    glm_api_key: str | None = None
+    glm_base_url: str = "https://api.z.ai/api/paas/v4"
+    glm_model: str = "glm-4.5-flash"
+    glm_timeout_seconds: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

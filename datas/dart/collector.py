@@ -45,6 +45,12 @@ def get_target_sectors_from_krx():
     df_krx = dfs[0]
     df_krx['종목코드'] = df_krx['종목코드'].astype(str).str.split('.').str[0].str.zfill(6)
     
+    # 💡 [핵심 추가] 스팩(SPAC), 리츠, 기업인수목적 등 페이퍼 컴퍼니 원천 차단
+    initial_count = len(df_krx)
+    paper_patterns = '스팩|리츠|기업인수목적|스팩\d+호'
+    df_krx = df_krx[~df_krx['회사명'].str.contains(paper_patterns, na=False, regex=True)]
+    print(f"필터링: 페이퍼 컴퍼니 제외됨 (전체 상장사 {initial_count}개 -> {len(df_krx)}개)")
+    
     keywords = {
         'semiconductor': ['반도체'],
         'finance': ['은행', '금융', '보험', '증권', '카드'],
@@ -64,8 +70,9 @@ def get_target_sectors_from_krx():
     print(f"완료: 타겟 섹터(반도체, 금융, 바이오) 발견 기업 수: {len(df_filtered)}곳")
     return df_filtered
 
+
 def collect_company_and_reports():
-    print("지정 섹터 3개년 타겟 수집 파이프라인 시작...")
+    print("지정 섹터 최근 6개월 타겟 수집 파이프라인 시작...")
     if not DART_API_KEY:
         print("DART_API_KEY 누락")
         return
@@ -94,7 +101,6 @@ def collect_company_and_reports():
         ON CONFLICT (rcept_no) DO NOTHING;
     """
 
-    print("DB 마스터 정보 동기화 중...")
     valid_companies = []
     for _, row in df_krx.iterrows():
         stock_code = row['종목코드']
@@ -112,7 +118,7 @@ def collect_company_and_reports():
     print(f"DB 마스터 동기화 완료: {len(valid_companies)}개 기업 등록됨")
 
     end_date = datetime.today()
-    begin_date = end_date - timedelta(days=3 * 365)
+    begin_date = end_date - timedelta(days=180) # 6개월 수정
     bgn_de = begin_date.strftime("%Y%m%d")
     end_de = end_date.strftime("%Y%m%d")
 
@@ -123,8 +129,7 @@ def collect_company_and_reports():
     print(f"공시 목록 수집 시작 (기간: {begin_date.strftime('%Y-%m-%d')} ~ {end_date.strftime('%Y-%m-%d')})")
 
     for idx, (corp_code, corp_name) in enumerate(valid_companies, 1):
-        # 실시간 진행 상황을 터미널에 출력합니다.
-        print(f"[{idx}/{total_companies}] {corp_name} 3개년 공시 목록 가져오는 중... (현재 누적 공시: {total_reports}건)")
+        print(f"[{idx}/{total_companies}] {corp_name} 6개월 공시 목록 가져오는 중... (현재 누적 공시: {total_reports}건)")
         
         time.sleep(0.5)
         params = {

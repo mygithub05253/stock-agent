@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .claude/
+.serena/
 .venv/
 venv/
 semiconductor_agent/.env

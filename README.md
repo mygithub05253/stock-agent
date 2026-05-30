@@ -47,13 +47,16 @@
 | RAG 저장소 | 방향 확정 | MVP 기본은 Postgres + pgvector, Chroma는 optional backend 후보 |
 | LangSmith | 준비 중 | 환경변수 placeholder만 반영, 실제 tracing 모듈은 후속 작업 |
 
-### 6 에이전트
-1. **Curator Agent** — 사용자 자연어 → 의도·종목 파싱 / 종목 미지정 시 후보 추천
-2. **Qual Worker Agent ★** — 뉴스·공시 RAG로 호재/악재 분석 (W1+W3 핵심)
-3. **Quant Worker Agent** — DART 재무 + pykrx 시세로 5y 밸류에이션 계산
-4. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교
-5. **Strategist & Synthesizer Agent** — 4 워커 종합 → BUY/HOLD/SELL 성격의 분석 신호 + PB 리포트
-6. **Guardrail & Evaluator Agent** — 위험 표현 차단 + RAGAS 자동 채점
+### 주요 에이전트
+1. **InvestorProfile Agent** — 온보딩 답변 → 투자성향·기간·손실감내·유동성 니즈 구조화
+2. **Curator Agent** — 사용자 자연어와 포트폴리오 → 분석 대상 종목/후보 큐레이션
+3. **RequestClassifier Agent** — 질문 → intent·scope·urgency 구조화
+4. **Qual Worker Agent ★** — 뉴스·공시 RAG로 호재/악재 분석 (현재 MVP mock)
+5. **Quant Worker Agent** — DART 재무 + pykrx 시세 기반 정량 분석 (현재 MVP mock)
+6. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교 (현재 MVP mock)
+7. **Strategist & Synthesizer Agent** — worker 결과와 포트폴리오 맥락 종합
+8. **InvestmentAnalyst Agent** — GLM으로 최종 분석 신호와 포트폴리오 적합도 보정
+9. **Guardrail & Evaluator Agent** — 위험 표현 차단 + 안전 문구 적용
 
 ### 11 사용자 기능
 
@@ -85,14 +88,18 @@ stock-agent/
 │   ├── prd/                       PRD (요구사항 정의서)
 │   ├── functional-spec/           기능 명세서 (각 기능 동작)
 │   ├── architecture/              시스템 설계 (흐름도·ERD·에이전트)
-│   │   └── system_architecture_dashboard.html
-│   │                                인터랙티브 시스템 아키텍처 대시보드
+│   │   ├── system_architecture_dashboard.html
+│   │   │                            인터랙티브 시스템 아키텍처 대시보드
+│   │   ├── backtesting_demo_architecture.md
+│   │   │                            백테스팅 시연 검증 아키텍처 문서
+│   │   └── backtesting_demo_dashboard.html
+│   │                                백테스팅 시연 검증 HTML 시각화
 │   ├── roadmap/                   주간 진행 로드맵 (날짜별 HTML 대시보드)
 │   ├── operations/                운영 가이드 (LLM 비용·배포)
 │   ├── decisions/                 ADR (의사결정 기록)
 │   ├── notion/                    노션 원본/정리본 보관
 │   ├── glossary.md                용어집
-│   └── assets/                    이미지·다이어그램 PNG
+│   └── assets/                    이미지·다이어그램 SVG/PNG
 │
 ├── datas/                         📥 데이터 수집 (데이터팀)
 │   ├── news/                      뉴스 크롤링
@@ -136,6 +143,42 @@ stock-agent/
 ---
 
 ## 🚀 빠른 시작
+
+### 로컬에서 단계형 투자성향/포트폴리오 분석 UI 확인
+
+현재 브랜치에서는 Streamlit으로 다음 흐름을 바로 확인할 수 있습니다.
+
+1. 투자성향 질문 카드에 답변
+2. 반도체/금융 후보 종목의 보유 수량과 평단가 입력
+3. 보유 현금 입력
+4. `투자성향 확인` 클릭
+5. `InvestorProfile → Curator → RequestClassifier → Quant/Qual/Competitor → Strategist → InvestmentAnalyst(GLM) → Guardrail` 실행 결과 확인
+6. 아래 `대화형 질문`에서 추가 질문 실행
+
+GLM key 없이도 local mock/rule-based fallback으로 화면 확인이 가능합니다.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+streamlit run streamlit_app.py --server.port 8501
+```
+
+브라우저에서 `http://127.0.0.1:8501`을 엽니다.
+
+GLM 기반 투자 분석기까지 확인하려면 key를 파일에 저장하지 말고, 실행 프로세스 환경변수로만 주입합니다.
+
+```bash
+GLM_API_KEY="glm:YOUR_LOCAL_KEY" \
+GLM_BASE_URL="https://api.z.ai/api/paas/v4" \
+GLM_MODEL="glm-4.5-flash" \
+streamlit run streamlit_app.py --server.port 8501
+```
+
+주의:
+- `.env`, API key, 개인 token은 커밋하지 않습니다.
+- GLM key가 없거나 호출에 실패하면 `InvestmentAnalyst Agent`는 기존 mock Strategist 결과로 fallback합니다.
+- 현재 데이터/정량/정성 worker는 MVP mock 데이터이며, 실제 DART/RAG/시세 연결은 후속 단계입니다.
 
 ### Docker 권장 실행
 
@@ -382,6 +425,9 @@ PM이 주로 관리하는 문서들:
 | `docs/functional-spec/` | 기능 명세서 (각 기능 트리거·입력·처리·출력·예외) | 개발팀 |
 | `docs/architecture/system_flow.md` | 시스템 흐름도 (Mermaid) | 전원 |
 | `docs/architecture/system_architecture_dashboard.html` | 시스템 아키텍처와 6 에이전트 흐름을 한 화면에서 보는 인터랙티브 HTML 대시보드 | 전원 |
+| `docs/architecture/backtesting_demo_architecture.md` | 2026-05-22 타깃 예측일 기준 백테스팅 검증 설계, 데이터 마스킹, Supabase 운영 흐름 | PM·개발팀 |
+| `docs/architecture/backtesting_demo_dashboard.html` | 발표 자료와 스크린샷에 바로 쓸 수 있는 백테스팅 검증 아키텍처 HTML 시각화 | PM·전원 |
+| `docs/functional-spec/demo/D1_backtesting_validation_spec_v0.1.md` | 중간 시연용 백테스팅 검증 모드 기능 명세 | 개발팀·PM |
 | `docs/roadmap/<날짜>/roadmap_dashboard.html` | 주간 진행 현황·완료/할 일·의사결정을 한 화면에서 보는 인터랙티브 로드맵 대시보드 (예: `docs/roadmap/2026-05-23/`) | 전원 |
 | `docs/architecture/erd.md` | DB ERD | 데이터팀·백엔드 |
 | `docs/architecture/agent_design.md` | 6 에이전트 상세 설계 | 에이전트 담당 |
@@ -434,6 +480,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-05-23 | v1.5 | 백테스팅 기반 AI 예측 검증 프로세스 문서화 — 5월 22일 타깃 예측일, 1/2/4주 마스킹, Supabase 단일 DB, HTML 아키텍처 시각화 추가 |
 | 2026-05-23 | v1.4 | 주간 로드맵 대시보드(`docs/roadmap/2026-05-23/`) 추가 — DART·매크로 수집 범위, 벡터DB(pgvector/Chroma), OpenRouter 도입 결정 항목 정리 |
 | 2026-05-23 | v1.3 | PM 문서 기반 인터랙티브 시스템 아키텍처 대시보드 추가, `docs/notion/` 문서 영역 반영 |
 | 2026-05-16 | v1.2 | Phase 1 E2E, Docker 앱 실행, Postgres pgvector RAG 저장소 기준 반영 |

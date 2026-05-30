@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Competitor Agent MVP 요약</title>
+  <style>
+    body { margin: 32px; color: #17202a; font-family: Arial, "Noto Sans KR", sans-serif; line-height: 1.6; background: #ffffff; }
+    main { max-width: 980px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 28px 0 10px; font-size: 20px; border-bottom: 1px solid #d9dee5; padding-bottom: 6px; }
+    p { margin: 8px 0 14px; }
+    .meta { color: #526070; margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0 24px; }
+    .card { border: 1px solid #d9dee5; border-radius: 8px; padding: 14px; background: #fbfcfd; }
+    .card strong { display: block; margin-bottom: 8px; }
+    code { background: #eef2f6; border-radius: 4px; padding: 2px 5px; font-size: 0.95em; }
+    ol, ul { padding-left: 22px; }
+    li { margin: 6px 0; }
+    .note { border-left: 4px solid #667085; padding: 10px 12px; background: #f6f8fa; }
+    @media (max-width: 720px) { body { margin: 20px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Competitor Agent MVP 요약</h1>
+  <p class="meta">팀 회의용 빠른 확인 문서 · 2026-05-27</p>
+  <p>Competitor Agent는 국내 같은 섹터 peer를 선정하고, 대상 종목의 상대적 위치와 데이터 품질 경고를 계산해 Strategist가 사용할 수 있는 근거를 반환합니다. MVP 계산은 LLM 없이 Python/tool 결과로 수행합니다.</p>
+
+  <section class="grid" aria-label="입력 DB 출력 요약">
+    <div class="card">
+      <strong>입력</strong>
+      Curator 결과의 <code>stock_code</code>, <code>corp_code</code>, <code>sector</code>
+    </div>
+    <div class="card">
+      <strong>DB</strong>
+      <code>company</code>, <code>stock_price</code>, <code>financial_statement</code>
+    </div>
+    <div class="card">
+      <strong>출력</strong>
+      <code>CompetitorResult</code>: <code>score</code>, peer 목록, evidence, warnings
+    </div>
+  </section>
+
+  <h2>핵심 원칙</h2>
+  <ul>
+    <li>국내 같은 섹터 peer만 사용하고 글로벌 peer는 임의로 추가하지 않습니다.</li>
+    <li>PER, PBR, ROE, 매출 성장률, 영업이익률, 부채비율은 <code>peer_tool.py</code> 계산 결과만 사용합니다.</li>
+    <li>결측 지표는 결측으로 남기며 수치를 임의로 채우지 않습니다.</li>
+    <li>점수는 투자 권유가 아니라 peer 대비 상대 위치를 설명하는 보조 지표입니다.</li>
+  </ul>
+
+  <h2>동작 흐름</h2>
+  <ol>
+    <li>Curator가 대상 종목과 섹터를 확정합니다.</li>
+    <li><code>run_competitor</code>가 DB 연결 후 <code>build_peer_comparison</code>을 호출합니다.</li>
+    <li><code>company</code>에서 대상 기업과 같은 섹터 peer 후보를 조회합니다.</li>
+    <li><code>stock_price</code>와 <code>financial_statement</code>에서 최신 가격과 최근 재무 snapshot을 조회합니다.</li>
+    <li>PER/PBR/ROE/성장률/마진/부채비율과 데이터 품질 점수를 계산합니다.</li>
+    <li>데이터 품질과 시가총액 근접도 기준으로 최종 peer를 선택합니다.</li>
+    <li>상대 위치, score, evidence, warnings를 <code>CompetitorResult</code>로 반환합니다.</li>
+  </ol>
+
+  <h2>경고 해석</h2>
+  <ul>
+    <li><code>peer_count_below_minimum</code>: peer가 3개 미만이라 비교 신뢰도가 낮습니다.</li>
+    <li><code>sector_missing</code>: 섹터 정보가 없어 같은 섹터 peer 선정이 제한되었습니다.</li>
+    <li><code>target_data_quality_low</code>: 대상 종목의 핵심 데이터가 부족해 점수를 보수적으로 봐야 합니다.</li>
+    <li><code>per_not_applicable</code>, <code>pbr_not_applicable</code>, <code>roe_missing</code> 등: 해당 지표를 계산할 수 없어 결측으로 처리했습니다.</li>
+    <li><code>mock_data_fallback</code>: DB 실패 시 데모 흐름 유지를 위해 반환된 대체 결과이며 실제 DB 기반 비교가 아닙니다.</li>
+  </ul>
+
+  <p class="note">UI에서는 score보다 warnings와 data quality를 먼저 보여주는 것이 안전합니다. 특히 fallback 결과는 별도 배지로 명확히 표시해야 합니다.</p>
+</main>
+</body>
+</html>

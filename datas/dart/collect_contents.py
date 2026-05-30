@@ -5,36 +5,42 @@ import zipfile
 import requests
 import psycopg2
 from bs4 import BeautifulSoup
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
-
-# RAG용 공시 원문 텍스트 수집
-# collector.py가 가져온 3개년 공시 목록 중 본문이 비어 있는 대상을 추려 원문을 파싱합니다.
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 DART_API_KEY = os.getenv("DART_API_KEY")
 
 def collect_disclosure_contents():
-    print("4탄: RAG용 공시 원문 텍스트 데이터 수집 시작...")
+    print("4탄: RAG용 공시 원문 텍스트 데이터 수집 시작 (최근 6개월 타겟)...")
     
     if not DART_API_KEY:
         print("DART_API_KEY 누락")
         return
 
+    # 최근 6개월 산출 및 문자열 변환
+    end_date = datetime.today()
+    begin_date = end_date - timedelta(days=180)
+    target_date_str = begin_date.strftime("%Y%m%d")
+
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
+        # 6개월 필터 적용 (rcept_dt 기준)
         cursor.execute("""
             SELECT dr.rcept_no, dr.report_nm 
             FROM disclosure_report dr
             LEFT JOIN disclosure_content dc ON dr.rcept_no = dc.rcept_no
-            WHERE dc.rcept_no IS NULL;
-        """)
+            WHERE dc.rcept_no IS NULL
+              AND dr.rcept_dt >= %s;
+        """, (target_date_str,))
+        
         target_reports = cursor.fetchall()
         
         if not target_reports:
-            print("이미 모든 공시 보고서의 원문 텍스트가 수집되어 있습니다.")
+            print("최근 6개월 기준, 모든 공시 보고서의 원문 텍스트가 수집되어 있습니다.")
             return
             
         print(f"본문 수집 대상 보고서: {len(target_reports)}건")
@@ -100,7 +106,7 @@ def collect_disclosure_contents():
                 print(f"본문 파싱 또는 DB 적재 에러 패스: {e}")
                 continue
                 
-        print(f"성공: 총 {success_count}건의 공시 원문 텍스트 데이터가 최종 적재되었습니다.")
+        print(f"성공: 최근 6개월 총 {success_count}건의 공시 원문 텍스트 데이터가 최종 적재되었습니다.")
         
     except Exception as e:
         print(f"치명적 오류 발생: {e}")
