@@ -109,6 +109,9 @@ def run_qual(state: AgentState) -> AgentState:
         if doc.get("body") and is_risk_text(doc["body"])
     ]
 
+    if not risks:
+        risks = ["검색된 뉴스에서 명확한 부정 리스크는 발견되지 않았으나, 업황 변동성과 실적 확인 전 불확실성은 고려해야 합니다."]
+
     if not evidence:
         evidence = ["뉴스 임베딩 검색 결과가 없어 정성 분석 근거가 부족합니다."]
 
