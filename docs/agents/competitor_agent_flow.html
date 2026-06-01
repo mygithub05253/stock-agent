@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Competitor Agent 흐름 시각화</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Malgun Gothic", "Noto Sans KR", Arial, sans-serif; background: #f8fafc; color: #0f172a; padding: 32px 24px; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #64748b; font-size: 0.85rem; margin-bottom: 28px; }
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; max-width: 700px; margin: 0 auto; }
+  .node { width: 100%; border-radius: 10px; padding: 14px 18px; }
+  .node-input  { background: #e0f2fe; border: 2px solid #0ea5e9; }
+  .node-phase1 { background: #dcfce7; border: 2px solid #16a34a; }
+  .node-phase2 { background: #fef9c3; border: 2px solid #ca8a04; }
+  .node-phase3 { background: #ede9fe; border: 2px solid #7c3aed; }
+  .node-output { background: #fee2e2; border: 2px solid #dc2626; }
+  .node-next   { background: #f1f5f9; border: 2px solid #94a3b8; }
+  .node h2 { font-size: 0.9rem; font-weight: 700; margin-bottom: 5px; }
+  .node ul { list-style: none; padding-left: 2px; }
+  .node ul li { font-size: 0.8rem; color: #334155; margin: 2px 0; }
+  .node ul li::before { content: "▸ "; color: #94a3b8; }
+  .badge { display: inline-block; font-size: 0.65rem; padding: 1px 6px; border-radius: 20px; font-weight: 600; margin-left: 6px; vertical-align: middle; }
+  .badge-free  { background: #bbf7d0; color: #166534; }
+  .badge-llm   { background: #ddd6fe; color: #4c1d95; }
+  .badge-cache { background: #fef08a; color: #713f12; }
+  .arrow { font-size: 1.3rem; color: #94a3b8; padding: 3px 0; text-align: center; }
+  .arrow-note { font-size: 0.7rem; color: #64748b; text-align: center; margin-top: -4px; margin-bottom: 2px; }
+  .fallback { width: 100%; background: #f8fafc; border-left: 3px solid #94a3b8; border-radius: 4px; padding: 7px 12px; margin-top: 6px; font-size: 0.75rem; color: #475569; }
+  .legend { max-width: 700px; margin: 18px auto 0; display: flex; gap: 14px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: #475569; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .modify-box { max-width: 700px; margin: 24px auto 0; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 16px 20px; }
+  .modify-box h3 { font-size: 0.9rem; font-weight: 700; color: #c2410c; margin-bottom: 7px; }
+  .modify-box p { font-size: 0.8rem; color: #431407; line-height: 1.6; margin-bottom: 8px; }
+  .modify-box table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .modify-box th { background: #fed7aa; padding: 5px 8px; text-align: left; font-weight: 600; }
+  .modify-box td { padding: 4px 8px; border-bottom: 1px solid #fde68a; vertical-align: top; }
+  .modify-box code { background: #fef3c7; padding: 1px 4px; border-radius: 3px; font-size: 0.74rem; font-family: monospace; }
+  .info-grid { max-width: 700px; margin: 0 auto 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .info-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
+  .info-card .label { font-size: 0.7rem; color: #64748b; margin-bottom: 3px; }
+  .info-card .value { font-size: 0.85rem; font-weight: 700; color: #0f172a; }
+</style>
+</head>
+<body>
+
+<h1>Competitor Agent 흐름 시각화</h1>
+<p class="subtitle">작성일: 2026-05-30 &nbsp;|&nbsp; 브랜치: feature/competitor-llm-ui &nbsp;|&nbsp; 관련 명세: docs/functional-spec/advanced/A3_peer_comparison_spec_v0.9.md</p>
+
+<div class="info-grid">
+  <div class="info-card"><div class="label">LLM 비용 (key 있을 때)</div><div class="value">~₩0.3 / call</div></div>
+  <div class="info-card"><div class="label">캐시</div><div class="value">종목당 하루 1회</div></div>
+  <div class="info-card"><div class="label">AgentState 호환</div><div class="value">기존 필드 변경 없음</div></div>
+</div>
+
+<div class="flow">
+
+  <div class="node node-input">
+    <h2>입력 — AgentState</h2>
+    <ul>
+      <li>CuratorResult: stock_code, corp_code, sector</li>
+      <li>UserProfile, Portfolio (Strategist 연계용)</li>
+    </ul>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="node node-phase1">
+    <h2>Phase 1 — Rule-Based Peer 계산 <span class="badge badge-free">₩0</span></h2>
+    <ul>
+      <li>DB: company 테이블 → 같은 섹터 peer 후보 조회</li>
+      <li>시가총액 밴드 필터: 0.25x ~ 4x (A3 명세 same_sector_marketcap_near)</li>
+      <li>DB: stock_price → 최신 시가총액, 종가</li>
+      <li>DB: financial_statement → 최근 3년 재무</li>
+      <li>지표 계산: PER / PBR / ROE / 매출성장률 / 영업이익률 / 부채비율</li>
+      <li>Outlier 플래그: peer 중앙값 10배 초과 지표에 outlier_xxx 추가</li>
+      <li>상대 위치: 지표별 백분위 → 0~100점 score (score=50이 peer 중립)</li>
+    </ul>
+    <div class="fallback">DB 연결 실패 → _mock_fallback_result() — mock_data_fallback 경고 포함, 파이프라인 계속</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="node node-phase2">
+    <h2>Phase 2 — 24h 인메모리 캐시 확인 <span class="badge badge-cache">캐시</span></h2>
+    <ul>
+      <li>키: {stock_code}_{YYYY-MM-DD} (모듈 레벨 dict)</li>
+      <li>캐시 HIT → Phase 3 건너뜀, 저장된 narrative 재사용 → ₩0</li>
+      <li>캐시 MISS → Phase 3 진행</li>
+      <li>Streamlit 재시작 시 캐시 초기화 (in-memory)</li>
+    </ul>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="arrow-note">(캐시 미스 AND OPENROUTER_API_KEY 설정된 경우에만)</div>
+
+  <div class="node node-phase3">
+    <h2>Phase 3 — OpenRouter LLM 서술 생성 <span class="badge badge-llm">~₩0.3/call</span></h2>
+    <ul>
+      <li>모델: google/gemini-flash-1.5 (OPENROUTER_MODEL 환경변수로 변경 가능)</li>
+      <li>프롬프트: prompts/competitor/system.md (GIC v11 Block J / G / F / B)</li>
+      <li>입력: Phase 1 수치 JSON만 전달 — LLM이 숫자를 만들지 않음 (Block J)</li>
+      <li>출력 JSON: peer_summary + evidence_cards + bear_case + data_gaps</li>
+      <li>OPENROUTER_API_KEY 없음 → 건너뜀 (₩0, rule-based 그대로)</li>
+    </ul>
+    <div class="fallback">LLM 실패 / 타임아웃 / key 없음 → None 반환, rule-based build_peer_summary() 유지</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="node node-output">
+    <h2>출력 — CompetitorResult</h2>
+    <ul>
+      <li>score (0~100) — rule-based 백분위 계산</li>
+      <li>peer_summary — LLM이 있으면 향상된 서술, 없으면 rule-based 문자열</li>
+      <li>peers: list[dict] — 종목코드/이름/PER/PBR/ROE/마진/성장률 (rule-based)</li>
+      <li>evidence: list[str] — rule-based 근거</li>
+      <li>evidence_cards: list[dict] — LLM Evidence Card (finding/confidence/flag)</li>
+      <li>bear_case: str — LLM Short-seller 관점 (Block F)</li>
+      <li>data_quality_flags, warnings — rule-based 플래그</li>
+      <li>a1_peer_multiple_payload: Peer PER/PBR 중앙값 → A1 밸류에이션 연계</li>
+    </ul>
+  </div>
+  <div class="arrow">↓</div>
+
+  <div class="node node-next">
+    <h2>다음 단계 → Strategist Agent</h2>
+    <ul>
+      <li>score, peer_summary, evidence를 Quant + Qual 결과와 종합</li>
+      <li>InvestmentAnalyst (GLM) → Guardrail 순으로 파이프라인 계속</li>
+      <li>Tier 2 Peer 탭: peer 메트릭 테이블 + evidence 카드 + bear_case 박스 렌더링</li>
+    </ul>
+  </div>
+
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#dcfce7;border:2px solid #16a34a"></div>Rule-Based (₩0)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fef9c3;border:2px solid #ca8a04"></div>캐시</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ede9fe;border:2px solid #7c3aed"></div>LLM (선택적, key 필요)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fee2e2;border:2px solid #dc2626"></div>출력 계약 (AgentState)</div>
+</div>
+
+<div class="modify-box">
+  <h3>🛠 팀원 여러분께 — 이 에이전트는 파이프라인 중간 단계입니다. 자유롭게 개선해 주세요!</h3>
+  <p>
+    Competitor Agent는 <strong>Curator → Competitor → Strategist</strong> 흐름의 중간에 위치합니다.
+    <code>AgentState.competitor</code> (CompetitorResult)의 <strong>기존 필드를 유지</strong>하는 한,
+    내부 로직은 언제든지 수정·개선할 수 있습니다.
+    수정하다 변경이 필요하면 자유롭게 건드려도 됩니다.
+  </p>
+  <table>
+    <tr><th>수정하고 싶은 것</th><th>파일</th><th>방법</th></tr>
+    <tr>
+      <td>LLM 프롬프트 품질 개선</td>
+      <td><code>prompts/competitor/system.md</code></td>
+      <td>마크다운 직접 수정 — Python 코드 변경 불필요</td>
+    </tr>
+    <tr>
+      <td>LLM 모델 교체</td>
+      <td><code>.env</code></td>
+      <td><code>OPENROUTER_MODEL=원하는_모델</code> 한 줄만 변경</td>
+    </tr>
+    <tr>
+      <td>Peer 선정 기준 변경</td>
+      <td><code>tools/peer_tool.py</code></td>
+      <td><code>select_peer_rows()</code> 또는 밴드 상수 수정</td>
+    </tr>
+    <tr>
+      <td>점수 가중치 조정</td>
+      <td><code>tools/peer_tool.py</code></td>
+      <td><code>calculate_relative_position()</code>의 weight 수정</td>
+    </tr>
+    <tr>
+      <td>UI 레이아웃 변경</td>
+      <td><code>streamlit_app.py</code></td>
+      <td><code>_render_peer_tab()</code> 함수만 수정</td>
+    </tr>
+    <tr>
+      <td>새 지표 추가 (EV/EBITDA 등)</td>
+      <td><code>tools/peer_tool.py</code> + <code>schemas/analysis.py</code></td>
+      <td>PeerMetricRow 필드 추가 + calculate_metric_row 수정</td>
+    </tr>
+  </table>
+  <p style="margin-top:10px; font-size:0.78rem; color:#78350f">
+    피드백이나 개선 제안은 GitHub Issues 또는 단톡방 (#stock-agent-pm) 으로 알려주세요!
+  </p>
+</div>
+
+</body>
+</html>

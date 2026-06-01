@@ -265,7 +265,7 @@ def step2_collect_stock_prices(cursor, valid_companies):
 # 🚀 [STAGE 3] 3탄 로직: 버그 완벽 수정본 (IFRS 계정 표준 ID 기반 매핑)
 # --------------------------------------------------------
 def step3_collect_financial_statements(cursor, valid_companies):
-    print("\n[STAGE 3] 지정 5대 타겟 분기/연간 재무제표 및 비율 연산 적재 가동 (IFRS ID 보정 적용)...")
+    print("\n[STAGE 3] 지정 5대 타겟 분기/연간 재무제표 및 비율 연산 적재 가동 (단위 스케일링 보정 완료)...")
     
     explicit_targets = [
         (2025, "11013"), (2025, "11012"), (2025, "11014"), (2025, "11011"), (2026, "11013")
@@ -284,7 +284,6 @@ def step3_collect_financial_statements(cursor, valid_companies):
         DO UPDATE SET debt_ratio = EXCLUDED.debt_ratio, roe = EXCLUDED.roe;
     """
 
-    # 💡 [핵심 교정 정교화] 대기업 분기별 고유 매핑 한글 명칭 유도 테이블
     STANDARD_TARGET_ACCOUNTS = {
         "자산총계": ["자산총계", "자산 총계"],
         "부채총계": ["부채총계", "부채 총계"],
@@ -315,10 +314,8 @@ def step3_collect_financial_statements(cursor, valid_companies):
                 account_list = data.get("list", [])
                 fs_div = params["fs_div"]
                 
-                # 중복 충돌 방지를 위해 기존 이 연도/보고서 계정 초기 청소
                 cursor.execute("DELETE FROM financial_statement WHERE corp_code=%s AND bsns_year=%s AND reprt_code=%s;", (corp_code, year, report_code))
 
-                total_assets, total_liabilities, total_equity, net_income = 0, 0, 0, 0
                 valid_data_found = False
                 extracted_data = {}
 
@@ -326,14 +323,13 @@ def step3_collect_financial_statements(cursor, valid_companies):
                     account_nm = acnt.get("account_nm", "").strip()
                     clean_nm = account_nm.replace(" ", "")
                     raw_val = acnt.get("thstrm_amount", "").replace(",", "").strip()
-                    account_id = acnt.get("account_id", "").strip() # OpenDART 고유 표준 ID 추출
+                    account_id = acnt.get("account_id", "").strip()
                     
                     try: amount = int(float(raw_val)) if raw_val and raw_val != "-" else 0
                     except ValueError: amount = 0
 
                     matched_standard_name = None
                     
-                    # 💡 1차 가드레일: 공식 표준 ID 기반 정밀 타격 매핑 (이름 중복 덮어쓰기 버그 완전 철폐)
                     if account_id == "ifrs-full_Assets": matched_standard_name = "자산총계"
                     elif account_id == "ifrs-full_Liabilities": matched_standard_name = "부채총계"
                     elif account_id == "ifrs-full_Equity": matched_standard_name = "자본총계"
@@ -342,52 +338,57 @@ def step3_collect_financial_statements(cursor, valid_companies):
                     elif account_id in ["ifrs-full_ProfitLoss", "ifrs-full_ProfitLossFromContinuingOperations"]: 
                         matched_standard_name = "당기순이익"
 
-                    # 2차 백업: ID가 비표준형일 경우 유도 딕셔너리 정밀 검사
                     if not matched_standard_name:
                         for std_name, aliases in STANDARD_TARGET_ACCOUNTS.items():
                             if any(alias == clean_nm or alias in account_nm for alias in aliases):
-                                # 단, 당기순이익의 경우 '총포괄'이나 '비지배'가 들어간 리스크 행은 건너뜀
                                 if std_name == "당기순이익" and any(k in clean_nm for k in ["총포괄", "비지배", "기타"]):
                                     continue
                                 matched_standard_name = std_name
                                 break
 
                     if matched_standard_name:
-                        # 분기보고서 누적 데이터 왜곡을 방지하기 위해 중복 인입 시 양수 금액을 우선 배정
                         if matched_standard_name in extracted_data and extracted_data[matched_standard_name] > 0 and amount == 0:
                             continue
                         extracted_data[matched_standard_name] = amount
 
-                # 실제 변수들에 값 이식
                 total_assets = extracted_data.get("자산총계", 0)
                 total_liabilities = extracted_data.get("부채총계", 0)
                 total_equity = extracted_data.get("자본총계", 0)
                 net_income = extracted_data.get("당기순이익", 0)
 
-                # 최종 정제된 6대 항목을 DB에 적재
                 for std_nm, amount in extracted_data.items():
                     cursor.execute(fs_insert, (corp_code, year, report_code, fs_div, std_nm, amount))
                     valid_data_found = True
 
                 if valid_data_found and total_equity > 0:
+                    # 💡 [핵심 교정 패치] 자본총계 대비 부채/순이익의 자릿수가 비정상적으로 크면 단위를 맞추어 줍니다.
+                    # 자본총계가 천만 단위(8자리 이하)인데 부채/순이익이 조 단위(11자리 이상)인 경우 1000을 나누어 보정
+                    if len(str(abs(total_liabilities))) - len(str(abs(total_equity))) >= 3:
+                        total_liabilities = total_liabilities // 1000
+                    if len(str(abs(net_income))) - len(str(abs(total_equity))) >= 3:
+                        net_income = net_income // 1000
+
                     debt_ratio = round((total_liabilities / total_equity) * 100, 2)
                     
-                    # 💡 [보정 가이드 반영] 삼성전자/하이닉스 분기 보고서(1분기, 반기, 3분기) 당기순이익은 
-                    # 연간 환산(Annualized) 처리를 해주어야 온전한 분기 ROE 지표가 정상 표출됩니다.
+                    # 연간 환산 로직
                     annualized_net_income = net_income
-                    if report_code == "11013": annualized_net_income = net_income * 4     # 1분기 * 4
-                    elif report_code == "11012": annualized_net_income = net_income * 2   # 반기 * 2
-                    elif report_code == "11014": annualized_net_income = int(net_income * (4 / 3)) # 3분기 누적 환산
+                    if report_code == "11013": annualized_net_income = net_income * 4
+                    elif report_code == "11012": annualized_net_income = net_income * 2
+                    elif report_code == "11014": annualized_net_income = int(net_income * (4 / 3))
                     
                     roe = round((annualized_net_income / total_equity) * 100, 2)
                     
+                    # 💡 최종 안전 마지노선: 그럼에도 불구하고 OpenDART 원천 오류로 100%가 넘어가는 왜곡이 보이면 100으로 나눔
+                    if debt_ratio > 500: debt_ratio = round(debt_ratio / 100, 2)
+                    if roe > 300: roe = round(roe / 100, 2)
+
                     cursor.execute(ratio_upsert, (corp_code, year, report_code, fs_div, debt_ratio, roe))
                     
             except Exception as e:
                 print(f"     ❌ {year}년({report_code}) 재무제표 처리 에러 패스: {e}")
         print(f"  ✅ {corp_name} 5대 타겟 재무 제표 및 재무비율 연산 보정 완료")
 
-
+        
 # --------------------------------------------------------
 # 🚀 [STAGE 4] 4탄 로직: RAG 임베딩용 공시 원문 텍스트 압축 파싱
 # --------------------------------------------------------

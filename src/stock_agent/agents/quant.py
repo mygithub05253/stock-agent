@@ -1,5 +1,6 @@
 import os
 import psycopg2
+from psycopg2 import OperationalError
 from dotenv import load_dotenv
 
 from stock_agent.schemas.analysis import AgentState, QuantResult
@@ -26,12 +27,28 @@ def run_quant(state: AgentState) -> AgentState:
         as_of_date = datetime.now().strftime("%Y-%m-%d")
 
     # DB 커넥션 오픈 및 Tool 호출
-    conn = psycopg2.connect(DATABASE_URL)
     try:
-        price_metrics = get_price_metrics(conn, stock_code, as_of_date)
-        fin_metrics = get_financial_metrics(conn, corp_code, as_of_date)
-    finally:
-        conn.close()
+        conn = psycopg2.connect(DATABASE_URL)
+    except (OperationalError, Exception) as exc:
+        price_metrics = {
+            "per": 18.0,
+            "pbr": 1.3,
+            "close_price": 0,
+        }
+        fin_metrics = {
+            "roe": 8.0,
+            "revenue_growth_yoy": 4.0,
+            "operating_margin": 12.0,
+            "debt_ratio": 90.0,
+        }
+        fallback_reason = f"{exc.__class__.__name__}: {exc}"
+    else:
+        try:
+            price_metrics = get_price_metrics(conn, stock_code, as_of_date)
+            fin_metrics = get_financial_metrics(conn, corp_code, as_of_date)
+        finally:
+            conn.close()
+        fallback_reason = None
 
     # Tool 결과를 통합하여 metrics 생성
     metrics = {
@@ -73,6 +90,10 @@ def run_quant(state: AgentState) -> AgentState:
         valuation_signal = "HOLD"
     else:
         valuation_signal = "SELL"
+
+    if fallback_reason:
+        reasons.append(f"DB 연결 실패로 데모용 정량 추정치를 사용했습니다. ({fallback_reason})")
+        risks.append("현재 정량 결과는 데모용 fallback 값이므로 실제 투자 판단 전 DB 연결 후 재확인이 필요합니다.")
 
     # AgentState 갱신
     state.quant = QuantResult(
