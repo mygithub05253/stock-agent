@@ -16,3 +16,4 @@ data/
 logs/
 scripts/switch-model.sh
 scripts/switchmodel.sh
+node_modules/

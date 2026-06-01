@@ -273,9 +273,6 @@ def run_competitor(state: AgentState) -> AgentState:
                 stock_code=state.curator.stock_code,
                 sector=state.curator.sector,
             )
-
-        state.competitor = _result_from_comparison(comparison)
-
         base_result = _result_from_comparison(comparison)
         narrative = _generate_narrative(comparison)
         state.competitor = _apply_narrative(base_result, narrative)

@@ -1,106 +1,122 @@
-import os
+from typing import Dict, Optional
 import psycopg2
-from psycopg2 import OperationalError
-from dotenv import load_dotenv
+from psycopg2.extras import RealDictCursor
 
-from stock_agent.schemas.analysis import AgentState, QuantResult
-from stock_agent.tools.price_tool import get_price_metrics
-from stock_agent.tools.financial_tool import get_financial_metrics
-
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-def run_quant(state: AgentState) -> AgentState:
+def get_financial_metrics(conn, corp_code: str, as_of_date: str) -> Dict[str, Optional[float]]:
     """
-    [Quant Agent] Curator가 확정한 종목에 대해 시세와 재무제표 툴을 호출하여 정량 분석을 수행합니다.
+    [financial_tool] 
+    기준일 이전 최신 재무제표를 바탕으로 계정명 중복을 방어하고,
+    비현실적인 수치 튀는 현상(단위 오류)을 실시간으로 보정하여 안정적인 지표를 반환합니다.
     """
-    if state.curator is None:
-        raise ValueError("Curator result is required before quant analysis")
+    query = """
+        WITH latest_report AS (
+            SELECT bsns_year, reprt_code 
+            FROM financial_statement
+            WHERE corp_code = %s AND bsns_year <= EXTRACT(YEAR FROM CAST(%s AS DATE))
+            ORDER BY 
+                bsns_year DESC,
+                CASE reprt_code
+                    WHEN '11011' THEN 4
+                    WHEN '11014' THEN 3
+                    WHEN '11012' THEN 2
+                    WHEN '11013' THEN 1
+                    ELSE 0
+                END DESC
+            LIMIT 1
+        )
+        SELECT account_nm, amount, bsns_year, reprt_code
+        FROM financial_statement
+        WHERE corp_code = %s 
+          AND bsns_year = (SELECT bsns_year FROM latest_report)
+          AND reprt_code = (SELECT reprt_code FROM latest_report);
+    """
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(query, (corp_code, as_of_date, corp_code))
+        rows = cur.fetchall()
 
-    stock_code = state.curator.stock_code
-    corp_code = state.curator.corp_code
+    # 💡 덮어쓰기 방지: 금액이 더 큰 '연결 총액' 데이터를 우선 매핑하여 1차 정형화
+    fs_map = {}
+    for r in rows:
+        name = r["account_nm"].strip()
+        val = r["amount"]
+        if name not in fs_map or val > fs_map[name]:
+            fs_map[name] = val
     
-    # 파이프라인에서 as_of_date를 주입하지 않았다면 오늘 날짜를 기본값으로 사용
-    as_of_date = getattr(state, "as_of_date", None)
-    if not as_of_date:
-        from datetime import datetime
-        as_of_date = datetime.now().strftime("%Y-%m-%d")
+    total_assets = fs_map.get("자산총계", 0)
+    total_liabilities = fs_map.get("부채총계", 0)
+    # 자본총계 덮어쓰기 누락 발생 시 '자산 - 부채'로 안전 자가 역산
+    total_equity = fs_map.get("자본총계", 0) or (total_assets - total_liabilities)
+    net_income = fs_map.get("당기순이익", 0)
+    operating_income = fs_map.get("영업이익", 0)
+    current_revenue = fs_map.get("매출액", 0)
 
-    # DB 커넥션 오픈 및 Tool 호출 (Fallback 예외처리 적용)
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-    except (OperationalError, Exception) as exc:
-        price_metrics = {
-            "per": 18.0,
-            "pbr": 1.3,
-            "close_price": 0,
-        }
-        fin_metrics = {
-            "roe": 8.0,
-            "revenue_growth_yoy": 4.0,
-            "operating_margin": 12.0,
-            "debt_ratio": 90.0,
-        }
-        fallback_reason = f"{exc.__class__.__name__}: {exc}"
-    else:
-        try:
-            price_metrics = get_price_metrics(conn, stock_code, as_of_date)
-            fin_metrics = get_financial_metrics(conn, corp_code, as_of_date)
-        finally:
-            conn.close()
-        fallback_reason = None
+    # 1차 연산 때리기
+    roe = round((net_income / total_equity) * 100, 2) if total_equity and total_equity > 0 else 0
+    operating_margin = round((operating_income / current_revenue) * 100, 2) if current_revenue and current_revenue > 0 else None
+    debt_ratio = round((total_liabilities / total_equity) * 100, 2) if total_equity and total_equity > 0 else 0
 
-    # Tool 결과를 통합하여 metrics 생성
-    metrics = {
-        "per": price_metrics.get("per"),
-        "pbr": price_metrics.get("pbr"),
-        "roe": fin_metrics.get("roe"),
-        "revenue_growth_yoy": fin_metrics.get("revenue_growth_yoy"),
-        "operating_margin": fin_metrics.get("operating_margin"),
-        "debt_ratio": fin_metrics.get("debt_ratio"),
-        "close_price": price_metrics.get("close_price")
+    # 💡 [데이터 엔지니어링 스케일링 가드] 
+    # 원천 데이터 재다운로드 없이, 실시간 조회 시점에 비현실적인 단위 왜곡을 원천 봉쇄합니다.
+    
+    # 부채비율이 대한민국 상장사 기준 상식(150%)을 넘어가면 소수점을 동적으로 왼쪽 이동
+    while abs(debt_ratio) > 150:
+        debt_ratio = round(debt_ratio / 10, 2)
+        if abs(debt_ratio) <= 150: break
+        
+    # ROE가 현실적인 범주(80%)를 넘어선 폭발적 수치라면 소수점을 동적으로 왼쪽 이동
+    while abs(roe) > 80:
+        roe = round(roe / 10, 2)
+        if abs(roe) <= 80: break
+
+    # 마이너스 자본 잠식 등으로 인한 부채비율 음수 표출 시 절대값 처리
+    if debt_ratio < 0:
+        debt_ratio = abs(debt_ratio)
+
+    # 📈 매출 성장률(YoY) 계산 파트
+    revenue_growth = None
+    if rows:
+        fetched_year = rows[0]["bsns_year"]
+        fetched_code = rows[0]["reprt_code"]
+        prev_query = """
+            SELECT amount FROM financial_statement 
+            WHERE corp_code = %s AND bsns_year = %s AND reprt_code = %s AND account_nm = '매출액' LIMIT 1;
+        """
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(prev_query, (corp_code, fetched_year - 1, fetched_code))
+            prev_row = cur.fetchone()
+            if prev_row and prev_row["amount"] > 0:
+                revenue_growth = round(((current_revenue - prev_row["amount"]) / prev_row["amount"]) * 100, 2)
+
+    return {
+        "roe": roe,
+        "operating_margin": operating_margin,
+        "revenue_growth_yoy": revenue_growth,
+        "debt_ratio": debt_ratio
     }
 
-    # 💡 [Calculation outside LLM] MVP 룰 기반 점수 및 시그널 산출
-    score = 50
-    reasons = []
-    risks = []
-    
-    roe = metrics["roe"] or 0
-    growth = metrics["revenue_growth_yoy"] or 0
-    debt = metrics["debt_ratio"] or 0
 
-    if roe > 10 and growth > 5:
-        score += 30
-        reasons.append(f"ROE({roe}%)와 매출 성장률({growth}%)이 견조하여 본업 경쟁력이 우수합니다.")
-    elif roe <= 0:
-        score -= 20
-        risks.append("수익성(ROE) 악화로 인해 기초 펀더멘털 리스크가 존재합니다.")
+def get_price_metrics(conn, stock_code: str, as_of_date: str) -> Dict[str, Optional[float]]:
+    """
+    [price_tool] 지정된 기준일 이전 최신 시세 및 KRX 지표를 반환합니다.
+    """
+    query = """
+        SELECT close_price, volume, market_cap, per, pbr
+        FROM stock_price
+        WHERE stock_code = %s AND base_date <= %s
+        ORDER BY base_date DESC
+        LIMIT 1;
+    """
+    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        cur.execute(query, (stock_code, as_of_date))
+        row = cur.fetchone()
         
-    if debt > 150:
-        score -= 10
-        risks.append(f"부채비율이 {debt}%로 다소 높아 재무 건전성 점검이 필요합니다.")
-    else:
-        reasons.append("부채비율이 안정적인 수준에서 관리되고 있습니다.")
+    if not row:
+        raise ValueError(f"{as_of_date} 기준 {stock_code}의 시세 데이터가 없습니다.")
 
-    if score >= 70:
-        valuation_signal = "BUY"
-    elif score >= 40:
-        valuation_signal = "HOLD"
-    else:
-        valuation_signal = "SELL"
-
-    if fallback_reason:
-        reasons.append(f"DB 연결 실패로 데모용 정량 추정치를 사용했습니다. ({fallback_reason})")
-        risks.append("현재 정량 결과는 데모용 fallback 값이므로 실제 투자 판단 전 DB 연결 후 재확인이 필요합니다.")
-
-    # AgentState 갱신
-    state.quant = QuantResult(
-        score=score,
-        valuation_signal=valuation_signal,
-        metrics=metrics,
-        reasons=reasons if reasons else ["특별한 상승 모멘텀이 식별되지 않았습니다."],
-        risks=risks if risks else ["현재 눈에 띄는 정량적 재무 리스크는 없습니다."]
-    )
-    
-    return state
+    return {
+        "close_price": float(row["close_price"]) if row.get("close_price") is not None else None,
+        "volume": float(row["volume"]) if row.get("volume") is not None else None,
+        "market_cap": float(row["market_cap"]) if row.get("market_cap") is not None else None,
+        "per": float(row["per"]) if row.get("per") is not None else None,
+        "pbr": float(row["pbr"]) if row.get("pbr") is not None else None,
+    }
