@@ -92,6 +92,7 @@ class UserRequest(BaseModel):
     intent: RequestIntent | None = None
     target_stock_code: str | None = None
     target_corp_name: str | None = None
+    target_sector: str | None = None
     analysis_scope: AnalysisScope | None = None
     urgency_reason: UrgencyReason | None = None
     requested_depth: RequestedDepth = "summary"
@@ -133,6 +134,8 @@ class CompetitorResult(BaseModel):
     relative_position: dict[str, float | int | str | None] = Field(default_factory=dict)
     data_quality_flags: list[str] = Field(default_factory=list)
     a1_peer_multiple_payload: dict[str, float | int | str | None] | None = None
+    evidence_cards: list[dict[str, str]] = Field(default_factory=list)
+    bear_case: str | None = None
     warnings: list[str] = Field(default_factory=list)
 
 

@@ -1,6 +1,7 @@
 import os
 import json
 import psycopg2
+from psycopg2 import OperationalError
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -16,6 +17,80 @@ client = OpenAI(
     api_key=os.getenv("GLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "mock-key",
     base_url=os.getenv("GLM_BASE_URL") or os.getenv("LLM_BASE_URL") or "https://api.openai.com/v1"
 )
+
+def classify_event_types(texts: list[str]) -> list[str]:
+    joined_text = " ".join(texts)
+
+    event_types = []
+
+    if any(keyword in joined_text for keyword in ["실적", "매출", "영업이익", "순이익", "이익률"]):
+        event_types.append("실적")
+
+    if any(keyword in joined_text for keyword in ["AI", "반도체", "수요", "업황", "산업", "사이클"]):
+        event_types.append("산업 트렌드")
+
+    if any(keyword in joined_text for keyword in ["신사업", "투자", "인수", "합병", "M&A", "고대역폭", "선단 공정"]):
+        event_types.append("신사업")
+
+    if any(keyword in joined_text for keyword in ["규제", "소송", "제재", "리스크", "불확실성"]):
+        event_types.append("규제/리스크")
+
+    if any(keyword in joined_text for keyword in ["환율", "금리", "물가", "경기", "거시"]):
+        event_types.append("매크로")
+
+    return event_types or ["기타"]
+
+
+def classify_sentiment(evidence: list[str], risks: list[str]) -> str:
+    if len(evidence) > len(risks):
+        return "positive"
+    if len(evidence) < len(risks):
+        return "negative"
+    return "neutral"
+
+
+def calculate_qual_score(sentiment: str, evidence: list[str], risks: list[str]) -> int:
+    base_score = 50
+
+    if sentiment == "positive":
+        base_score += 15
+    elif sentiment == "negative":
+        base_score -= 15
+
+    base_score += min(len(evidence) * 3, 15)
+    base_score -= min(len(risks) * 4, 20)
+
+    return max(0, min(100, base_score))
+
+
+def is_risk_text(text: str) -> bool:
+    risk_keywords = [
+        "리스크",
+        "불확실",
+        "감소",
+        "둔화",
+        "제한적",
+        "악화",
+        "부진",
+        "하락",
+        "규제",
+        "소송",
+        "적자",
+    ]
+
+    return any(keyword in text for keyword in risk_keywords)
+
+
+def format_doc_as_evidence(doc: dict) -> str:
+    title = doc.get("title") or doc.get("report_nm") or "제목 없음"
+    body = doc.get("body", "")
+    source = doc.get("publisher") or doc.get("source_url") or ""
+
+    if source:
+        return f"{title}: {body} (출처: {source})"
+
+    return f"{title}: {body}"
+
 
 def run_qual(state: AgentState) -> AgentState:
     """
@@ -33,11 +108,17 @@ def run_qual(state: AgentState) -> AgentState:
     end_date = as_of_date_str
 
     # 1. DB에서 공시 원문 로드
-    conn = psycopg2.connect(DATABASE_URL)
+    disclosure_docs = None
+    db_fallback_reason = None
     try:
-        disclosure_docs = get_disclosure_context(conn, corp_code, start_date, end_date)
-    finally:
-        conn.close()
+        conn = psycopg2.connect(DATABASE_URL)
+    except (OperationalError, Exception) as exc:
+        db_fallback_reason = f"{exc.__class__.__name__}: {exc}"
+    else:
+        try:
+            disclosure_docs = get_disclosure_context(conn, corp_code, start_date, end_date)
+        finally:
+            conn.close()
 
     # 텍스트 조립 및 컨텍스트 길이 방어 (상위 3000자 슬라이싱)
     context_str = ""
@@ -45,6 +126,11 @@ def run_qual(state: AgentState) -> AgentState:
         for doc in disclosure_docs:
             context_str += f"\n\n[공시명: {doc['report_nm']} / 공시일: {doc['rcept_dt']}]\n"
             context_str += doc['content'][:3000]
+    elif db_fallback_reason:
+        context_str = (
+            "DB 연결 실패로 실제 공시를 읽지 못했습니다. "
+            "데모용 정성 분석을 위해 fallback 컨텍스트를 사용합니다."
+        )
     else:
         context_str = "해당 기간 내에 발행된 공시 보고서 원문이 없습니다."
 
