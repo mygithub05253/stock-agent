@@ -64,14 +64,68 @@ def test_parses_fenced_response():
     assert result["peer_summary"] == "good"
 
 
-def test_raises_on_http_error():
+def test_raises_on_http_error_after_retries_exhausted():
     mock_resp = MagicMock()
     mock_resp.status_code = 429
     mock_resp.text = "rate limit exceeded"
-    with patch("stock_agent.llm.openrouter_client.requests.post", return_value=mock_resp):
+    with patch("stock_agent.llm.openrouter_client.requests.post", return_value=mock_resp) as mock_post:
         with patch("stock_agent.llm.openrouter_client.get_settings", return_value=_mock_settings()):
-            with pytest.raises(OpenRouterClientError, match="429"):
+            with patch("stock_agent.llm.openrouter_client.time.sleep"):
+                with pytest.raises(OpenRouterClientError, match="429"):
+                    openrouter_chat_json([ChatMessage(role="user", content="test")])
+    # 일시적 장애(429)는 최초 1회 + 재시도 2회 = 총 3회 시도 후 실패해야 한다
+    assert mock_post.call_count == 3
+
+
+def test_does_not_retry_on_client_error():
+    mock_resp = MagicMock()
+    mock_resp.status_code = 401
+    mock_resp.text = "unauthorized"
+    with patch("stock_agent.llm.openrouter_client.requests.post", return_value=mock_resp) as mock_post:
+        with patch("stock_agent.llm.openrouter_client.get_settings", return_value=_mock_settings()):
+            with pytest.raises(OpenRouterClientError, match="401"):
                 openrouter_chat_json([ChatMessage(role="user", content="test")])
+    # 잘못된 요청(4xx, 429 제외)은 재시도 없이 즉시 실패해 크레딧을 보호한다
+    assert mock_post.call_count == 1
+
+
+def test_retries_then_succeeds_on_transient_error():
+    fail_resp = MagicMock()
+    fail_resp.status_code = 503
+    fail_resp.text = "temporarily unavailable"
+    ok_resp = MagicMock()
+    ok_resp.status_code = 200
+    ok_resp.json.return_value = {
+        "choices": [{"message": {"content": '{"peer_summary": "복구됨"}'}}]
+    }
+    with patch(
+        "stock_agent.llm.openrouter_client.requests.post",
+        side_effect=[fail_resp, ok_resp],
+    ) as mock_post:
+        with patch("stock_agent.llm.openrouter_client.get_settings", return_value=_mock_settings()):
+            with patch("stock_agent.llm.openrouter_client.time.sleep"):
+                result = openrouter_chat_json([ChatMessage(role="user", content="test")])
+    assert result == {"peer_summary": "복구됨"}
+    assert mock_post.call_count == 2
+
+
+def test_retries_on_network_exception_then_succeeds():
+    import requests as requests_module
+
+    ok_resp = MagicMock()
+    ok_resp.status_code = 200
+    ok_resp.json.return_value = {
+        "choices": [{"message": {"content": '{"peer_summary": "ok"}'}}]
+    }
+    with patch(
+        "stock_agent.llm.openrouter_client.requests.post",
+        side_effect=[requests_module.ConnectionError("boom"), ok_resp],
+    ) as mock_post:
+        with patch("stock_agent.llm.openrouter_client.get_settings", return_value=_mock_settings()):
+            with patch("stock_agent.llm.openrouter_client.time.sleep"):
+                result = openrouter_chat_json([ChatMessage(role="user", content="test")])
+    assert result == {"peer_summary": "ok"}
+    assert mock_post.call_count == 2
 
 
 def test_raises_on_invalid_json():
