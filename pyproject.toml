@@ -10,6 +10,9 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.8.0",
     "psycopg[binary]>=3.2.0",
+    # quant.py·tools(financial/price/rag_tool)·datas 수집 스크립트가 psycopg2를 직접 import한다.
+    # psycopg(v3)로 통일 전까지 두 드라이버를 함께 선언해 ImportError를 막는다. (검토 리포트 권고 2번)
+    "psycopg2-binary>=2.9.0",
     "python-dotenv>=1.0.1",
     "pydantic-settings>=2.4.0",
     "requests>=2.32.0",
@@ -33,3 +36,5 @@ target-version = "py311"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# editable install 없이도 pytest가 src 레이아웃 패키지를 찾도록 경로 주입
+pythonpath = ["src"]
