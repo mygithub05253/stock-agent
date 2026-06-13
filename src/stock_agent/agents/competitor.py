@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from stock_agent.agents.fallback import should_fallback
 from stock_agent.config import get_settings
 from stock_agent.llm.openrouter_client import ChatMessage, OpenRouterClientError, openrouter_chat_json
 from stock_agent.schemas.analysis import AgentState, CompetitorResult
@@ -24,27 +25,6 @@ except ModuleNotFoundError as exc:
 _PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "competitor" / "system.md"
 
 _narrative_cache: dict[str, dict[str, Any]] = {}
-
-_DB_FALLBACK_MARKERS = (
-    "authentication",
-    "connection",
-    "connectionerror",
-    "database",
-    "db",
-    "interfaceerror",
-    "operationalerror",
-    "psycopg",
-    "timeout",
-)
-
-
-def _is_expected_fallback_error(exc: Exception) -> bool:
-    if isinstance(exc, (ConnectionError, OSError, TimeoutError)):
-        return True
-    error_text = f"{exc.__class__.__name__}: {exc}".lower()
-    return any(marker in error_text for marker in _DB_FALLBACK_MARKERS)
-
-
 
 def _load_system_prompt() -> str:
     return _PROMPT_PATH.read_text(encoding="utf-8")
@@ -283,7 +263,7 @@ def run_competitor(state: AgentState) -> AgentState:
         narrative = _generate_narrative(comparison)
         state.competitor = _apply_narrative(base_result, narrative)
     except Exception as exc:
-        if not _is_expected_fallback_error(exc):
+        if not should_fallback(exc):
             raise
         state.competitor = _mock_fallback_result(f"{exc.__class__.__name__}: {exc}")
 

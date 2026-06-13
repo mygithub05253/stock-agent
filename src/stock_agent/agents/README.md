@@ -62,6 +62,20 @@
 - 모든 agent output에는 가능한 한 `source`, `as_of_date`, `data_version`, `warnings`를 포함할 수 있도록 schema 확장을 고려합니다.
 - 에이전트 단위 테스트는 `tests/agents/test_<agent_name>.py` 에 작성합니다.
 
+## 에러핸들링 & 폴백 기준
+
+- 외부 의존성(DB, API, RAG/embedding, LLM gateway) 실패는 에이전트가 가능한 한 fallback 결과를 만들어 파이프라인을 유지합니다.
+- DB 연결은 테스트와 데모 경로가 오래 멈추지 않도록 짧은 `connect_timeout`과 단기 실패 캐시를 둡니다.
+- 예상 가능한 외부 실패 판정은 `fallback.py`의 `should_fallback()`을 사용합니다. 코드 버그처럼 예상하지 못한 예외는 숨기지 않고 다시 raise합니다.
+- fallback 결과에는 `fallback_reason` 또는 warning을 남겨 Strategist/Guardrail/UI가 신뢰도를 낮춰 표시할 수 있게 합니다.
+- 민감정보가 들어간 `.env.example` 충돌은 항상 placeholder 값을 채택합니다. 실제 키와 DB URL은 `.env` 또는 배포 환경변수로만 관리합니다.
+- 현재 구현 상태:
+  - Quant: DB 연결 실패 시 보수적인 mock 지표와 risk를 반환합니다.
+  - Qual: 뉴스/공시 RAG 검색 각각 실패 시 독립 fallback 문서를 반환합니다.
+  - Competitor: peer DB 연결 실패 시 mock peer 비교와 warning을 반환합니다.
+  - Macro: macro DB/tool 실패 시 mock 거시 지표와 risk를 반환합니다.
+  - Guardrail: fallback 근거가 포함된 결과를 사용자 경고로 승격합니다.
+
 ## 작업 충돌 방지
 
 - 에이전트 1개 = 담당 1명 원칙. 같은 파일 동시 작업 금지.

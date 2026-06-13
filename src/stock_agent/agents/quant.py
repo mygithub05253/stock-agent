@@ -2,6 +2,7 @@ import time
 
 import psycopg2
 
+from stock_agent.agents.fallback import ensure_database_available
 from stock_agent.config import get_settings
 from stock_agent.schemas.analysis import AgentState, QuantResult
 from stock_agent.tools.financial_tool import get_financial_metrics
@@ -50,6 +51,8 @@ def _normalize_metrics(raw: dict[str, float | int], fallback: dict[str, float | 
         for key in fallback
     }
 
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL") or get_settings().resolved_database_url
 
 def run_quant(state: AgentState) -> AgentState:
     """
@@ -76,6 +79,25 @@ def run_quant(state: AgentState) -> AgentState:
     conn, connect_reasons = _connect_with_retry()
     if conn is None:
         fallback_reasons.extend(connect_reasons)
+        
+    # DB 커넥션 오픈 및 Tool 호출
+    try:
+        ensure_database_available()
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=1)
+    except (OperationalError, Exception) as exc:
+        price_metrics = {
+            "per": 18.0,
+            "pbr": 1.3,
+            "close_price": 0,
+        }
+        fin_metrics = {
+            "roe": 8.0,
+            "revenue_growth_yoy": 4.0,
+            "operating_margin": 12.0,
+            "debt_ratio": 90.0,
+        }
+        fallback_reason = f"{exc.__class__.__name__}: {exc}"
+
     else:
         try:
             try:
@@ -183,5 +205,5 @@ def run_quant(state: AgentState) -> AgentState:
         reasons=reasons if reasons else ["특별한 상승 모멘텀이 식별되지 않았습니다."],
         risks=risks if risks else ["현재 눈에 띄는 정량적 재무 리스크는 없습니다."]
     )
-
+    
     return state

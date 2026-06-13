@@ -3,6 +3,7 @@ from stock_agent.agents import (
     run_curator,
     run_guardrail,
     run_investment_analyst,
+    run_macro,
     run_qual,
     run_quant,
     run_request_classifier,
@@ -79,6 +80,7 @@ def run_phase1_analysis(
     state = run_quant(state)
     state = run_qual(state)
     state = run_competitor(state)
+    state = run_macro(state)
     state = run_strategist(state)
     state = run_investment_analyst(state)
     state = run_guardrail(state)
