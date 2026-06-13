@@ -307,7 +307,6 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
     st.subheader("3. 저장된 포트폴리오")
     _render_portfolio_summary(portfolio)
 
-    _ensure_initial_analysis_output(user_profile, portfolio)
     _render_output()
 
     st.subheader("4. 대화형 질문")

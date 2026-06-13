@@ -3,12 +3,14 @@ import psycopg2
 from psycopg2 import OperationalError
 from dotenv import load_dotenv
 
+from stock_agent.agents.fallback import ensure_database_available
+from stock_agent.config import get_settings
 from stock_agent.schemas.analysis import AgentState, QuantResult
 from stock_agent.tools.price_tool import get_price_metrics
 from stock_agent.tools.financial_tool import get_financial_metrics
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL") or get_settings().resolved_database_url
 
 def run_quant(state: AgentState) -> AgentState:
     """
@@ -28,7 +30,8 @@ def run_quant(state: AgentState) -> AgentState:
 
     # DB 커넥션 오픈 및 Tool 호출
     try:
-        conn = psycopg2.connect(DATABASE_URL)
+        ensure_database_available()
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=1)
     except (OperationalError, Exception) as exc:
         price_metrics = {
             "per": 18.0,

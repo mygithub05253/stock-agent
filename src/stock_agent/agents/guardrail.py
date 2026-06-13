@@ -22,6 +22,10 @@ def run_guardrail(state: AgentState) -> AgentState:
 
     if state.qual is not None and any("mock" in risk.lower() for risk in state.qual.risks):
         warnings.append("뉴스/공시 근거는 mock 데이터이므로 실제 RAG 연결 전까지 신뢰도를 보수적으로 표시합니다.")
+    if state.qual is not None and any("fallback" in item.lower() for item in state.qual.evidence + state.qual.risks):
+        warnings.append("뉴스/공시 검색 일부가 fallback으로 대체되어 최신 원문 확인이 필요합니다.")
+    if state.competitor is not None and any("fallback" in item.lower() for item in state.competitor.warnings):
+        warnings.append("Peer 비교 일부가 fallback으로 대체되어 실제 DB 기준 재확인이 필요합니다.")
 
     state.guardrail = GuardrailResult(
         passed=True,

@@ -4,11 +4,13 @@ from psycopg2 import OperationalError
 from datetime import datetime
 from dotenv import load_dotenv
 
+from stock_agent.agents.fallback import ensure_database_available
+from stock_agent.config import get_settings
 from stock_agent.schemas.analysis import AgentState, MacroResult, Signal
 from stock_agent.tools.macro_tool import get_macro_context
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL") or get_settings().resolved_database_url
 
 # ==========================================
 # DB 연결 실패 시 fallback mock 데이터
@@ -191,7 +193,8 @@ def run_macro(state: AgentState) -> AgentState:
     prev_context: dict | None = None
 
     try:
-        conn = psycopg2.connect(DATABASE_URL)
+        ensure_database_available()
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=1)
     except (OperationalError, Exception) as exc:
         fallback_reason = f"{exc.__class__.__name__}: {exc}"
     else:
