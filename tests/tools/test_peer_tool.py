@@ -142,7 +142,9 @@ def test_median_or_none_ignores_none_values() -> None:
     assert median_or_none([None, None]) is None
 
 
-def test_select_peer_rows_excludes_target_and_prefers_quality_then_market_cap_proximity() -> None:
+def test_select_peer_rows_prefers_overall_comparability_over_pure_quality() -> None:
+    # 복합 유사도 고도화: 규모가 거의 같은 peer는 데이터 완성도가 약간 낮아도,
+    # 규모가 3.5배 차이 나는 고완성도 peer보다 더 좋은 비교군으로 본다.
     target = peer_tool.PeerMetricRow(
         corp_code="1",
         stock_code="AAA001",
@@ -151,12 +153,12 @@ def test_select_peer_rows_excludes_target_and_prefers_quality_then_market_cap_pr
         market_cap=1_000,
         data_quality_score=100,
     )
-    low_quality_close_peer = peer_tool.PeerMetricRow(
+    lower_quality_close_peer = peer_tool.PeerMetricRow(
         corp_code="2",
         stock_code="BBB001",
         corp_name="Lower Quality Close",
         sector="semiconductor",
-        market_cap=1_010,
+        market_cap=1_010,  # 규모 거의 동일
         data_quality_score=60,
     )
     high_quality_far_peer = peer_tool.PeerMetricRow(
@@ -164,8 +166,7 @@ def test_select_peer_rows_excludes_target_and_prefers_quality_then_market_cap_pr
         stock_code="CCC001",
         corp_name="High Quality Far",
         sector="semiconductor",
-
-        market_cap=3_500,  # 3.5x — within 0.25x~4x band
+        market_cap=3_500,  # 3.5x — band 안이지만 규모 격차 큼
         data_quality_score=90,
     )
     high_quality_close_peer = peer_tool.PeerMetricRow(
@@ -179,11 +180,68 @@ def test_select_peer_rows_excludes_target_and_prefers_quality_then_market_cap_pr
 
     selected = peer_tool.select_peer_rows(
         target,
-        [target, low_quality_close_peer, high_quality_far_peer, high_quality_close_peer],
+        [target, lower_quality_close_peer, high_quality_far_peer, high_quality_close_peer],
         max_peer_count=2,
     )
 
-    assert [row.stock_code for row in selected] == ["DDD001", "CCC001"]
+    # 규모가 가까운 두 peer가 멀리 떨어진 고완성도 peer를 앞선다.
+    assert [row.stock_code for row in selected] == ["DDD001", "BBB001"]
+    assert "CCC001" not in [row.stock_code for row in selected]
+
+
+def test_select_peer_rows_breaks_ties_by_business_economics_similarity() -> None:
+    # 규모·완성도가 동일하면 영업이익률(사업 경제성)이 더 비슷한 peer를 선택한다.
+    target = peer_tool.PeerMetricRow(
+        corp_code="1",
+        stock_code="AAA001",
+        corp_name="Target",
+        sector="semiconductor",
+        market_cap=1_000,
+        operating_margin=0.20,
+        data_quality_score=90,
+    )
+    similar_margin_peer = peer_tool.PeerMetricRow(
+        corp_code="2",
+        stock_code="BBB001",
+        corp_name="Similar Margin",
+        sector="semiconductor",
+        market_cap=1_000,
+        operating_margin=0.19,  # target과 유사
+        data_quality_score=90,
+    )
+    different_margin_peer = peer_tool.PeerMetricRow(
+        corp_code="3",
+        stock_code="CCC001",
+        corp_name="Different Margin",
+        sector="semiconductor",
+        market_cap=1_000,
+        operating_margin=0.02,  # target과 크게 다름
+        data_quality_score=90,
+    )
+
+    selected = peer_tool.select_peer_rows(
+        target,
+        [target, different_margin_peer, similar_margin_peer],
+        max_peer_count=1,
+    )
+
+    assert [row.stock_code for row in selected] == ["BBB001"]
+
+
+def test_peer_similarity_is_higher_for_closer_size_and_margin() -> None:
+    target = peer_tool.PeerMetricRow(
+        corp_code="1", stock_code="AAA001", corp_name="T",
+        market_cap=1_000, operating_margin=0.20, data_quality_score=90,
+    )
+    close = peer_tool.PeerMetricRow(
+        corp_code="2", stock_code="BBB001", corp_name="Close",
+        market_cap=1_050, operating_margin=0.19, data_quality_score=90,
+    )
+    far = peer_tool.PeerMetricRow(
+        corp_code="3", stock_code="CCC001", corp_name="Far",
+        market_cap=3_500, operating_margin=0.02, data_quality_score=90,
+    )
+    assert peer_tool.peer_similarity(target, close) > peer_tool.peer_similarity(target, far)
 
 
 def test_load_peer_candidates_fetches_broader_candidate_pool(monkeypatch) -> None:
