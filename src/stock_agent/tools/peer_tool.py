@@ -523,12 +523,66 @@ def _mark_outliers(rows: list[PeerMetricRow], target_stock_code: str) -> list[Pe
     return result
 
 
+# peer 복합 유사도 가중치. 합이 1이 되도록 유지한다.
+# - size: 시가총액 근접(규모 유사)  - business: 영업이익률 근접(사업 경제성 유사)
+# - quality: 데이터 완성도(보조 요인 — 단독으로 선정을 지배하지 않게 낮게 둔다)
+# 일부 지표가 결측이면 가용 항목으로 가중치를 재정규화한다.
+_SIM_WEIGHT_SIZE = 0.45
+_SIM_WEIGHT_BUSINESS = 0.30
+_SIM_WEIGHT_QUALITY = 0.25
+
+
+def _proximity(target_value: float | None, peer_value: float | None) -> float | None:
+    """두 값의 근접도를 0~1로 반환(1=동일). 비교 불가하면 None.
+
+    상대 격차 기반이라 절대 규모가 큰 시가총액·비율 지표 모두에 쓸 수 있다.
+    """
+    if target_value is None or peer_value is None:
+        return None
+    scale = max(abs(target_value), 1e-9)
+    gap = abs(peer_value - target_value) / scale
+    return 1.0 / (1.0 + gap)
+
+
+def peer_similarity(target: PeerMetricRow, row: PeerMetricRow) -> float:
+    """target 대비 peer 후보의 복합 유사도(0~1, 높을수록 좋은 비교군).
+
+    시총 근접(규모)·영업이익률 근접(사업 경제성)·데이터 완성도를 가중 합산한다.
+    company 테이블에 별도 사업구성 컬럼이 없어, 보유 재무지표(영업이익률)로
+    "사업 경제성 유사도"를 근사한다(정직한 프록시).
+    """
+    components: list[tuple[float, float]] = []  # (weight, score)
+
+    size_sim = _proximity(
+        float(target.market_cap) if target.market_cap is not None else None,
+        float(row.market_cap) if row.market_cap is not None else None,
+    )
+    if size_sim is not None:
+        components.append((_SIM_WEIGHT_SIZE, size_sim))
+
+    business_sim = _proximity(target.operating_margin, row.operating_margin)
+    if business_sim is not None:
+        components.append((_SIM_WEIGHT_BUSINESS, business_sim))
+
+    # 데이터 완성도는 항상 존재(0~100) → 보조 요인으로 포함
+    components.append((_SIM_WEIGHT_QUALITY, row.data_quality_score / 100.0))
+
+    total_weight = sum(weight for weight, _ in components)
+    if total_weight <= 0:
+        return 0.0
+    return sum(weight * score for weight, score in components) / total_weight
+
+
 def select_peer_rows(
     target: PeerMetricRow,
     rows: list[PeerMetricRow],
     max_peer_count: int,
 ) -> list[PeerMetricRow]:
+    """시총 band로 1차 거른 뒤 복합 유사도(시총·사업경제성·데이터완성도)로 선정한다.
 
+    데이터 완성도만 1순위로 보던 기존 방식은 규모·사업이 훨씬 비슷한 peer를
+    한 지표 결측만으로 밀어내는 한계가 있었다. 복합 점수로 전체 비교가능성을 본다.
+    """
     candidates = [row for row in rows if row.stock_code != target.stock_code]
 
     if target.market_cap is not None:
@@ -541,12 +595,9 @@ def select_peer_rows(
         if len(within_band) >= 2:
             candidates = within_band
 
-    def sort_key(row: PeerMetricRow) -> tuple[int, float]:
-        if target.market_cap and row.market_cap:
-            gap = abs(row.market_cap - target.market_cap) / target.market_cap
-        else:
-            gap = 9_999.0
-        return (-row.data_quality_score, gap)
+    # 유사도 내림차순. 동점 시 데이터 완성도 높은 쪽을 안정적으로 우선한다.
+    def sort_key(row: PeerMetricRow) -> tuple[float, int]:
+        return (-peer_similarity(target, row), -row.data_quality_score)
 
     return sorted(candidates, key=sort_key)[:max_peer_count]
 
@@ -682,7 +733,8 @@ def build_peer_comparison(
     if target_company.sector:
         peer_selection_summary = (
             f"{target_company.sector} 섹터에서 후보 {len(peer_candidates)}개를 불러와 "
-            f"데이터 완성도와 시가총액 근접도 기준으로 {len(selected_peers)}개를 선택했습니다."
+            f"시가총액·사업 경제성(영업이익률)·데이터 완성도를 가중한 복합 유사도 기준으로 "
+            f"{len(selected_peers)}개를 선택했습니다."
         )
     else:
         peer_selection_summary = "섹터 정보가 없어 같은 섹터 peer 후보를 선택하지 못했습니다."
