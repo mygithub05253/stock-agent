@@ -45,13 +45,19 @@
 ### 2.1 Postgres 테이블 관계
 
 ```mermaid
+```mermaid
 erDiagram
+
     users ||--o{ holdings : "보유종목"
     users ||--o{ analysis_history : "분석이력"
-    company ||--o{ financial_data : "재무"
-    company ||--o{ disclosure : "공시"
+
+    company ||--o{ financial_statement : "재무제표"
+    company ||--o{ financial_ratio : "재무비율"
+    company ||--o{ disclosure_report : "공시"
     company ||--o{ stock_price : "시세"
-    company ||--o{ holdings : "보유 종목 매핑"
+    company ||--o{ holdings : "보유종목 매핑"
+
+    disclosure_report ||--|| disclosure_content : "원문"
 
     users {
         uuid id PK
@@ -59,11 +65,11 @@ erDiagram
         string password_hash
         string name
         date birth_date
-        string risk_profile "보수/중립/공격"
-        string investment_horizon "단기/중기/장기"
+        string risk_profile
+        string investment_horizon
         decimal target_return
         decimal max_drawdown_tolerance
-        json interest_sectors "[반도체, 금융, 소비재]"
+        json interest_sectors
         timestamp created_at
     }
 
@@ -71,41 +77,56 @@ erDiagram
         uuid id PK
         uuid user_id FK
         string stock_code FK
-        decimal weight "0.0~1.0"
+        decimal weight
         bigint avg_price
         int qty
         date bought_at
     }
 
     company {
-        varchar corp_code PK "DART 8자리"
-        varchar stock_code UK "종목 6자리"
+        varchar corp_code PK
+        varchar stock_code UK
         varchar corp_name
         varchar sector
         date listing_date
         timestamp created_at
-        timestamp updated_at
     }
 
-    financial_data {
+    financial_statement {
         bigint id PK
         varchar corp_code FK
         int bsns_year
-        varchar reprt_code "11011 등"
+        varchar reprt_code
+        varchar fs_div
         varchar account_nm
-        varchar std_account_nm
-        bigint thstrm_amount
+        bigint amount
         timestamp created_at
     }
 
-    disclosure {
-        varchar rcept_no PK "DART 14자리"
+    financial_ratio {
+        bigint id PK
+        varchar corp_code FK
+        int bsns_year
+        varchar reprt_code
+        varchar fs_div
+        decimal debt_ratio
+        decimal roe
+        timestamp created_at
+    }
+
+    disclosure_report {
+        varchar rcept_no PK
         varchar corp_code FK
         varchar report_nm
-        varchar flr_nm
         date rcept_dt
-        decimal sentiment_score "AI -1.0~1.0"
         timestamp created_at
+    }
+
+    disclosure_content {
+        varchar rcept_no PK
+        text content
+        text summary
+        timestamp updated_at
     }
 
     stock_price {
@@ -113,8 +134,14 @@ erDiagram
         varchar stock_code FK
         date base_date
         int close_price
-        bigint volume
         bigint market_cap
+        bigint volume
+        decimal per
+        decimal pbr
+        decimal dividend_yield
+        bigint foreign_net_buy
+        bigint institutional_net_buy
+        decimal short_ratio
         timestamp created_at
     }
 
@@ -122,7 +149,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         varchar stock_code
-        string action "BUY/HOLD/SELL"
+        string action
         decimal confidence
         decimal mos
         json tier1_output
@@ -130,7 +157,7 @@ erDiagram
     }
 ```
 
-> 📌 **데이터팀 확정 4 테이블** = `company`, `financial_data`, `disclosure`, `stock_price`
+> 📌 **데이터팀 확정 4 테이블** = `company`, `financial_statement`, `financial_ratio`, `disclosure_report`, `disclosure_content`, `stock_price`
 > 📌 **PM 추가 제안 3 테이블** = `users`, `holdings`, `analysis_history` (회원·포트·분석 이력 — 데이터팀 협의 후 확정)
 
 ### 2.2 RAG 문서/청크 (Postgres + pgvector)
