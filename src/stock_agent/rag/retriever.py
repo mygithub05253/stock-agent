@@ -16,66 +16,70 @@ def get_embedding_model() -> SentenceTransformer:
 def retrieve_news(ticker: str | None, query: str, k: int = 5) -> list[dict[str, Any]]:
     model = get_embedding_model()
     query_embedding = model.encode(query).tolist()
+    try:
+        with get_connection() as conn:
+            register_vector(conn)
 
-    with get_connection() as conn:
-        register_vector(conn)
+            with conn.cursor() as cur:
+                if ticker is None:
+                    cur.execute(
+                        """
+                        select
+                            id,
+                            stock_code,
+                            title,
+                            body,
+                            source_url,
+                            publisher,
+                            published_at,
+                            event_type,
+                            sentiment,
+                            1 - (embedding <=> %s::vector) as similarity
+                        from news_chunks
+                        where embedding is not null
+                        order by embedding <=> %s::vector
+                        limit %s::int
+                        """,
+                        (
+                            query_embedding,
+                            query_embedding,
+                            k,
+                        ),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        select
+                            id,
+                            stock_code,
+                            title,
+                            body,
+                            source_url,
+                            publisher,
+                            published_at,
+                            event_type,
+                            sentiment,
+                            1 - (embedding <=> %s::vector) as similarity
+                        from news_chunks
+                        where stock_code = %s::text
+                          and embedding is not null
+                        order by embedding <=> %s::vector
+                        limit %s::int
+                        """,
+                        (
+                            query_embedding,
+                            ticker,
+                            query_embedding,
+                            k,
+                        ),
+                    )
 
-        with conn.cursor() as cur:
-            if ticker is None:
-                cur.execute(
-                    """
-                    select
-                        id,
-                        stock_code,
-                        title,
-                        body,
-                        source_url,
-                        publisher,
-                        published_at,
-                        event_type,
-                        sentiment,
-                        1 - (embedding <=> %s::vector) as similarity
-                    from news_chunks
-                    where embedding is not null
-                    order by embedding <=> %s::vector
-                    limit %s::int
-                    """,
-                    (
-                        query_embedding,
-                        query_embedding,
-                        k,
-                    ),
-                )
-            else:
-                cur.execute(
-                    """
-                    select
-                        id,
-                        stock_code,
-                        title,
-                        body,
-                        source_url,
-                        publisher,
-                        published_at,
-                        event_type,
-                        sentiment,
-                        1 - (embedding <=> %s::vector) as similarity
-                    from news_chunks
-                    where stock_code = %s::text
-                      and embedding is not null
-                    order by embedding <=> %s::vector
-                    limit %s::int
-                    """,
-                    (
-                        query_embedding,
-                        ticker,
-                        query_embedding,
-                        k,
-                    ),
-                )
-
-            columns = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
+                columns = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+    except Exception:
+        # DB or vector index may be unavailable in test/dev environments.
+        # Return empty evidence set and let callers handle absence gracefully.
+        return []
 
     return [dict(zip(columns, row)) for row in rows]
 

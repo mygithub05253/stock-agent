@@ -83,7 +83,61 @@ def run_phase1_analysis(
     state = run_macro(state)
     state = run_strategist(state)
     state = run_investment_analyst(state)
-    state = run_guardrail(state)
+    # Guardrail is critical but must not crash the pipeline; capture exceptions.
+    try:
+        state = run_guardrail(state)
+    except Exception as exc:  # pragma: no cover - defensive path
+        # populate a conservative GuardrailResult on failure
+        from stock_agent.schemas.analysis import GuardrailResult
+
+        state.guardrail = GuardrailResult(
+            passed=False,
+            warnings=[f"Guardrail failed with exception: {exc.__class__.__name__}: {exc}"],
+            revised_headline=(state.strategist.headline if state.strategist else "") or "",
+            disclaimer="Guardrail evaluation failed; 일부 출력이 제한될 수 있습니다.",
+        )
+
+    # If guardrail softening/guarantee issues were detected, attempt an automatic rewrite
+    # up to a small number of retries to see if the content can be safely softened.
+    from stock_agent.agents import guardrail as guardrail_module
+
+    max_rewrites = 2
+    rewrite_attempts = 0
+    if state.guardrail and state.strategist:
+        gw = state.guardrail
+        # determine whether it's worth attempting an automatic rewrite
+        while rewrite_attempts < max_rewrites and not gw.passed and any(
+            kw in w.lower() for w in gw.warnings for kw in ("guarantee", "soften", "insufficient")
+        ):
+            rewrite_attempts += 1
+            # perform a conservative rewrite of the headline and re-evaluate
+            try:
+                strat = state.strategist
+                new_headline = guardrail_module._soften_headline(strat.headline or "")
+                strat.headline = new_headline
+                state = run_guardrail(state)
+                gw = state.guardrail
+                if gw.passed:
+                    break
+            except Exception:
+                break
+
+    # Apply Guardrail decisions to strategist output: soften or redact as needed
+    if state.guardrail and state.strategist:
+        gw = state.guardrail
+        strat = state.strategist
+        if not gw.passed:
+            # If PII or profanity detected, redact and downgrade signal
+            if any("PII" in w or "Inappropriate language" in w for w in gw.warnings):
+                strat.headline = "출력 제한: 민감 콘텐츠가 검출되어 일부 내용이 숨겨졌습니다."
+                strat.signal = "HOLD"
+                strat.confidence = max(0, strat.confidence - 30)
+                strat.suitability = max(0, strat.suitability - 30)
+                # reflect redact in guardrail revised_headline as well
+                gw.revised_headline = strat.headline
+            else:
+                # Otherwise, adopt the guardrail-revised headline (softened)
+                strat.headline = gw.revised_headline
 
     if state.strategist is None or state.guardrail is None:
         raise RuntimeError("analysis pipeline finished without strategist or guardrail output")
