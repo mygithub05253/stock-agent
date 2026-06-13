@@ -468,12 +468,12 @@
       },
       competitor: {
         name: "Competitor Agent", kr: "Peer 횡비교", ico: "ico-emerald", llm: true, owner: "이동원", state: "done",
-        role: "같은 섹터 Peer를 추출해 PER·PBR·ROE 등으로 횡비교하고 상대적 위치(percentile)를 계산합니다. 3단계 폴백으로 데모가 멈추지 않습니다.",
+        role: "같은 섹터 Peer를 시총·영업이익률(사업 경제성)·데이터 완성도 가중 복합 유사도로 선정해 PER·PBR·ROE 등으로 횡비교하고 상대적 위치(percentile)를 계산합니다. 3단계 폴백으로 데모가 멈추지 않습니다.",
         input: ["CuratorResult (stock_code·sector)"],
         output: ["CompetitorResult (peer_summary·peers·relative_position·percentile)"],
-        data: ["peer_tool (DB 정상 경로)", "MCP peer_data_server (pykrx 실시간 폴백)", "GLM narrative 병합"],
-        fallback: ["3단계: DB → MCP 실시간 시세(실데이터) → mock(최후) — #56"],
-        gap: ["MCP stdio 분리 시연(#6 1→2), Peer 선정 고도화, 비교 품질 회귀 평가"]
+        data: ["peer_tool (DB 정상 경로, peer_similarity 복합 유사도 선정 #62)", "MCP peer_data_server (pykrx 실시간 폴백, tools/list 핸드셰이크 #59)", "GLM narrative 병합"],
+        fallback: ["3단계: DB → MCP 실시간 시세(실데이터) → mock(최후) — #56·#59"],
+        gap: ["Peer 비교 품질 회귀 평가 골든셋, MCP stdio 외부 노출 확장"]
       },
       macro: {
         name: "Macro Agent", kr: "거시경제", ico: "ico-emerald", llm: false, owner: "melinamuun", state: "done",

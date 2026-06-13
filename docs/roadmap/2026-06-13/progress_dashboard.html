@@ -566,10 +566,10 @@
   <script>
     const TEAM = [
       {
-        name: "이동원", handle: "mygithub05253", percent: 86, tone: "strong", status: "강점 확장",
+        name: "이동원", handle: "mygithub05253", percent: 88, tone: "strong", status: "강점 확장",
         area: "Competitor · MCP 브리지 · RAGAS 평가 · Guardrail/Strategist 정비 · CI/Docker · PM 문서",
-        shipped: ["Competitor MCP stdio + tools/list 핸드셰이크 데모·자동테스트(#56·#59)", "Guardrail 게이팅·Strategist resilience 머지 정비(#50·#51·#55)", "RAGAS context_precision 추가(#60)·CI 안전망·발표 흐름도·팀 대시보드"],
-        focus: "context_recall reference 작성 후 재측정, 오픈웨이트 모델 설정 지원, 미배정 과제 담당 확정"
+        shipped: ["Competitor MCP tools/list 핸드셰이크(#59) + Peer 선정 복합 유사도 고도화(#62)", "RAGAS context_precision(#60) · CI 충돌마커 게이트(#63) · ERD 코드 정합(#64)", "Guardrail·Strategist 머지 정비(#50·#51·#55) · 발표 흐름도 · 팀 대시보드"],
+        focus: "context_recall reference 작성 후 재측정, 오픈웨이트 모델 설정 지원, 미배정 과제(#7·#10) 담당 확정"
       },
       {
         name: "백형준", handle: "vividbaek", percent: 66, tone: "watch", status: "핵심 레버 보유",
@@ -603,7 +603,7 @@
       { name: "RequestClassifier", percent: 75, owner: "백형준 중심", status: "strong", label: "실동작", evidence: "의도·범위·긴급도를 구조화하고 GLM 실패 시 기본 분류로 fallback.", focus: "분류 결과가 Graph 라우팅을 실제 변경하도록 연결(LangGraph 전환과 동반)." },
       { name: "Quant", percent: 66, owner: "윤수정", status: "focus", label: "강화 필요", evidence: "DART/가격 도구와 fallback 결과가 있고 테스트 보강(#53)됨. 실데이터 증거는 보강 여지.", focus: "DART retry와 부분 실패 허용, mock 의존 축소." },
       { name: "Qual", percent: 64, owner: "doyekeem · 윤수정", status: "focus", label: "P0 해소", evidence: "retrieve_*_with_fallback로 retriever 실패 try/except 처리 — 파이프라인 크래시 전파 제거(#52).", focus: "Hybrid/Reranker 연결과 RAGAS contexts 개선." },
-      { name: "Competitor", percent: 90, owner: "이동원", status: "strong", label: "강점", evidence: "peer_tool·캐시·DB fallback·MCP 실시간 시세(#56)에 더해 tools/list 핸드셰이크 데모·자동 통합테스트(#59) — stdio round-trip 실측 완료.", focus: "Peer 선정 고도화(시총·사업구성 유사도), 비교 품질 회귀 평가 추가." },
+      { name: "Competitor", percent: 92, owner: "이동원", status: "strong", label: "강점", evidence: "MCP tools/list 핸드셰이크 실측(#59) + Peer 선정 복합 유사도 고도화(#62: 시총·영업이익률·완성도 가중). 3단계 폴백·캐시 완비.", focus: "Peer 비교 품질 회귀 평가 골든셋 추가, MCP stdio 외부 노출 확장." },
       { name: "Macro", percent: 72, owner: "melinamuun", status: "strong", label: "연결됨", evidence: "run_phase1_analysis에서 run_macro 호출 + Strategist _WEIGHTS_WITH_MACRO(0.15) 실소비(#49).", focus: "실데이터 폭 확대, LangGraph 노드화." },
       { name: "Strategist", percent: 60, owner: "백형준", status: "focus", label: "부분실패 허용", evidence: "Quant·Qual·Competitor·Macro 가중 합성 + 일부 결손 허용(graceful degradation, #51). 전 케이스 HOLD 변별력은 과제.", focus: "BUY/SELL 변별력 강화, 골든셋 다양화." },
       { name: "InvestmentAnalyst", percent: 65, owner: "백형준", status: "focus", label: "sLLM 잔여", evidence: "GLM 분석과 fallback은 연결됐으나 OpenRouter 기본이 gpt-4o-mini라 오픈웨이트 sLLM 요구 미충족.", focus: "오픈웨이트 모델 실호출과 trace 증거 확보(#3 핵심)." },
@@ -616,7 +616,7 @@
       { no: 1, name: "Multi-Agent 구조", weight: 2, report: 2, now: 2, code: 2, target: 4, status: "watch", label: "정체", evidence: "역할 분리는 있으나 StateGraph·동적 라우팅·fan-out 부재. 코드 변화 없음 — 최대 레버." },
       { no: 2, name: "에러핸들링 & 폴백", weight: 2, report: 3, now: 3, code: 4, target: 4, status: "progress", label: "코드 상승", evidence: "Qual try/except(#52)·Strategist 부분실패 허용(#51)으로 잔여 구멍 해소. 재검증 시 4 기대." },
       { no: 3, name: "sLLM + 검증 + 관측", weight: 2, report: 2, now: 2, code: 3, target: 4, status: "watch", label: "부분 상승", evidence: "Guardrail 게이팅 구현(#50)으로 (b) 진전. 단 (a) 오픈웨이트 sLLM·(c) 관측 span은 여전히 미충족." },
-      { no: 4, name: "5대 설계문서", weight: 1, report: 3, now: 3, code: 3, target: 4, status: "watch", label: "캡 3", evidence: "유스케이스·인터페이스 정의서 부재, ERD-실제 SQL 정합 작업 일부 진행(erd.md 수정 커밋)." },
+      { no: 4, name: "5대 설계문서", weight: 1, report: 3, now: 3, code: 3, target: 4, status: "watch", label: "캡 3", evidence: "ERD-실제 SQL 정합 완료(#64: financial_data→financial_statement 정정 + 구현 상태표·미구현 명시). 잔여 캡 사유는 유스케이스·인터페이스 정의서 부재 — 작성 시 4~5." },
       { no: 5, name: "Dockerise", weight: 1, report: 2, now: 4, code: 4, target: 5, status: "strong", label: "공식 개선", evidence: "강사 Full 검증에서 build·DB healthy·app HTTP 200 확인. HEALTHCHECK·멀티스테이지로 5 도달 가능." },
       { no: 6, name: "MCP / A2A", weight: 1, report: 0, now: 0, code: 2, target: 2, status: "progress", label: "코드 상승", evidence: "Competitor 폴백이 stdio FastMCP 서버 호출(#56). #59에서 tools/list 핸드셰이크 명시·데모 스크립트·자동 통합테스트 추가 — initialize→tools/list→call_tool round-trip 실측(sector_roster 7개)." },
       { no: 7, name: "vLLM", weight: 1, report: 0, now: 0, code: 0, target: 1, status: "risk", label: "미배정", evidence: "로컬 모델 서빙 경로 없음. #3 오픈웨이트 작업과 묶으면 효율적." },
