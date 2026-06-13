@@ -45,8 +45,7 @@
 ### 2.1 Postgres 테이블 관계
 
 ```mermaid
-```mermaid
-erDiagram
+    erDiagram
 
     users ||--o{ holdings : "보유종목"
     users ||--o{ analysis_history : "분석이력"
