@@ -166,7 +166,7 @@ flowchart LR
     ECOS --> MC
 
     subgraph "저장소"
-        PG[(🗄 Postgres<br/>정형 데이터<br/>company / financial_statement /<br/>disclosure / stock_price /<br/>users / holdings)]
+        PG[(🗄 Postgres<br/>정형 데이터<br/>company / financial_statement /<br/>disclosure_report / stock_price /<br/>users · holdings 설계안)]
         VEC[(🔍 pgvector tables<br/>rag_documents / rag_chunks<br/>뉴스·공시 본문<br/>+ 임베딩 벡터)]
     end
 
