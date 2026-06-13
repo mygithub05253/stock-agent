@@ -3,6 +3,7 @@
 .claude/
 .serena/
 .venv/
+.venv-*/
 venv/
 semiconductor_agent/.env
 __pycache__/

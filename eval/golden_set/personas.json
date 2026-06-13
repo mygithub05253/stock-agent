@@ -1,0 +1,141 @@
+{
+  "version": "0.1",
+  "description": "골든셋 페르소나 입력. run_benchmark.py가 각 케이스를 Phase 1 파이프라인에 넣어 평가한다.",
+  "cases": [
+    {
+      "case_id": "park_minho_hold_review",
+      "persona": "박민호 — 40대 보수형 직장인, 삼성전자 장기 보유",
+      "query": "삼성전자 계속 가져가도 될까?",
+      "user_profile": {
+        "user_id": "golden-park-minho",
+        "risk_tolerance": "low",
+        "investment_horizon_months": 24,
+        "max_drawdown_tolerance": -0.05,
+        "liquidity_need_level": "high",
+        "preferred_sectors": ["반도체"]
+      },
+      "portfolio": {
+        "cash_weight": 0.3,
+        "holdings": [
+          {
+            "stock_code": "005930",
+            "corp_name": "삼성전자",
+            "sector": "반도체",
+            "weight": 0.7,
+            "avg_price": 72000,
+            "qty": 20,
+            "current_price": 78000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "kim_jiyeon_buy_more",
+      "persona": "김지연 — 30대 공격형, SK하이닉스 추가 매수 고민",
+      "query": "SK하이닉스 비중 늘려도 돼?",
+      "user_profile": {
+        "user_id": "golden-kim-jiyeon",
+        "risk_tolerance": "high",
+        "investment_horizon_months": 36,
+        "max_drawdown_tolerance": -0.25,
+        "liquidity_need_level": "low",
+        "preferred_sectors": ["반도체", "AI 인프라"]
+      },
+      "portfolio": {
+        "cash_weight": 0.4,
+        "holdings": [
+          {
+            "stock_code": "000660",
+            "corp_name": "SK하이닉스",
+            "sector": "반도체",
+            "weight": 0.6,
+            "avg_price": 185000,
+            "qty": 5,
+            "current_price": 201000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "lee_seojun_portfolio_review",
+      "persona": "이서준 — 20대 초보 투자자, 포트폴리오 전반 점검 요청",
+      "query": "요즘 내 포트폴리오에서 볼만한 종목 알려줘",
+      "user_profile": {
+        "user_id": "golden-lee-seojun",
+        "risk_tolerance": "medium",
+        "investment_horizon_months": 12,
+        "max_drawdown_tolerance": -0.1,
+        "liquidity_need_level": "medium",
+        "preferred_sectors": ["반도체", "금융"]
+      },
+      "portfolio": {
+        "cash_weight": 0.5,
+        "holdings": [
+          {
+            "stock_code": "005930",
+            "corp_name": "삼성전자",
+            "sector": "반도체",
+            "weight": 0.5,
+            "avg_price": 70000,
+            "qty": 5,
+            "current_price": 78000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "choi_eunseo_sell_decision",
+      "persona": "최은서 — 50대 보수형, 급락 시 손절 고민",
+      "query": "삼성전자 급락했는데 손절해야 해?",
+      "user_profile": {
+        "user_id": "golden-choi-eunseo",
+        "risk_tolerance": "low",
+        "investment_horizon_months": 6,
+        "max_drawdown_tolerance": -0.05,
+        "liquidity_need_level": "high",
+        "preferred_sectors": ["반도체"]
+      },
+      "portfolio": {
+        "cash_weight": 0.1,
+        "holdings": [
+          {
+            "stock_code": "005930",
+            "corp_name": "삼성전자",
+            "sector": "반도체",
+            "weight": 0.9,
+            "avg_price": 80000,
+            "qty": 30,
+            "current_price": 72000
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "jung_hana_news_check",
+      "persona": "정하나 — 30대 중립형, 공시 이슈 확인 요청",
+      "query": "삼성전자 공시 이슈 확인해줘",
+      "user_profile": {
+        "user_id": "golden-jung-hana",
+        "risk_tolerance": "medium",
+        "investment_horizon_months": 18,
+        "max_drawdown_tolerance": -0.15,
+        "liquidity_need_level": "medium",
+        "preferred_sectors": ["반도체"]
+      },
+      "portfolio": {
+        "cash_weight": 0.6,
+        "holdings": [
+          {
+            "stock_code": "005930",
+            "corp_name": "삼성전자",
+            "sector": "반도체",
+            "weight": 0.4,
+            "avg_price": 75000,
+            "qty": 8,
+            "current_price": 78000
+          }
+        ]
+      }
+    }
+  ]
+}

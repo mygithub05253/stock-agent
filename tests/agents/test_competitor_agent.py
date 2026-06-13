@@ -1,8 +1,20 @@
+from types import SimpleNamespace
+
 import pytest
 
 from stock_agent.agents import competitor as competitor_module
 from stock_agent.schemas.analysis import AgentState, CuratorResult, Portfolio, UserProfile
 from stock_agent.tools.peer_tool import PeerComparison, PeerMetricRow
+
+
+@pytest.fixture(autouse=True)
+def no_openrouter_key(monkeypatch):
+    """로컬 .env에 OpenRouter 키가 있어도 테스트가 실제 LLM을 호출(과금)하지 않도록 차단한다."""
+    monkeypatch.setattr(
+        competitor_module,
+        "get_settings",
+        lambda: SimpleNamespace(openrouter_api_key=None),
+    )
 
 
 def _state_with_curator() -> AgentState:

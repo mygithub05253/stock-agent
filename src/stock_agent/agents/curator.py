@@ -22,28 +22,45 @@ _COMPANY_ALIASES = {
     "sk하이닉스": {
         "corp_name": "SK하이닉스",
         "stock_code": "000660",
-        "corp_code": None,
+        "corp_code": "00164779",
         "sector": "반도체",
     },
     "하이닉스": {
         "corp_name": "SK하이닉스",
         "stock_code": "000660",
-        "corp_code": None,
+        "corp_code": "00164779",
         "sector": "반도체",
     },
     "kb금융": {
         "corp_name": "KB금융",
         "stock_code": "105560",
-        "corp_code": None,
+        "corp_code": "00688996",
         "sector": "금융",
     },
     "신한지주": {
         "corp_name": "신한지주",
         "stock_code": "055550",
-        "corp_code": None,
+        "corp_code": "00382199",
         "sector": "금융",
     },
 }
+
+# Curator 설계 원칙: KRX 종목코드와 DART corp_code를 "함께" 반환해야 한다.
+# GLM 응답이나 보유종목 경로에서 corp_code가 비면 Quant/Qual의 DART 재무 조회가
+# 전부 실패하므로, 알려진 종목은 카탈로그에서 corp_code를 보충한다.
+_STOCK_TO_CORP = {
+    alias["stock_code"]: alias["corp_code"]
+    for alias in _COMPANY_ALIASES.values()
+    if alias.get("corp_code")
+}
+
+
+def _resolve_corp_code(stock_code: str | None, corp_code: str | None) -> str | None:
+    if corp_code:
+        return corp_code
+    if stock_code:
+        return _STOCK_TO_CORP.get(stock_code)
+    return None
 
 
 def run_curator(state: AgentState) -> AgentState:
@@ -103,7 +120,7 @@ def run_curator(state: AgentState) -> AgentState:
                         intent=intent,
                         corp_name=selected["corp_name"],
                         stock_code=selected["stock_code"],
-                        corp_code=selected.get("corp_code"),
+                        corp_code=_resolve_corp_code(selected["stock_code"], selected.get("corp_code")),
                         sector=selected["sector"],
                         candidates=list(candidates),
                         warnings=list(warnings),
@@ -171,7 +188,7 @@ def run_curator(state: AgentState) -> AgentState:
         intent=intent,
         corp_name=selected["corp_name"],
         stock_code=selected["stock_code"],
-        corp_code=selected["corp_code"],
+        corp_code=_resolve_corp_code(selected["stock_code"], selected["corp_code"]),
         sector=selected["sector"],
         candidates=candidates,
         warnings=warnings,

@@ -46,6 +46,7 @@
 | 공통 개발환경 | 구현됨 | Docker Compose로 `Streamlit app + Postgres pgvector` 실행 |
 | RAG 저장소 | 방향 확정 | MVP 기본은 Postgres + pgvector, Chroma는 optional backend 후보 |
 | LangSmith | 준비 중 | 환경변수 placeholder만 반영, 실제 tracing 모듈은 후속 작업 |
+| CI 안전망 | 구현됨 | `.github/workflows/ci.yml` — compileall + pytest 게이트로 PR 자동 검증 |
 
 ### 주요 에이전트
 1. **InvestorProfile Agent** — 온보딩 답변 → 투자성향·기간·손실감내·유동성 니즈 구조화
@@ -429,6 +430,8 @@ PM이 주로 관리하는 문서들:
 | `docs/architecture/backtesting_demo_dashboard.html` | 발표 자료와 스크린샷에 바로 쓸 수 있는 백테스팅 검증 아키텍처 HTML 시각화 | PM·전원 |
 | `docs/functional-spec/demo/D1_backtesting_validation_spec_v0.1.md` | 중간 시연용 백테스팅 검증 모드 기능 명세 | 개발팀·PM |
 | `docs/roadmap/<날짜>/roadmap_dashboard.html` | 주간 진행 현황·완료/할 일·의사결정을 한 화면에서 보는 인터랙티브 로드맵 대시보드 (예: `docs/roadmap/2026-05-23/`) | 전원 |
+| `docs/roadmap/2026-06-12/progress_dashboard.html` | 강사님 재검토 공식 점수와 팀원별 파트·에이전트별 구현도·집중 피드백·미배정 과제를 추적하는 인터랙티브 작업 현황 대시보드 | 전원 |
+| `docs/guides/2026-06-13/streamlit_usage_guide.html` | Streamlit UI 실행·테스트 사용 가이드 — 실제 화면 스크린샷 6장과 단계별 설명, FAQ 포함 | 전원 (특히 신규 팀원) |
 | `docs/architecture/erd.md` | DB ERD | 데이터팀·백엔드 |
 | `docs/architecture/agent_design.md` | 6 에이전트 상세 설계 | 에이전트 담당 |
 | `docs/operations/llm_cost_guide.md` | LLM 비용 절감 가이드 | 에이전트 담당·PM |
@@ -480,6 +483,9 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-13 | v1.8 | 강사님 재검토 32/70(D) 원문 보관, 팀원·에이전트별 작업 현황 대시보드 확장 |
+| 2026-06-13 | v1.7 | Streamlit UI 사용 가이드(스크린샷 포함) 추가, RAGAS 실데이터 실측·Macro Agent 머지 반영 |
+| 2026-06-12 | v1.6 | CI 안전망 추가, OpenRouter 재시도, 루브릭 진행도 대시보드 추가 |
 | 2026-05-23 | v1.5 | 백테스팅 기반 AI 예측 검증 프로세스 문서화 — 5월 22일 타깃 예측일, 1/2/4주 마스킹, Supabase 단일 DB, HTML 아키텍처 시각화 추가 |
 | 2026-05-23 | v1.4 | 주간 로드맵 대시보드(`docs/roadmap/2026-05-23/`) 추가 — DART·매크로 수집 범위, 벡터DB(pgvector/Chroma), OpenRouter 도입 결정 항목 정리 |
 | 2026-05-23 | v1.3 | PM 문서 기반 인터랙티브 시스템 아키텍처 대시보드 추가, `docs/notion/` 문서 영역 반영 |

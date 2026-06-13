@@ -40,14 +40,20 @@ docs/
 │   ├── db_connection_guide.md              ← 로컬/Supabase DB 연결 전환 가이드
 │   ├── llm_cost_guide.md                   ← LLM 비용 절감 가이드
 │   └── pm_workflow_guide.md                ← PM 문서 작성/협업 가이드
+├── feedback/                               ← 외부 피드백 원문 + 갭 분석·대응 계획
+│   ├── README.md                           ← 피드백 보관 규칙 / 인덱스
+│   ├── 2026-05-31_강사검토리포트_d24b475.md ← 강사님 검토 리포트 원문 (20/70, 루브릭 10항목)
+│   └── 2026-06-13_갭분석_파트별_강화계획_v1.0.md ← 피드백 대비 파트별 강화·구현 계획
 ├── decisions/                              ← ADR (Architecture Decision Records)
 │   ├── ADR-001-data-arch-postgres-pgvector.md
 │   ├── ADR-002-critic-separation-vs-merge.md
 │   ├── ADR-003-six-agent-structure.md
 │   └── ADR-004-monthly-cost-cap.md
 ├── roadmap/
-│   └── 2026-05-23/
-│       └── roadmap_dashboard.html
+│   ├── 2026-05-23/
+│   │   └── roadmap_dashboard.html
+│   └── 2026-06-12/
+│       └── progress_dashboard.html         ← 루브릭 진행도 대시보드 (리포트→현재→목표)
 ├── notion/                                 ← 노션 원본/정리본 보관
 │   ├── architecture.md
 │   ├── database.md

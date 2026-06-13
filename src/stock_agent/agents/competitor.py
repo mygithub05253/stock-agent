@@ -98,6 +98,12 @@ def _generate_narrative(comparison: PeerComparison) -> dict[str, Any] | None:
     if key in _narrative_cache:
         return _narrative_cache[key]
 
+    # 키에 날짜가 들어가므로 날짜가 바뀌면 어제 항목은 다시 조회되지 않는다.
+    # 장기 실행 프로세스에서 캐시가 무한히 쌓이지 않도록 오늘 키만 남긴다.
+    today_suffix = f"_{date.today().isoformat()}"
+    for stale_key in [k for k in _narrative_cache if not k.endswith(today_suffix)]:
+        del _narrative_cache[stale_key]
+
     try:
         result = openrouter_chat_json(
             [

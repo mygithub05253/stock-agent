@@ -1,0 +1,38 @@
+{
+  "version": "0.1",
+  "description": "케이스별 기대 결과. rule-based 채점(run_benchmark.py)이 이 기준과 실제 출력을 비교한다.",
+  "common": {
+    "allowed_signals": ["BUY", "HOLD", "SELL"],
+    "disclaimer_must_contain": "투자 권유",
+    "confidence_range": [0, 100],
+    "suitability_range": [0, 100]
+  },
+  "cases": {
+    "park_minho_hold_review": {
+      "expected_stock_code": "005930",
+      "expected_intent": "holding_review",
+      "notes": "보수형 + 비중 70%이므로 suitability가 낮게 보정되어야 한다."
+    },
+    "kim_jiyeon_buy_more": {
+      "expected_stock_code": "000660",
+      "expected_intent": ["risk_review", "holding_review"],
+      "notes": "공격형이므로 동일 종목 대비 suitability가 보수형보다 높아야 한다. 비중 확대 질문은 risk/holding 둘 다 합리적 분류로 허용한다."
+    },
+    "lee_seojun_portfolio_review": {
+      "expected_intent": "portfolio_review",
+      "expect_candidates": true,
+      "notes": "특정 종목이 없으므로 Curator가 후보를 제시해야 한다."
+    },
+    "choi_eunseo_sell_decision": {
+      "expected_stock_code": "005930",
+      "expected_intent": "sell_decision",
+      "expected_urgency": "drop",
+      "notes": "급락 표현이 urgency_reason=drop으로 분류되어야 한다."
+    },
+    "jung_hana_news_check": {
+      "expected_stock_code": "005930",
+      "expected_urgency": "news",
+      "notes": "공시 키워드가 urgency_reason=news로 분류되어야 한다."
+    }
+  }
+}

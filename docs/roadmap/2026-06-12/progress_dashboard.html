@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 팀 작업 현황 대시보드 · 2026-06-13</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --emerald: #059669;
+      --emerald-soft: #ecfdf5;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --red: #dc2626;
+      --red-soft: #fef2f2;
+      --violet: #7c3aed;
+      --violet-soft: #f5f3ff;
+      --slate-soft: #f1f5f9;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Pretendard, "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    a { color: inherit; text-decoration: none; }
+    code {
+      border-radius: 5px;
+      background: var(--slate-soft);
+      padding: 1px 5px;
+      color: #334155;
+      font-size: 0.92em;
+    }
+    button { font: inherit; }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(6px);
+    }
+    .header-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--blue);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .logo-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .logo-sub { font-size: 12px; color: var(--muted); }
+    nav.topnav { display: none; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
+    nav.topnav a { padding: 6px 9px; border-radius: 8px; }
+    nav.topnav a:hover { background: var(--slate-soft); color: var(--text); }
+    @media (min-width: 900px) { nav.topnav { display: flex; } }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+    section { margin-top: 34px; scroll-margin-top: 82px; }
+    .card, .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+    }
+    .card { padding: 20px; }
+    .section-label {
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .section-title { margin-top: 4px; font-size: 22px; font-weight: 800; }
+    .section-desc { max-width: 850px; margin-top: 6px; color: var(--muted); font-size: 14px; }
+    .section-note {
+      margin-top: 14px;
+      border-left: 4px solid var(--blue);
+      border-radius: 0 10px 10px 0;
+      background: var(--blue-soft);
+      padding: 11px 14px;
+      color: #1e3a8a;
+      font-size: 13px;
+    }
+
+    .hero { display: grid; gap: 16px; margin-top: 0; }
+    @media (min-width: 920px) { .hero { grid-template-columns: 1.45fr 0.55fr; } }
+    .hero h1 { margin-top: 10px; font-size: 27px; font-weight: 800; line-height: 1.35; }
+    @media (min-width: 640px) { .hero h1 { font-size: 34px; } }
+    .hero .lede { max-width: 760px; margin-top: 12px; color: var(--muted); }
+    .score-journey {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      align-items: stretch;
+      gap: 6px;
+    }
+    .score-step { border-radius: 10px; padding: 12px 10px; text-align: center; }
+    .score-step .lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .score-step .val { margin-top: 2px; font-size: 22px; font-weight: 800; }
+    .score-step .sub { color: var(--muted); font-size: 11px; }
+    .score-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 18px; font-weight: 700; }
+    .step-report { border: 1px solid #fecaca; background: var(--red-soft); }
+    .step-report .lbl, .step-report .val { color: var(--red); }
+    .step-now { border: 1px solid #bfdbfe; background: var(--blue-soft); }
+    .step-now .lbl, .step-now .val { color: var(--blue); }
+    .step-target { border: 1px solid #a7f3d0; background: var(--emerald-soft); }
+    .step-target .lbl, .step-target .val { color: var(--emerald); }
+    @media (max-width: 600px) {
+      .score-journey { grid-template-columns: 1fr; }
+      .score-arrow { transform: rotate(90deg); min-height: 18px; }
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .dot-report { background: #f87171; }
+    .dot-now { background: var(--blue); }
+    .dot-target { background: #34d399; }
+    aside.meta dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    aside.meta .stat { border-radius: 10px; background: var(--slate-soft); padding: 10px 12px; }
+    aside.meta dt { color: var(--muted); font-size: 12px; }
+    aside.meta dd { margin-top: 2px; font-size: 18px; font-weight: 800; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      padding: 4px 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .method-grid, .team-grid, .agent-grid, .rubric-grid, .focus-grid, .unassigned-grid {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    @media (min-width: 760px) {
+      .method-grid { grid-template-columns: repeat(4, 1fr); }
+      .team-grid, .agent-grid, .rubric-grid, .focus-grid { grid-template-columns: 1fr 1fr; }
+      .unassigned-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .method-card { padding: 15px; }
+    .method-card strong { display: block; font-size: 14px; }
+    .method-card p { margin-top: 5px; color: var(--muted); font-size: 12px; }
+
+    .team-card, .agent-card, .rubric-card, .focus-card, .unassigned-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      padding: 16px;
+    }
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .card-title { font-size: 16px; font-weight: 800; }
+    .card-subtitle { margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .percent { color: var(--blue); font-size: 22px; font-weight: 800; white-space: nowrap; }
+    .progress-track { height: 10px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: var(--slate-soft); }
+    .progress-fill { width: 0; height: 100%; border-radius: 999px; background: var(--blue); transition: width 700ms ease; }
+    .progress-fill.strong { background: var(--emerald); }
+    .progress-fill.risk { background: var(--red); }
+    .progress-fill.watch { background: var(--amber); }
+    .detail-block { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+    .detail-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+    .detail-block p, .detail-block ul { margin-top: 5px; color: var(--muted); font-size: 13px; }
+    .detail-block ul { margin-left: 17px; }
+    .detail-block li { margin-top: 3px; }
+    .focus-line {
+      margin-top: 12px;
+      border-left: 4px solid var(--amber);
+      border-radius: 0 8px 8px 0;
+      background: var(--amber-soft);
+      padding: 9px 11px;
+      color: #92400e;
+      font-size: 13px;
+    }
+
+    .badge, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge { padding: 3px 8px; }
+    .tag { padding: 2px 8px; }
+    .badge-strong, .tag-done { background: var(--emerald-soft); color: var(--emerald); }
+    .badge-progress, .tag-now { background: var(--blue-soft); color: var(--blue); }
+    .badge-watch, .tag-owner { background: var(--amber-soft); color: var(--amber); }
+    .badge-risk, .tag-risk { background: var(--red-soft); color: var(--red); }
+    .badge-unassigned, .badge-weight { background: var(--violet-soft); color: var(--violet); }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+    .filter-button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      padding: 6px 11px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .filter-button:hover, .filter-button.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
+    .agent-card[hidden] { display: none; }
+    .agent-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .evidence { margin-top: 10px; color: var(--muted); font-size: 12px; }
+    .evidence strong { color: var(--text); }
+
+    .rubric-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .rubric-name { font-size: 15px; font-weight: 700; }
+    .rubric-no { margin-right: 4px; color: var(--muted); font-weight: 600; }
+    .badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .bars { display: grid; gap: 8px; margin-top: 12px; }
+    .bar-row { display: grid; grid-template-columns: 62px 1fr 64px; align-items: center; gap: 8px; font-size: 12px; }
+    .bar-label { color: var(--muted); font-weight: 600; }
+    .bar-track { height: 10px; overflow: hidden; border-radius: 999px; background: var(--slate-soft); }
+    .bar-fill { width: 0; height: 100%; border-radius: 999px; transition: width 700ms ease; }
+    .bar-fill.report { background: #f87171; }
+    .bar-fill.now { background: var(--blue); }
+    .bar-fill.target { background: #34d399; }
+    .bar-val { text-align: right; font-weight: 700; }
+    .rubric-evidence { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; color: var(--muted); font-size: 13px; }
+    .rubric-evidence strong { color: var(--text); font-weight: 600; }
+
+    .focus-card { border-left: 4px solid var(--amber); }
+    .focus-card.high { border-left-color: var(--red); }
+    .focus-card h3, .unassigned-card h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 14px; }
+    .focus-card p, .unassigned-card p { margin-top: 7px; color: var(--muted); font-size: 13px; }
+    .focus-card ul, .unassigned-card ul { margin: 8px 0 0 18px; color: var(--muted); font-size: 13px; }
+    .focus-card li, .unassigned-card li { margin-top: 3px; }
+
+    .timeline { display: grid; gap: 0; margin-top: 18px; }
+    .tl-item { display: grid; grid-template-columns: 36px 1fr; gap: 12px; }
+    .tl-rail { display: flex; flex-direction: column; align-items: center; }
+    .tl-dot {
+      width: 27px;
+      height: 27px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--blue);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .tl-item.current .tl-dot { background: var(--red); }
+    .tl-line { width: 2px; flex: 1; margin: 4px 0; background: var(--border); }
+    .tl-item:last-child .tl-line { display: none; }
+    .tl-body { padding-bottom: 19px; }
+    .tl-body h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 14px; }
+    .tl-body p { margin-top: 4px; color: var(--muted); font-size: 13px; }
+
+    .source-list { margin-top: 16px; overflow: hidden; }
+    .source-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      padding: 11px 0;
+      font-size: 13px;
+    }
+    .source-row:first-child { border-top: 0; }
+    .source-row strong { color: var(--muted); }
+    .source-row a { color: var(--blue); font-weight: 600; }
+    footer { margin-top: 42px; text-align: center; color: var(--muted); font-size: 12px; }
+    @media (max-width: 600px) {
+      .source-row { grid-template-columns: 1fr; gap: 3px; }
+      .bar-row { grid-template-columns: 54px 1fr 55px; }
+      .team-card, .agent-card, .rubric-card, .focus-card, .unassigned-card { padding: 14px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .progress-fill, .bar-fill { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a class="logo" href="#top">
+        <span class="logo-badge">SA</span>
+        <span>
+          <span class="logo-title">stock-agent</span><br />
+          <span class="logo-sub">팀 작업 현황 대시보드 · 2026-06-13</span>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="#team">팀원별</a>
+        <a href="#agents">에이전트별</a>
+        <a href="#rubric">루브릭</a>
+        <a href="#feedback">집중 피드백</a>
+        <a href="#roadmap">실행 순서</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="card">
+        <p class="section-label">2026-06-13 강사 공식 재검토 반영</p>
+        <h1>RAGAS 게이트를 해제해 D등급 진입, 이제 핵심 에이전트의 실동작을 연결할 차례</h1>
+        <p class="lede">
+          강사님 재검토는 커밋 <strong>93487d3</strong>을 Full 모드로 검증해
+          <strong>32/70 · D등급</strong>을 확정했습니다. Docker 빌드·기동·HTTP 200과 RAGAS 실호출은 강점으로 인정됐지만,
+          LangGraph·sLLM·Guardrail 게이팅·Hybrid RAG는 여전히 선언 또는 미구현 수준입니다.
+          이 대시보드는 팀원 개인을 평가하지 않고, GitHub 기여 이력으로 추정한 <strong>담당 파트의 구현도와 다음 완료 기준</strong>을 보여줍니다.
+        </p>
+        <div class="score-journey">
+          <div class="score-step step-report">
+            <div class="lbl">최초 검토 (05-31)</div>
+            <div class="val">20 / 70</div>
+            <div class="sub">F등급 · RAGAS 게이트</div>
+          </div>
+          <div class="score-arrow">→</div>
+          <div class="score-step step-now">
+            <div class="lbl">공식 재검토 (06-13)</div>
+            <div class="val">32 / 70</div>
+            <div class="sub">D등급 · 게이트 없음</div>
+          </div>
+          <div class="score-arrow">→</div>
+          <div class="score-step step-target">
+            <div class="lbl">팀 제안 목표</div>
+            <div class="val">46 / 70</div>
+            <div class="sub">핵심 실동작 연결</div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="dot dot-report"></i>최초 공식 점수</span>
+          <span><i class="dot dot-now"></i>최신 공식 점수</span>
+          <span><i class="dot dot-target"></i>파트별 강화 목표</span>
+        </div>
+      </div>
+
+      <aside class="card meta">
+        <h2 style="font-size:15px; font-weight:700;">이번 대시보드 기준</h2>
+        <div class="pill-row">
+          <span class="pill">강사 재검토 93487d3</span>
+          <span class="pill">분석 기준 main 26144e0</span>
+          <span class="pill">GitHub 협업자 5명</span>
+        </div>
+        <dl>
+          <div class="stat"><dt>공식 개선 폭</dt><dd>+12</dd></div>
+          <div class="stat"><dt>에이전트 모듈</dt><dd>10</dd></div>
+          <div class="stat"><dt>집중 피드백</dt><dd>6</dd></div>
+          <div class="stat"><dt>미배정 과제</dt><dd>3</dd></div>
+        </dl>
+        <p style="margin-top:12px; font-size:12px; color:var(--muted);">
+          공식 점수는 강사 재검토 결과만 사용합니다. 이후 main에 머지된 Macro Agent·실데이터 측정·문서는
+          점수 상승이 재검증되기 전까지 구현 근거로만 표시합니다.
+        </p>
+      </aside>
+    </section>
+
+    <section id="method">
+      <p class="section-label">Reading Guide</p>
+      <h2 class="section-title">구현도 산정 기준</h2>
+      <p class="section-desc">구현도는 코드 줄 수나 커밋 수가 아니라, 실제 서비스 경로에서 동작하는 정도를 네 축으로 판단한 작업 계획용 지표입니다.</p>
+      <div class="method-grid">
+        <article class="panel method-card"><strong>핵심 로직 30%</strong><p>에이전트 책임에 맞는 계산·판단 로직과 입출력 계약이 있는가.</p></article>
+        <article class="panel method-card"><strong>실행 경로 연결 30%</strong><p>파이프라인과 UI에서 실제 호출되고 다음 에이전트가 결과를 소비하는가.</p></article>
+        <article class="panel method-card"><strong>폴백·테스트 20%</strong><p>DB·LLM 실패 시 안전하게 동작하고 회귀 테스트가 있는가.</p></article>
+        <article class="panel method-card"><strong>검증 증거 20%</strong><p>강사 채점 기준으로 실행 결과·리포트·문서 정합을 증명할 수 있는가.</p></article>
+      </div>
+    </section>
+
+    <section id="team">
+      <p class="section-label">Team Ownership</p>
+      <h2 class="section-title">팀원별 파트 구현도</h2>
+      <p class="section-desc">GitHub 협업자와 실제 파일 기여 이력으로 담당 파트를 추정했습니다. 퍼센트는 개인 역량 평가가 아니라 현재 담당 코드 영역의 완성도입니다.</p>
+      <div class="team-grid" id="teamGrid"></div>
+    </section>
+
+    <section id="agents">
+      <p class="section-label">Agent Readiness</p>
+      <h2 class="section-title">에이전트별 구현 현황</h2>
+      <p class="section-desc">에이전트 코드 존재 여부보다 파이프라인 연결과 강사 채점 가능한 실동작을 더 크게 반영했습니다.</p>
+      <div class="toolbar" aria-label="에이전트 상태 필터">
+        <button class="filter-button active" type="button" data-filter="all">전체</button>
+        <button class="filter-button" type="button" data-filter="strong">강점</button>
+        <button class="filter-button" type="button" data-filter="focus">집중 피드백</button>
+        <button class="filter-button" type="button" data-filter="disconnected">미연결</button>
+      </div>
+      <div class="agent-grid" id="agentGrid"></div>
+    </section>
+
+    <section id="rubric">
+      <p class="section-label">Official Rubric Scoreboard</p>
+      <h2 class="section-title">루브릭 10항목 공식 재검토 결과</h2>
+      <p class="section-desc">현재값은 2026-06-13 강사 재검토의 공식 점수입니다. 목표값은 파트별 강화 계획에서 제안한 다음 재검토 목표입니다.</p>
+      <p class="section-note">
+        최초 리포트 원문은 종합 점수를 <strong>20/70</strong>으로 확정했지만, 공개된 항목별 점수를 그대로 가중 합산하면
+        22점입니다. 아래 최초 항목값은 원문을 수정하지 않고 유지하며, 상단 총점은 공식 종합 점수 20점을 따릅니다.
+      </p>
+      <div class="rubric-grid" id="rubricGrid"></div>
+    </section>
+
+    <section id="feedback">
+      <p class="section-label">Instructor Feedback</p>
+      <h2 class="section-title">지금 가장 집중해야 할 피드백</h2>
+      <p class="section-desc">강사님이 명시한 우선순위와 가중치 효과를 기준으로, 팀 작업 순서를 다시 압축했습니다.</p>
+      <div class="focus-grid">
+        <article class="focus-card high">
+          <h3><span class="tag tag-risk">P0</span> Qual 폴백 구멍부터 닫기</h3>
+          <p><code>qual.py</code>는 retriever 실패를 잡지 않아 DB·임베딩 환경 문제를 전체 파이프라인 크래시로 전파합니다.</p>
+          <ul><li>retriever 호출 try/except + 빈 결과 fallback</li><li>CI 제외 테스트 3건 재활성화</li><li>담당: doyekeem 중심, 윤수정 협업</li></ul>
+        </article>
+        <article class="focus-card high">
+          <h3><span class="tag tag-risk">P0</span> 오픈웨이트 sLLM 실호출</h3>
+          <p>현재 OpenRouter 기본 모델은 <code>openai/gpt-4o-mini</code>라 항목 #3의 sLLM 요구를 충족하지 못합니다.</p>
+          <ul><li>300B 이하 오픈웨이트 모델을 기본 또는 검증 노드에 연결</li><li>Guardrail 게이팅·관측과 묶어 #3 가중점 회복</li><li>담당: 백형준 중심, 이동원 설정·평가 지원</li></ul>
+        </article>
+        <article class="focus-card">
+          <h3><span class="tag tag-owner">P1</span> LangGraph StateGraph 전환</h3>
+          <p>역할별 파일은 분리돼 있지만 실행은 여전히 순차 함수 호출입니다. Multi-Agent 차별성이 가장 크게 막힌 지점입니다.</p>
+          <ul><li>worker fan-out + Strategist join + 조건부 라우팅</li><li>Macro Agent도 실행 경로에 포함</li><li>담당: 백형준, melinamuun 협업</li></ul>
+        </article>
+        <article class="focus-card">
+          <h3><span class="tag tag-owner">P1</span> RAGAS 지표 확장과 실데이터 재측정</h3>
+          <p>RAGAS는 공식 4점을 받았지만 context precision/recall과 키 없는 재실행 증거가 부족합니다.</p>
+          <ul><li>context_precision·context_recall·relevancy 포함</li><li>Qual RAG 수정 후 누적 리포트 생성</li><li>담당: 이동원, doyekeem 협업</li></ul>
+        </article>
+        <article class="focus-card">
+          <h3><span class="tag tag-owner">P2</span> Hybrid + Reranker 실연결</h3>
+          <p>DB의 tsvector GIN 인덱스는 준비됐지만 검색 코드는 pgvector 단독입니다.</p>
+          <ul><li>키워드 + 벡터 RRF 결합</li><li>reranker와 청킹 추가</li><li>담당: doyekeem</li></ul>
+        </article>
+        <article class="focus-card">
+          <h3><span class="tag tag-owner">P2</span> Strategist 변별력과 Guardrail 게이팅</h3>
+          <p>골든셋이 전부 HOLD이고 Guardrail은 <code>passed=True</code> 고정이라 최종 판단 품질을 증명하기 어렵습니다.</p>
+          <ul><li>Macro 포함 가중 종합과 부분 실패 허용</li><li>passed=False + 재합성 경로</li><li>담당: 백형준, melinamuun 협업</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="unassigned">
+      <p class="section-label">Ownership Needed</p>
+      <h2 class="section-title">미배정 과제</h2>
+      <p class="section-desc">다음 회의에서 담당자를 정해야 실제 일정으로 전환됩니다. 작은 실동작 1개를 먼저 만드는 최소구현 경로를 제안합니다.</p>
+      <div class="unassigned-grid">
+        <article class="unassigned-card">
+          <h3><span class="badge badge-unassigned">미배정</span> #6 MCP / A2A</h3>
+          <p>금융 Tool 1개를 MCP 서버로 노출하고 <code>tools/list</code> 핸드셰이크를 증명합니다.</p>
+          <ul><li>예상 효과: 0→1~2</li><li>추천 파트: 데이터 Tool 담당</li></ul>
+        </article>
+        <article class="unassigned-card">
+          <h3><span class="badge badge-unassigned">미배정</span> #7 vLLM</h3>
+          <p>로컬 소형 모델 1개를 Guardrail 또는 검증 노드 한 경로에 연결합니다.</p>
+          <ul><li>예상 효과: 0→1~2</li><li>추천 파트: LLM·Graph 담당</li></ul>
+        </article>
+        <article class="unassigned-card">
+          <h3><span class="badge badge-unassigned">미배정</span> #10 스트리밍·비동기</h3>
+          <p><code>st.write_stream</code> 토큰 출력과 worker 병렬 실행을 LangGraph 전환에 함께 묶습니다.</p>
+          <ul><li>예상 효과: 1→3~4</li><li>추천 파트: UI·Graph 담당</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <p class="section-label">Execution Order</p>
+      <h2 class="section-title">P0~P3 실행 순서</h2>
+      <div class="timeline">
+        <div class="tl-item current">
+          <div class="tl-rail"><div class="tl-dot">P0</div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h3>파이프라인 안정성 복원 <span class="tag tag-risk">즉시</span></h3>
+            <p>Qual fallback 복원, CI 제외 테스트 재활성화, Macro를 pipeline에 연결합니다. 담당: doyekeem·윤수정·백형준·melinamuun.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-rail"><div class="tl-dot">P1</div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h3>가중 ×2 항목 회복 <span class="tag tag-owner">최대 레버리지</span></h3>
+            <p>오픈웨이트 sLLM, LangGraph fan-out, Guardrail 게이팅·관측, RAGAS 실데이터 지표 확장을 완료합니다.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-rail"><div class="tl-dot">P2</div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h3>분석 품질 고도화 <span class="tag tag-now">품질</span></h3>
+            <p>Hybrid/Reranker, Macro→Strategist 반영, Quant·GLM retry, BUY/HOLD/SELL 변별력을 강화합니다.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-rail"><div class="tl-dot">P3</div></div>
+          <div class="tl-body">
+            <h3>미배정 항목 최소 실동작 <span class="tag tag-owner">PM 배정 필요</span></h3>
+            <p>MCP, vLLM, 스트리밍·비동기에서 각각 재현 가능한 한 경로를 만들고 증거를 남깁니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sources">
+      <p class="section-label">Evidence</p>
+      <h2 class="section-title">근거와 해석 범위</h2>
+      <div class="card source-list">
+        <div class="source-row"><strong>최신 공식 점수</strong><span><a href="../../feedback/2026-06-13_강사재검토리포트_93487d3.md">강사 재검토 리포트 93487d3</a> · 32/70(D), Full 동적 검증</span></div>
+        <div class="source-row"><strong>파트별 계획</strong><span><a href="../../feedback/2026-06-13_갭분석_파트별_강화계획_v1.0.md">갭 분석 및 파트별 강화 계획 v1.0</a></span></div>
+        <div class="source-row"><strong>현재 코드 기준</strong><span><code>main@26144e0</code> · Macro·실데이터 RAGAS·UI 가이드·갭분석 머지 포함</span></div>
+        <div class="source-row"><strong>담당자 기준</strong><span>GitHub 협업자 5명과 파일별 기여 이력 기반 추정. 최종 배정은 PM·팀 합의가 우선입니다.</span></div>
+      </div>
+    </section>
+
+    <footer>
+      stock-agent · 팀 작업 현황 대시보드 · 기준일 2026-06-13 (KST)<br />
+      공식 점수와 자체 구현도를 분리했으며, 점수 상승은 다음 강사 재검토 전까지 확정하지 않습니다.
+    </footer>
+  </main>
+
+  <script>
+    const TEAM = [
+      {
+        name: "이동원", handle: "mygithub05253", percent: 82, tone: "strong", status: "강점 확장",
+        area: "Competitor · RAGAS 평가 · CI/Docker · PM 문서",
+        shipped: ["Competitor peer 비교·OpenRouter fallback", "RAGAS 하네스·실데이터 베이스라인", "CI 안전망·팀 문서 대시보드"],
+        focus: "RAGAS 지표 확장, 오픈웨이트 모델 설정 지원, Docker 마감과 미배정 과제 담당 확정"
+      },
+      {
+        name: "백형준", handle: "vividbaek", percent: 62, tone: "watch", status: "핵심 연결 필요",
+        area: "InvestorProfile · Curator · Classifier · Strategist · InvestmentAnalyst · Graph/UI",
+        shipped: ["사용자 접수·개인화 흐름", "Curator·Classifier GLM 경로", "Phase 1 파이프라인·Docker 앱 골격"],
+        focus: "LangGraph 전환, 오픈웨이트 sLLM 실호출, Strategist 변별력과 Guardrail 게이팅"
+      },
+      {
+        name: "윤수정", handle: "Yoonssu", percent: 68, tone: "watch", status: "실데이터 강화",
+        area: "DART/KRX 데이터 · Quant · Qual 공시 연결",
+        shipped: ["DART 스키마·수집·적재", "Quant Agent 로직과 테스트", "Qual 공시 원문 연결"],
+        focus: "Quant retry·실데이터 경로 확대, Qual fallback 복원 협업, 문서-실제 테이블명 정합"
+      },
+      {
+        name: "doyekeem", handle: "doyekeem", percent: 48, tone: "risk", status: "P0 병목",
+        area: "News 수집 · pgvector RAG · Qual 검색 경로",
+        shipped: ["뉴스 수집·전처리·임베딩", "pgvector news retrieval", "Qual Agent 검색 연결"],
+        focus: "Qual try/except fallback, CI 제외 테스트 복원, Hybrid/RRF/Reranker와 청킹"
+      },
+      {
+        name: "melinamuun", handle: "melinamuun", percent: 60, tone: "watch", status: "파이프라인 미연결",
+        area: "Macro 데이터 · Macro Tool · Macro Agent",
+        shipped: ["거시경제 데이터 수집·DB", "Macro Agent 핵심 로직·fallback·테스트", "MacroResult·AgentState 계약"],
+        focus: "Graph 담당과 pipeline 연결, Strategist가 Macro 결과를 실제 소비하도록 가중 로직 추가"
+      }
+    ];
+
+    const AGENTS = [
+      { name: "InvestorProfile", percent: 75, owner: "백형준", status: "strong", label: "실동작", evidence: "온보딩 응답을 UserProfile로 구조화하고 UI 접수 흐름에 연결됨.", focus: "프로필 DB 저장·재사용 증거를 추가." },
+      { name: "Curator", percent: 80, owner: "백형준 중심 · 이동원 보정", status: "strong", label: "실동작", evidence: "rule-based+GLM 경로와 corp_code 보정이 있으며 pipeline 첫 단계로 실행됨.", focus: "카탈로그 외 종목의 corp_code 해소 경로를 확정." },
+      { name: "RequestClassifier", percent: 75, owner: "백형준 중심", status: "strong", label: "실동작", evidence: "의도·범위·긴급도를 구조화하고 GLM 실패 시 기본 분류로 fallback.", focus: "분류 결과가 Graph 라우팅을 실제 변경하도록 연결." },
+      { name: "Quant", percent: 65, owner: "윤수정", status: "focus", label: "강화 필요", evidence: "DART/가격 도구와 fallback 결과가 있으나 재시도와 실데이터 증거가 부족.", focus: "DART retry와 부분 실패 허용, mock 의존 축소." },
+      { name: "Qual", percent: 45, owner: "doyekeem · 윤수정", status: "focus", label: "P0 병목", evidence: "뉴스·공시 검색 경로는 있으나 retriever 실패를 잡지 않아 파이프라인을 중단시킴.", focus: "fallback 복원 후 Hybrid/Reranker와 RAGAS contexts 개선." },
+      { name: "Competitor", percent: 85, owner: "이동원", status: "strong", label: "강점", evidence: "peer_tool·캐시·OpenRouter 서술·명시적 DB fallback·테스트가 연결됨.", focus: "모델 fallback chain과 비교 품질 회귀 평가를 추가." },
+      { name: "Macro", percent: 60, owner: "melinamuun", status: "disconnected", label: "미연결", evidence: "핵심 로직·fallback·테스트는 강하지만 run_phase1_analysis에서 호출되지 않음.", focus: "pipeline 연결과 Strategist 가중치 반영." },
+      { name: "Strategist", percent: 45, owner: "백형준", status: "focus", label: "집중 피드백", evidence: "Quant·Qual·Competitor를 합성하지만 엄격 precondition과 전 케이스 HOLD 문제가 있음.", focus: "부분 실패 허용, Macro 포함, BUY/SELL 변별력 강화." },
+      { name: "InvestmentAnalyst", percent: 65, owner: "백형준", status: "focus", label: "강화 필요", evidence: "GLM 분석과 fallback은 연결됐지만 오픈웨이트 sLLM 요구를 충족하지 못함.", focus: "오픈웨이트 모델 실호출과 trace 증거 확보." },
+      { name: "Guardrail", percent: 30, owner: "백형준 · 담당 확정 필요", status: "focus", label: "집중 피드백", evidence: "금지 표현 치환은 동작하지만 passed=True가 고정이며 재합성 경로가 없음.", focus: "passed=False 게이팅, 재시도, 관측 span을 구현." },
+      { name: "Graph Orchestration", percent: 25, owner: "백형준 · Graph 담당", status: "disconnected", label: "미구현", evidence: "현재 8단계 순차 동기 호출이며 StateGraph·fan-out·conditional edge가 없음.", focus: "LangGraph 전환으로 #1과 #10을 함께 개선." }
+    ];
+
+    const RUBRIC = [
+      { no: 1, name: "Multi-Agent 구조", weight: 2, report: 2, now: 2, target: 4, status: "watch", label: "정체", evidence: "역할 분리는 있으나 StateGraph·동적 라우팅·fan-out 부재." },
+      { no: 2, name: "에러핸들링 & 폴백", weight: 2, report: 3, now: 3, target: 4, status: "progress", label: "진행중", evidence: "OpenRouter retry와 다수 fallback은 강점. Qual·GLM·Strategist 구멍이 남음." },
+      { no: 3, name: "sLLM + 검증 + 관측", weight: 2, report: 2, now: 2, target: 4, status: "watch", label: "정체", evidence: "오픈웨이트 sLLM 부재, Guardrail passed=True 고정, trace 미연결." },
+      { no: 4, name: "5대 설계문서", weight: 1, report: 3, now: 3, target: 3, status: "watch", label: "캡 3", evidence: "유스케이스·인터페이스 정의서 부재와 ERD-실제 SQL 불일치." },
+      { no: 5, name: "Dockerise", weight: 1, report: 2, now: 4, target: 4, status: "strong", label: "공식 개선", evidence: "강사 Full 검증에서 build·DB healthy·app HTTP 200 확인." },
+      { no: 6, name: "MCP / A2A", weight: 1, report: 0, now: 0, target: 1, status: "risk", label: "미배정", evidence: "구현·의존성·실동작 경로 없음." },
+      { no: 7, name: "vLLM", weight: 1, report: 0, now: 0, target: 1, status: "risk", label: "미배정", evidence: "로컬 모델 서빙 경로 없음." },
+      { no: 8, name: "RAGAS 정량평가", weight: 2, report: 0, now: 4, target: 4, status: "strong", label: "게이트 해소", evidence: "evaluate() 실호출·수치 리포트가 공식 인정됨. 지표 확장 시 5점 가능." },
+      { no: 9, name: "RAG 고도화", weight: 1, report: 2, now: 2, target: 3, status: "watch", label: "정체", evidence: "pgvector 단독 검색. Hybrid·RRF·Reranker·청킹 미연결." },
+      { no: 10, name: "스트리밍 & 비동기", weight: 1, report: 1, now: 1, target: 2, status: "risk", label: "미배정", evidence: "st.write_stream·asyncio.gather·stream=True 경로 없음." }
+    ];
+
+    const STATUS_CLASS = {
+      strong: "badge-strong",
+      progress: "badge-progress",
+      watch: "badge-watch",
+      focus: "badge-watch",
+      disconnected: "badge-risk",
+      risk: "badge-risk"
+    };
+
+    const MAX = 5;
+
+    function animateFills() {
+      const fills = document.querySelectorAll("[data-pct]");
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.style.width = entry.target.dataset.pct + "%";
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.15 });
+        fills.forEach(fill => observer.observe(fill));
+      } else {
+        fills.forEach(fill => { fill.style.width = fill.dataset.pct + "%"; });
+      }
+    }
+
+    function renderTeam() {
+      document.getElementById("teamGrid").innerHTML = TEAM.map(item => `
+        <article class="team-card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">${item.name} <span class="badge ${STATUS_CLASS[item.tone]}">${item.status}</span></div>
+              <div class="card-subtitle">@${item.handle} · ${item.area}</div>
+            </div>
+            <div class="percent">${item.percent}%</div>
+          </div>
+          <div class="progress-track"><div class="progress-fill ${item.tone}" data-pct="${item.percent}"></div></div>
+          <div class="detail-block">
+            <div class="detail-label">현재 구현 근거</div>
+            <ul>${item.shipped.map(value => `<li>${value}</li>`).join("")}</ul>
+          </div>
+          <div class="focus-line"><strong>집중 피드백:</strong> ${item.focus}</div>
+        </article>
+      `).join("");
+    }
+
+    function renderAgents() {
+      document.getElementById("agentGrid").innerHTML = AGENTS.map(item => `
+        <article class="agent-card" data-status="${item.status}">
+          <div class="card-head">
+            <div>
+              <div class="card-title">${item.name}</div>
+              <div class="card-subtitle">담당 추정: ${item.owner}</div>
+            </div>
+            <div class="percent">${item.percent}%</div>
+          </div>
+          <div class="agent-meta"><span class="badge ${STATUS_CLASS[item.status]}">${item.label}</span></div>
+          <div class="progress-track"><div class="progress-fill ${item.status === "strong" ? "strong" : item.status === "disconnected" ? "risk" : "watch"}" data-pct="${item.percent}"></div></div>
+          <p class="evidence"><strong>근거:</strong> ${item.evidence}</p>
+          <div class="focus-line"><strong>다음 DoD:</strong> ${item.focus}</div>
+        </article>
+      `).join("");
+    }
+
+    function barRow(label, cls, score) {
+      const pct = Math.round((score / MAX) * 100);
+      return `
+        <div class="bar-row">
+          <span class="bar-label">${label}</span>
+          <div class="bar-track"><div class="bar-fill ${cls}" data-pct="${pct}"></div></div>
+          <span class="bar-val">${score} / ${MAX}</span>
+        </div>`;
+    }
+
+    function renderRubric() {
+      document.getElementById("rubricGrid").innerHTML = RUBRIC.map(item => `
+        <article class="rubric-card">
+          <div class="rubric-head">
+            <div class="rubric-name"><span class="rubric-no">#${item.no}</span>${item.name}</div>
+            <div class="badges">
+              <span class="badge ${STATUS_CLASS[item.status]}">${item.label}</span>
+              <span class="badge badge-weight">가중 ×${item.weight}</span>
+            </div>
+          </div>
+          <div class="bars">
+            ${barRow("최초 검토", "report", item.report)}
+            ${barRow("공식 현재", "now", item.now)}
+            ${barRow("다음 목표", "target", item.target)}
+          </div>
+          <div class="rubric-evidence"><strong>강사 피드백:</strong> ${item.evidence}</div>
+        </article>
+      `).join("");
+    }
+
+    function bindFilters() {
+      const buttons = document.querySelectorAll(".filter-button");
+      const cards = document.querySelectorAll(".agent-card");
+      buttons.forEach(button => {
+        button.addEventListener("click", () => {
+          buttons.forEach(item => item.classList.remove("active"));
+          button.classList.add("active");
+          const filter = button.dataset.filter;
+          cards.forEach(card => {
+            const status = card.dataset.status;
+            card.hidden = !(filter === "all" || status === filter || (filter === "focus" && ["focus", "watch"].includes(status)));
+          });
+        });
+      });
+    }
+
+    renderTeam();
+    renderAgents();
+    renderRubric();
+    bindFilters();
+    animateFills();
+  </script>
+</body>
+</html>

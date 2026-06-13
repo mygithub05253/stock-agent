@@ -30,7 +30,8 @@ class Settings(BaseSettings):
 
     openrouter_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_model: str = "google/gemini-flash-1.5"
+    # 주의: gemini-flash-1.5는 OpenRouter에서 퇴역(404)해 기본값을 저가 현행 모델로 교체 (2026-06-12)
+    openrouter_model: str = "openai/gpt-4o-mini"
     openrouter_timeout_seconds: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

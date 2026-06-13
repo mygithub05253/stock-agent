@@ -156,6 +156,17 @@ class GuardrailResult(BaseModel):
     disclaimer: str
 
 
+class MacroResult(BaseModel):
+    score: int = Field(ge=0, le=100)
+    macro_signal: Signal
+    indicators: dict[str, float | None]
+    rate_of_change: dict[str, float | None] = Field(default_factory=dict)
+    reasons: list[str]
+    risks: list[str]
+    sector: str
+    as_of_date: str
+
+
 class Tier1Result(BaseModel):
     signal: Signal
     confidence: int
@@ -174,6 +185,7 @@ class AgentState(BaseModel):
     quant: QuantResult | None = None
     qual: QualResult | None = None
     competitor: CompetitorResult | None = None
+    macro: MacroResult | None = None
     strategist: StrategistResult | None = None
     guardrail: GuardrailResult | None = None
 
