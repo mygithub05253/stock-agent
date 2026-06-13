@@ -154,6 +154,12 @@ class GuardrailResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     revised_headline: str
     disclaimer: str
+    # 게이팅 결과: 근거 부족·정합성 결함이 있을 때 Strategist 재합성을 요청한다.
+    needs_revision: bool = False
+    risk_level: Literal["low", "medium", "high"] = "low"
+    # 관측: 어떤 검증을 수행했고 통과했는지 추적 가능한 기록 (langfuse 미설치 시에도 보존).
+    checks: list[dict[str, str | bool]] = Field(default_factory=list)
+    trace_id: str | None = None
 
 
 class MacroResult(BaseModel):
