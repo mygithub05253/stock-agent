@@ -77,25 +77,91 @@ def _extract_payload(result: Any) -> Any:
     return None
 
 
+def _server_params():
+    """서버를 자식 프로세스(stdio)로 띄우기 위한 공통 파라미터."""
+    from mcp import StdioServerParameters
+
+    return StdioServerParameters(
+        command=sys.executable,
+        args=["-m", _SERVER_MODULE],
+        env=_child_env(),
+    )
+
+
+def _tool_names(list_tools_result: Any) -> list[str]:
+    """list_tools 응답에서 Tool 이름 목록을 안전하게 추출한다."""
+    tools = getattr(list_tools_result, "tools", None) or []
+    return [getattr(t, "name", "") for t in tools if getattr(t, "name", "")]
+
+
+async def _adiscover_tools(timeout: float) -> list[dict[str, Any]]:
+    """서버와 stdio 핸드셰이크 후 tools/list 결과(이름·설명)를 반환한다.
+
+    market_metrics(KRX 시세) 같은 네트워크 의존 Tool을 호출하지 않으므로
+    오프라인·CI에서도 MCP 트랜스포트 round-trip을 그대로 실증할 수 있다.
+    """
+    from mcp import ClientSession
+    from mcp.client.stdio import stdio_client
+
+    params = _server_params()
+
+    async def _run() -> list[dict[str, Any]]:
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                listed = await session.list_tools()
+                tools = getattr(listed, "tools", None) or []
+                return [
+                    {"name": getattr(t, "name", ""), "description": getattr(t, "description", "") or ""}
+                    for t in tools
+                    if getattr(t, "name", "")
+                ]
+
+    return await asyncio.wait_for(_run(), timeout=timeout)
+
+
+def discover_tools(timeout: float = _DEFAULT_TIMEOUT_SECONDS) -> list[dict[str, Any]]:
+    """동기 진입점: tools/list 핸드셰이크 결과를 반환한다(데모·통합 테스트용).
+
+    실패 시 `McpUnavailableError`로 통일한다.
+    """
+    if not is_available():
+        raise McpUnavailableError("mcp 패키지가 설치되어 있지 않습니다. `pip install -e .[mcp]`")
+    try:
+        return asyncio.run(_adiscover_tools(timeout))
+    except McpUnavailableError:
+        raise
+    except (asyncio.TimeoutError, TimeoutError) as exc:
+        raise McpUnavailableError(f"MCP 서버 응답 타임아웃({timeout}s)") from exc
+    except Exception as exc:  # noqa: BLE001 - 서버 기동·통신 실패를 단일 신호로 통일
+        raise McpUnavailableError(f"MCP tools/list 실패: {exc.__class__.__name__}: {exc}") from exc
+
+
 async def _afetch(
     stock_code: str,
     sector: str | None,
     base_date: str | None,
     timeout: float,
 ) -> McpPeerData:
-    from mcp import ClientSession, StdioServerParameters
+    from mcp import ClientSession
     from mcp.client.stdio import stdio_client
 
-    params = StdioServerParameters(
-        command=sys.executable,
-        args=["-m", _SERVER_MODULE],
-        env=_child_env(),
-    )
+    params = _server_params()
 
     async def _run() -> McpPeerData:
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
+
+                # MCP 표준 흐름: 호출 전 tools/list로 사용 가능한 Tool을 발견(handshake)한다.
+                # 기대 Tool이 없으면 즉시 폴백 신호로 전환해 잘못된 서버에 call하지 않는다.
+                listed = await session.list_tools()
+                available = set(_tool_names(listed))
+                missing = {"sector_roster", "market_metrics"} - available
+                if missing:
+                    raise McpUnavailableError(
+                        f"MCP 서버에 기대 Tool이 없습니다: {sorted(missing)} (발견: {sorted(available)})"
+                    )
 
                 # 비교군 후보 코드(대상 포함) 구성. 서버 로스터를 우선 시도하되,
                 # 비어 있으면 클라이언트 측 로스터로 보강한다.

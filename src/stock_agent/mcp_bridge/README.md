@@ -2,7 +2,12 @@
 
 루브릭 #6(MCP/A2A)의 **"외부 데이터 Tool 1개를 MCP 서버로 노출 + 실동작 1경로"** 를 충족하는
 모듈입니다. Competitor Agent가 **DB에 연결하지 못했을 때**, 하드코딩 mock 대신 자체 MCP 서버를
-`in-process`로 띄워 **pykrx 실시간 시세 기반 peer 비교**를 확보합니다.
+**별도 자식 프로세스(stdio 트랜스포트)** 로 띄워 **pykrx 실시간 시세 기반 peer 비교**를 확보합니다.
+
+> ⚠️ 트랜스포트는 in-process가 아니라 **진짜 stdio**입니다. 클라이언트가 `sys.executable -m
+> peer_data_server`로 서버를 자식 프로세스로 실행하고 `initialize → tools/list → call_tool`
+> 표준 핸드셰이크로 통신합니다. 호출 전 `tools/list`로 기대 Tool(`sector_roster`·`market_metrics`)을
+> 발견하지 못하면 즉시 폴백 신호로 전환합니다.
 
 ## 구성
 
@@ -45,10 +50,16 @@ pip install -e .[mcp]          # mcp SDK + pykrx (선택 의존성)
 # 서버 단독 실행(stdio)
 python -m stock_agent.mcp_bridge.peer_data_server
 
+# 핸드셰이크 데모 (발표·시연용, KRX 네트워크 불필요 — sector_roster + tools/list)
+PYTHONPATH=src python scripts/mcp_peer_handshake_demo.py 반도체
+
 # 클라이언트 직접 호출(스모크)
 python -c "from stock_agent.mcp_bridge.peer_data_client import fetch_mcp_peer_data; \
 print(fetch_mcp_peer_data('005930', sector='반도체').records[:2])"
 ```
+
+데모는 `initialize → tools/list → call_tool(sector_roster)` round-trip을 출력하므로,
+강사 시연·발표 스크린샷에 그대로 쓸 수 있습니다(`sector_roster`는 정적 데이터라 오프라인 동작).
 
 `mcp`/`pykrx` 미설치 환경에서도 순수 헬퍼(`peer_roster`, `peer_data_server`의 매핑 함수)는
 import·테스트 가능하며, 클라이언트는 `is_available()`이 False를 반환해 Competitor가 mock으로
@@ -57,8 +68,10 @@ import·테스트 가능하며, 클라이언트는 `is_available()`이 False를 
 ## 테스트
 
 - `tests/mcp_bridge/test_mcp_bridge.py` — 로스터·서버 순수 헬퍼·클라이언트 헬퍼(네트워크/실서버 미사용)
+- `tests/mcp_bridge/test_mcp_handshake.py` — **실제 stdio round-trip 자동 검증**. `discover_tools()`로 `tools/list`를 호출해 `sector_roster`·`market_metrics` 노출을 확인(오프라인 동작, `mcp` 미설치 시 skip)
 - `tests/tools/test_peer_tool.py` — `build_comparison_from_market_rows`(실시간 레코드 → PeerComparison)
 - `tests/agents/test_competitor_agent.py` — DB실패→MCP실데이터 / MCP실패→mock 3단 폴백 체인
 
-> MCP 트랜스포트 round-trip(서버 기동+Tool 호출)과 pykrx 실데이터는 네트워크가 필요하므로
-> 자동 테스트가 아닌 위 스모크 명령으로 수동 검증합니다.
+> `tools/list` 핸드셰이크와 `sector_roster` round-trip은 **자동 테스트**로 검증됩니다(네트워크 불필요).
+> `market_metrics`의 pykrx 실데이터만 KRX 접속이 필요해, 접속 불가 환경에서는 통일된
+> `McpUnavailableError`로 mock 폴백합니다(크래시 없음).
