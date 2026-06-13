@@ -426,6 +426,7 @@ PM이 주로 관리하는 문서들:
 | `docs/functional-spec/` | 기능 명세서 (각 기능 트리거·입력·처리·출력·예외) | 개발팀 |
 | `docs/architecture/system_flow.md` | 시스템 흐름도 (Mermaid) | 전원 |
 | `docs/architecture/system_architecture_dashboard.html` | 시스템 아키텍처와 6 에이전트 흐름을 한 화면에서 보는 인터랙티브 HTML 대시보드 | 전원 |
+| `docs/architecture/agent_flow_dashboard.html` | **발표·온보딩용** — 9 에이전트 전체 파이프라인 흐름 + 노드 클릭 시 에이전트별 입력·출력·데이터소스·폴백·담당 상세, 데이터/인프라 레이어, 폴백 전략, 현재 vs 목표(LangGraph) 비교를 한 화면에 담은 인터랙티브 흐름도 | 전원 (특히 신규 팀원·발표) |
 | `docs/architecture/backtesting_demo_architecture.md` | 2026-05-22 타깃 예측일 기준 백테스팅 검증 설계, 데이터 마스킹, Supabase 운영 흐름 | PM·개발팀 |
 | `docs/architecture/backtesting_demo_dashboard.html` | 발표 자료와 스크린샷에 바로 쓸 수 있는 백테스팅 검증 아키텍처 HTML 시각화 | PM·전원 |
 | `docs/functional-spec/demo/D1_backtesting_validation_spec_v0.1.md` | 중간 시연용 백테스팅 검증 모드 기능 명세 | 개발팀·PM |
@@ -484,6 +485,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-13 | v1.10 | 발표·온보딩용 에이전트 흐름도(`docs/architecture/agent_flow_dashboard.html`) 추가 — 9 에이전트 파이프라인 + 노드 클릭 상세(입출력·데이터·폴백)·인프라 레이어·폴백 전략·현재 vs LangGraph 목표 |
 | 2026-06-13 | v1.9 | 강사 재검토 이후 머지(#49 Macro·#50 Guardrail·#51 Strategist·#52 Qual·#56 Competitor MCP) 반영한 06-13 EOD 대시보드 추가 — 6대 피드백 중 4건 코드 해소·남은 ×2 레버(LangGraph·sLLM) 강조 |
 | 2026-06-13 | v1.8 | 강사님 재검토 32/70(D) 원문 보관, 팀원·에이전트별 작업 현황 대시보드 확장 |
 | 2026-06-13 | v1.7 | Streamlit UI 사용 가이드(스크린샷 포함) 추가, RAGAS 실데이터 실측·Macro Agent 머지 반영 |

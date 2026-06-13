@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 에이전트 흐름도 · 발표/온보딩용</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --emerald: #059669;
+      --emerald-soft: #ecfdf5;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --red: #dc2626;
+      --red-soft: #fef2f2;
+      --violet: #7c3aed;
+      --violet-soft: #f5f3ff;
+      --cyan: #0891b2;
+      --cyan-soft: #ecfeff;
+      --slate-soft: #f1f5f9;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Pretendard, "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    a { color: inherit; text-decoration: none; }
+    code { border-radius: 5px; background: var(--slate-soft); padding: 1px 5px; color: #334155; font-size: 0.9em; }
+    button { font: inherit; cursor: pointer; }
+
+    header {
+      position: sticky; top: 0; z-index: 40;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.95); backdrop-filter: blur(6px);
+    }
+    .header-inner { max-width: 1180px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-badge { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--violet); color: #fff; font-size: 13px; font-weight: 800; }
+    .logo-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .logo-sub { font-size: 12px; color: var(--muted); }
+    nav.topnav { display: none; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
+    nav.topnav a { padding: 6px 9px; border-radius: 8px; }
+    nav.topnav a:hover { background: var(--slate-soft); color: var(--text); }
+    @media (min-width: 900px) { nav.topnav { display: flex; } }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+    section { margin-top: 38px; scroll-margin-top: 82px; }
+    .card, .panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+    .card { padding: 20px; }
+    .section-label { color: var(--violet); font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .section-title { margin-top: 4px; font-size: 22px; font-weight: 800; }
+    .section-desc { max-width: 880px; margin-top: 6px; color: var(--muted); font-size: 14px; }
+    .section-note { margin-top: 14px; border-left: 4px solid var(--violet); border-radius: 0 10px 10px 0; background: var(--violet-soft); padding: 11px 14px; color: #5b21b6; font-size: 13px; }
+
+    .hero h1 { margin-top: 10px; font-size: 27px; font-weight: 800; line-height: 1.35; }
+    @media (min-width: 640px) { .hero h1 { font-size: 33px; } }
+    .hero .lede { max-width: 820px; margin-top: 12px; color: var(--muted); }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+    .pill { border: 1px solid var(--border); border-radius: 999px; background: #fff; padding: 4px 10px; color: var(--muted); font-size: 12px; }
+    .pill strong { color: var(--text); }
+
+    /* ===== Flow diagram ===== */
+    .flow { margin-top: 20px; display: grid; gap: 10px; }
+    .flow-stage { display: grid; gap: 10px; }
+    .flow-node {
+      border: 1px solid var(--border); border-radius: 12px; background: var(--card);
+      padding: 13px 15px; cursor: pointer; transition: box-shadow 150ms ease, border-color 150ms ease, transform 100ms ease;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .flow-node:hover { border-color: var(--violet); box-shadow: 0 4px 14px rgba(124,58,237,0.12); transform: translateY(-1px); }
+    .flow-node.active { border-color: var(--violet); box-shadow: 0 0 0 2px var(--violet-soft); }
+    .node-ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; font-weight: 800; color: #fff; }
+    .node-body { flex: 1; min-width: 0; }
+    .node-name { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .node-name small { color: var(--muted); font-weight: 600; font-size: 12px; }
+    .node-role { color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+    .node-step { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+    .flow-arrow { text-align: center; color: var(--muted); font-size: 16px; line-height: 1; }
+
+    .fanout {
+      border: 1px dashed var(--violet); border-radius: 14px; background: var(--violet-soft);
+      padding: 12px; display: grid; gap: 10px;
+    }
+    .fanout-label { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--violet); display: flex; align-items: center; gap: 6px; }
+    .fanout-grid { display: grid; gap: 8px; }
+    @media (min-width: 720px) { .fanout-grid { grid-template-columns: repeat(4, 1fr); } }
+    .fanout-grid .flow-node { background: #fff; }
+
+    .ico-blue { background: var(--blue); } .ico-emerald { background: var(--emerald); }
+    .ico-amber { background: var(--amber); } .ico-violet { background: var(--violet); }
+    .ico-cyan { background: var(--cyan); } .ico-red { background: var(--red); }
+    .ico-slate { background: #475569; }
+
+    /* ===== Detail panel ===== */
+    .detail-wrap { margin-top: 16px; }
+    .agent-detail { border: 1px solid var(--border); border-radius: 14px; background: var(--card); padding: 20px; }
+    .ad-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .ad-title { font-size: 19px; font-weight: 800; }
+    .ad-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+    .badge { display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 3px 9px; white-space: nowrap; }
+    .b-llm { background: var(--blue-soft); color: var(--blue); }
+    .b-rule { background: var(--slate-soft); color: #475569; }
+    .b-owner { background: var(--amber-soft); color: var(--amber); }
+    .b-done { background: var(--emerald-soft); color: var(--emerald); }
+    .b-gap { background: var(--red-soft); color: var(--red); }
+    .ad-role { margin-top: 10px; color: var(--text); font-size: 14px; }
+    .ad-grid { display: grid; gap: 12px; margin-top: 16px; }
+    @media (min-width: 720px) { .ad-grid { grid-template-columns: 1fr 1fr; } }
+    .ad-block { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+    .ad-block .lbl { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .ad-block ul { margin: 7px 0 0 16px; font-size: 13px; color: #334155; }
+    .ad-block li { margin-top: 3px; }
+    .ad-block.io { border-left: 3px solid var(--blue); }
+    .ad-block.data { border-left: 3px solid var(--cyan); }
+    .ad-block.fallback { border-left: 3px solid var(--emerald); }
+    .ad-block.gap { border-left: 3px solid var(--amber); }
+
+    /* ===== Generic grids ===== */
+    .grid2 { display: grid; gap: 14px; margin-top: 18px; }
+    @media (min-width: 760px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+    .grid3 { display: grid; gap: 14px; margin-top: 18px; }
+    @media (min-width: 760px) { .grid3 { grid-template-columns: repeat(3, 1fr); } }
+    .mini { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 16px; }
+    .mini h3 { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 7px; }
+    .mini p { margin-top: 6px; color: var(--muted); font-size: 13px; }
+    .mini ul { margin: 8px 0 0 16px; color: var(--muted); font-size: 13px; }
+    .mini li { margin-top: 3px; }
+    .mini code { font-size: 12px; }
+
+    .layer { border-left: 4px solid var(--cyan); }
+    .tag { display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 8px; }
+    .tag-now { background: var(--blue-soft); color: var(--blue); }
+    .tag-target { background: var(--emerald-soft); color: var(--emerald); }
+    .tag-gap { background: var(--red-soft); color: var(--red); }
+
+    .cmp { display: grid; gap: 14px; margin-top: 18px; }
+    @media (min-width: 760px) { .cmp { grid-template-columns: 1fr 1fr; } }
+    .cmp-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .cmp-card.now { border-top: 3px solid var(--blue); }
+    .cmp-card.target { border-top: 3px solid var(--emerald); }
+    .cmp-card h3 { font-size: 15px; font-weight: 800; }
+    .cmp-card ul { margin: 10px 0 0 17px; font-size: 13px; color: #334155; }
+    .cmp-card li { margin-top: 5px; }
+
+    footer { margin-top: 44px; text-align: center; color: var(--muted); font-size: 12px; }
+    .hint { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .flow-node { transition: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a class="logo" href="#top">
+        <span class="logo-badge">↯</span>
+        <span>
+          <span class="logo-title">stock-agent 에이전트 흐름도</span><br />
+          <span class="logo-sub">발표·온보딩용 · main HEAD(4790f2d) 기준 · 2026-06-13</span>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="#flow">파이프라인</a>
+        <a href="#agents">에이전트 상세</a>
+        <a href="#data">데이터·인프라</a>
+        <a href="#fallback">폴백 전략</a>
+        <a href="#status">현재 vs 목표</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero" style="margin-top:0;">
+      <div class="card">
+        <p class="section-label">System Flow · 한눈에 보는 멀티에이전트</p>
+        <h1>한 번의 질문이 9개 에이전트를 거쳐 근거 있는 BUY/HOLD/SELL 신호가 되기까지</h1>
+        <p class="lede">
+          사용자의 투자성향과 포트폴리오가 입력되면 <strong>Curator</strong>가 분석 대상을 정하고,
+          <strong>Quant·Qual·Competitor·Macro</strong> 4개 워커가 정량·정성·Peer·매크로를 병렬 수집한 뒤,
+          <strong>Strategist</strong>가 가중 종합하고 <strong>InvestmentAnalyst(GLM)</strong>가 보정하며
+          마지막으로 <strong>Guardrail</strong>이 위험 표현을 게이팅합니다. 아래 노드를 클릭하면 각 에이전트의
+          입력·출력·데이터소스·폴백을 상세히 볼 수 있습니다.
+        </p>
+        <div class="pill-row">
+          <span class="pill"><strong>9</strong> 에이전트</span>
+          <span class="pill"><strong>4</strong> 워커 fan-out</span>
+          <span class="pill"><strong>3단계</strong> 폴백 (Competitor)</span>
+          <span class="pill">LLM: <strong>GLM</strong> + OpenRouter</span>
+          <span class="pill">저장소: <strong>Postgres + pgvector</strong></span>
+          <span class="pill">실시간: <strong>MCP(pykrx)</strong></span>
+        </div>
+        <p class="hint">⚠️ 이 문서는 코드(main HEAD) 기준 스냅샷입니다. 파이프라인 구조가 바뀌면 갱신하세요. 현재는 동기 순차 실행이며, LangGraph 전환은 진행 예정(아래 "현재 vs 목표" 참고).</p>
+      </div>
+    </section>
+
+    <section id="flow">
+      <p class="section-label">Pipeline</p>
+      <h2 class="section-title">전체 실행 흐름 (run_phase1_analysis)</h2>
+      <p class="section-desc">코드의 실제 호출 순서입니다. 4개 워커는 현재 순차 호출되지만 서로 의존이 없어 LangGraph 전환 시 그대로 병렬 fan-out 됩니다. 각 노드 클릭 → 아래 상세 패널 이동.</p>
+
+      <div class="flow">
+        <div class="flow-node" data-agent="investor" role="button" tabindex="0">
+          <span class="node-ico ico-slate">0</span>
+          <span class="node-body"><span class="node-name">InvestorProfile <small>투자성향 구조화</small></span><span class="node-role">온보딩 답변 → UserProfile (UI 접수 단계, 파이프라인 진입 전)</span></span>
+          <span class="node-step">사전 단계</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-agent="curator" role="button" tabindex="0">
+          <span class="node-ico ico-blue">1</span>
+          <span class="node-body"><span class="node-name">Curator <small>분석 대상 큐레이션</small></span><span class="node-role">질문+포트폴리오 → 종목코드·섹터·corp_code 확정</span></span>
+          <span class="node-step">run_curator</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-agent="classifier" role="button" tabindex="0">
+          <span class="node-ico ico-blue">2</span>
+          <span class="node-body"><span class="node-name">RequestClassifier <small>의도 분류</small></span><span class="node-role">질문 → intent·scope·urgency 구조화</span></span>
+          <span class="node-step">run_request_classifier</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+
+        <div class="fanout">
+          <div class="fanout-label">⑂ Worker Fan-out · Quant·Qual·Competitor·Macro (Curator 출력만 의존 → 병렬화 가능)</div>
+          <div class="fanout-grid">
+            <div class="flow-node" data-agent="quant" role="button" tabindex="0">
+              <span class="node-ico ico-emerald">3</span>
+              <span class="node-body"><span class="node-name">Quant</span><span class="node-role">재무·시세 정량</span></span>
+            </div>
+            <div class="flow-node" data-agent="qual" role="button" tabindex="0">
+              <span class="node-ico ico-emerald">4</span>
+              <span class="node-body"><span class="node-name">Qual</span><span class="node-role">뉴스·공시 RAG</span></span>
+            </div>
+            <div class="flow-node" data-agent="competitor" role="button" tabindex="0">
+              <span class="node-ico ico-emerald">5</span>
+              <span class="node-body"><span class="node-name">Competitor</span><span class="node-role">Peer 횡비교</span></span>
+            </div>
+            <div class="flow-node" data-agent="macro" role="button" tabindex="0">
+              <span class="node-ico ico-emerald">6</span>
+              <span class="node-body"><span class="node-name">Macro</span><span class="node-role">거시경제</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-agent="strategist" role="button" tabindex="0">
+          <span class="node-ico ico-violet">7</span>
+          <span class="node-body"><span class="node-name">Strategist <small>가중 종합</small></span><span class="node-role">4워커 가중 합성(Quant .40·Qual .25·Comp .20·Macro .15) + 부분실패 허용</span></span>
+          <span class="node-step">run_strategist</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-agent="analyst" role="button" tabindex="0">
+          <span class="node-ico ico-blue">8</span>
+          <span class="node-body"><span class="node-name">InvestmentAnalyst <small>GLM 보정</small></span><span class="node-role">최종 분석 신호·포트폴리오 적합도 보정 (GLM → rule-based fallback)</span></span>
+          <span class="node-step">run_investment_analyst</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-agent="guardrail" role="button" tabindex="0">
+          <span class="node-ico ico-red">9</span>
+          <span class="node-body"><span class="node-name">Guardrail <small>안전 게이팅</small></span><span class="node-role">7게이트 검증 → passed=not blocked + 재합성 rewrite 루프</span></span>
+          <span class="node-step">run_guardrail</span>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node" data-agent="output" role="button" tabindex="0">
+          <span class="node-ico ico-cyan">✓</span>
+          <span class="node-body"><span class="node-name">Output <small>Tier 1/2/3</small></span><span class="node-role">신호+신뢰도+근거 카드 → Streamlit UI 렌더</span></span>
+          <span class="node-step">AnalysisOutput</span>
+        </div>
+      </div>
+      <p class="hint">💡 노드를 클릭하면 아래 상세가 해당 에이전트로 바뀝니다.</p>
+
+      <div class="detail-wrap"><div class="agent-detail" id="agentDetail"></div></div>
+    </section>
+
+    <section id="agents">
+      <p class="section-label">Agent Detail</p>
+      <h2 class="section-title">에이전트별 책임·입출력·폴백</h2>
+      <p class="section-desc">위 흐름 노드를 클릭하거나, 발표 시 이 표를 순서대로 짚으면 됩니다. 데이터소스/LLM/폴백은 코드 기준입니다.</p>
+      <div class="section-note">
+        <strong>읽는 법:</strong> <span class="badge b-llm">LLM</span> = GLM/OpenRouter 호출, <span class="badge b-rule">RULE</span> = 룰·계산 기반(LLM 미사용),
+        <span class="badge b-done">해소</span> = 강사 피드백 코드 반영, <span class="badge b-gap">잔여</span> = 다음 과제.
+      </div>
+      <div id="agentCards" class="grid2"></div>
+    </section>
+
+    <section id="data">
+      <p class="section-label">Data &amp; Infra</p>
+      <h2 class="section-title">데이터·인프라 레이어</h2>
+      <p class="section-desc">에이전트가 소비하는 실제 데이터 출처와 저장소입니다.</p>
+      <div class="grid3">
+        <article class="mini layer">
+          <h3>🗄 Postgres + pgvector</h3>
+          <p>정형 + 비정형 단일 DB. JOIN·트랜잭션과 벡터 유사도 검색을 한 곳에서.</p>
+          <ul>
+            <li><code>company</code> · <code>stock_price</code> 종목·시세 마스터</li>
+            <li><code>financial_statement</code> DART 재무</li>
+            <li><code>disclosure_report/content</code> 공시</li>
+            <li><code>rag_documents</code> · <code>rag_chunks</code> <code>vector(1024)</code></li>
+          </ul>
+        </article>
+        <article class="mini layer">
+          <h3>🌐 외부 데이터 Tool</h3>
+          <p><code>tools/</code> 계층이 외부 API를 감쌉니다.</p>
+          <ul>
+            <li><code>financial_tool</code> · <code>price_tool</code> (DART·pykrx)</li>
+            <li><code>rag_tool</code> 공시 원문 검색</li>
+            <li><code>macro_tool</code> 거시지표</li>
+            <li><code>peer_tool</code> 섹터 Peer 비교</li>
+          </ul>
+        </article>
+        <article class="mini layer">
+          <h3>🔌 MCP 브리지 (실시간)</h3>
+          <p><code>mcp_bridge/</code> 자체 FastMCP 서버 — DB 미연결 시 실데이터 폴백.</p>
+          <ul>
+            <li><code>peer_data_server</code> Tool: <code>sector_roster</code>·<code>market_metrics</code></li>
+            <li>pykrx 실시간 시세 → Peer 비교</li>
+            <li>루브릭 #6(MCP) 실동작 경로</li>
+            <li><code>[mcp]</code> extra (mcp, pykrx)</li>
+          </ul>
+        </article>
+      </div>
+      <div class="grid2">
+        <article class="mini">
+          <h3>🤖 LLM 스택</h3>
+          <ul>
+            <li><strong>GLM</strong>(glm-4.5-flash) — Curator·Classifier·Competitor narrative·InvestmentAnalyst</li>
+            <li><strong>OpenRouter</strong>(현재 gpt-4o-mini) — 429/5xx 재시도 + backoff</li>
+            <li>모든 LLM 경로는 실패 시 <strong>rule-based fallback</strong> 보유</li>
+            <li class="tag tag-gap" style="margin-top:6px;">잔여: 오픈웨이트 sLLM 미충족 (루브릭 #3a)</li>
+          </ul>
+        </article>
+        <article class="mini">
+          <h3>🧪 평가·운영</h3>
+          <ul>
+            <li><strong>RAGAS</strong> 하네스(<code>eval/run_benchmark.py</code>) — evaluate() 실호출</li>
+            <li>골든셋 <code>eval/golden_set/personas.json</code> 5케이스</li>
+            <li><strong>CI</strong>(<code>ci.yml</code>) compileall + pytest 게이트</li>
+            <li><strong>Docker</strong> build·DB healthy·HTTP 200 동적 검증</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="fallback">
+      <p class="section-label">Resilience</p>
+      <h2 class="section-title">폴백 전략 — "데모는 절대 멈추지 않는다"</h2>
+      <p class="section-desc">강사 재검토에서 강점으로 인정된 축입니다. 모든 워커가 DB·LLM 실패에 안전하게 degrade 합니다.</p>
+      <div class="grid3">
+        <article class="mini" style="border-left:4px solid var(--emerald);">
+          <h3>① Competitor 3단계</h3>
+          <p>가장 정교한 폴백 체인.</p>
+          <ul>
+            <li><strong>DB</strong> peer_tool 정상 경로</li>
+            <li>실패 → <strong>MCP</strong> pykrx 실시간 시세(실데이터)</li>
+            <li>그래도 실패 → <strong>mock</strong> (최후 보루)</li>
+          </ul>
+        </article>
+        <article class="mini" style="border-left:4px solid var(--emerald);">
+          <h3>② Qual / Quant</h3>
+          <p>retriever·DB 호출을 try/except로 감쌈(#52·#53).</p>
+          <ul>
+            <li>Qual: <code>retrieve_*_with_fallback</code></li>
+            <li>Quant: <code>_connect_with_retry</code> + 기본값</li>
+            <li>크래시 전파 차단</li>
+          </ul>
+        </article>
+        <article class="mini" style="border-left:4px solid var(--emerald);">
+          <h3>③ Strategist / Guardrail</h3>
+          <p>부분 실패 허용 + 안전 게이팅.</p>
+          <ul>
+            <li>Strategist: 워커 결손 시 가중 재정규화(#51)</li>
+            <li>Guardrail: 7게이트 → 차단·재합성(#50)</li>
+            <li>LLM 실패 → 보수적 결과</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="status">
+      <p class="section-label">Now vs Target</p>
+      <h2 class="section-title">현재 구조 vs 목표 구조 (정직하게)</h2>
+      <p class="section-desc">발표 시 "어디까지 했고 다음이 무엇인지"를 솔직히 보여주는 슬라이드입니다.</p>
+      <div class="cmp">
+        <article class="cmp-card now">
+          <h3><span class="tag tag-now">현재</span> 동기 순차 파이프라인</h3>
+          <ul>
+            <li><code>pipeline.py</code>가 9개 <code>run_*</code> 함수를 위에서 아래로 호출</li>
+            <li>워커는 서로 의존 없지만 순차 실행 (병렬 아님)</li>
+            <li>역할 분리·폴백·게이팅·MCP·Macro 가중은 모두 동작</li>
+            <li>출력은 완성 후 <code>st.status</code>로 일괄 표시</li>
+          </ul>
+        </article>
+        <article class="cmp-card target">
+          <h3><span class="tag tag-target">목표</span> LangGraph StateGraph</h3>
+          <ul>
+            <li><code>Send</code>로 4워커 fan-out → Strategist join</li>
+            <li>RequestClassifier 결과로 <strong>conditional 라우팅</strong></li>
+            <li>오픈웨이트 sLLM 노드 실호출 (루브릭 #3a)</li>
+            <li><code>st.write_stream</code> 토큰 스트리밍 (루브릭 #10)</li>
+          </ul>
+        </article>
+      </div>
+      <div class="section-note">
+        이 흐름도의 노드/카드 구조는 LangGraph 전환 후에도 그대로 유효합니다 — 바뀌는 것은 "호출 방식(순차→그래프)"이지 "에이전트 책임"이 아닙니다. 그래서 지금 흐름을 먼저 고정해두면 전환 작업의 기준점이 됩니다.
+      </div>
+    </section>
+
+    <footer>
+      stock-agent · 에이전트 흐름도 (발표·온보딩용) · main HEAD 4790f2d · 2026-06-13 (KST)<br />
+      코드 변경 시 이 문서를 갱신하세요. 관련: docs/architecture/system_flow.md · system_architecture_dashboard.html
+    </footer>
+  </main>
+
+  <script>
+    const AGENTS = {
+      investor: {
+        name: "InvestorProfile Agent", kr: "투자성향 구조화", ico: "ico-slate", llm: false, owner: "백형준", state: "done",
+        role: "온보딩 질문 답변을 점수화해 위험성향·투자기간·손실감내·유동성 니즈를 가진 UserProfile로 구조화합니다. 파이프라인 진입 전 UI 접수 단계에서 1회 실행됩니다.",
+        input: ["온보딩 질문 답변(dict)", "user_id"],
+        output: ["UserProfile (risk_tolerance·horizon·cash_source·preferred_sectors)"],
+        data: ["LLM 미사용 — _score_answers 룰 기반 점수화"],
+        fallback: ["입력 누락 시 보수적 기본 성향 적용"],
+        gap: ["프로필 DB 영속화·재사용 증거 추가"]
+      },
+      curator: {
+        name: "Curator Agent", kr: "분석 대상 큐레이션", ico: "ico-blue", llm: true, owner: "백형준 · 이동원 보정", state: "done",
+        role: "사용자 자연어와 포트폴리오를 받아 분석할 종목코드·섹터·corp_code를 확정합니다. 파이프라인의 첫 단계로, 이후 모든 워커가 이 출력에 의존합니다.",
+        input: ["user_query", "Portfolio", "UserProfile"],
+        output: ["CuratorResult (stock_code·corp_name·sector·corp_code)"],
+        data: ["rule-based 카탈로그 + GLM 큐레이션", "corp_code 보정 로직"],
+        fallback: ["GLM 실패 시 rule-based 종목 매칭"],
+        gap: ["카탈로그 외 종목의 corp_code 동적 해소"]
+      },
+      classifier: {
+        name: "RequestClassifier Agent", kr: "의도 분류", ico: "ico-blue", llm: true, owner: "백형준", state: "done",
+        role: "사용자 질문의 의도(intent)·범위(scope)·긴급도(urgency)를 구조화합니다. 향후 LangGraph에서 조건부 라우팅의 입력이 됩니다.",
+        input: ["UserRequest(raw_query)"],
+        output: ["분류 결과 (intent·scope·urgency)"],
+        data: ["GLM 분류 호출"],
+        fallback: ["GLM 실패 시 기본 분류값 (rule-based)"],
+        gap: ["분류 결과가 실제 Graph 라우팅을 변경하도록 연결 (LangGraph 전환과 동반)"]
+      },
+      quant: {
+        name: "Quant Worker", kr: "정량 분석", ico: "ico-emerald", llm: false, owner: "윤수정", state: "done",
+        role: "DART 재무와 pykrx 시세 기반으로 밸류에이션·수익성·성장성 정량 지표와 근거를 계산합니다.",
+        input: ["CuratorResult (stock_code·corp_code)"],
+        output: ["QuantResult (score·reasons·지표)"],
+        data: ["financial_tool (DART)", "price_tool (pykrx)", "Postgres financial_statement·stock_price"],
+        fallback: ["_connect_with_retry DB 재시도(#53)", "실패 시 기본값 결과"],
+        gap: ["DART retry 폭 확대·실데이터 증거, mock 의존 축소"]
+      },
+      qual: {
+        name: "Qual Worker", kr: "정성 분석 (RAG)", ico: "ico-emerald", llm: false, owner: "doyekeem · 윤수정", state: "done",
+        role: "뉴스·공시를 pgvector RAG로 검색해 호재/악재 이벤트를 분류하고 정성 근거를 만듭니다.",
+        input: ["CuratorResult (ticker·corp_code)"],
+        output: ["QualResult (evidence·event_types·sentiment)"],
+        data: ["rag/retriever (pgvector <=> 벡터검색)", "rag_chunks·rag_documents", "bge-m3 임베딩"],
+        fallback: ["retrieve_news_with_fallback / retrieve_disclosures_with_fallback — try/except + fallback docs(#52)"],
+        gap: ["Hybrid(BM25+벡터 RRF)·Reranker·청킹 연결 (루브릭 #9)"]
+      },
+      competitor: {
+        name: "Competitor Agent", kr: "Peer 횡비교", ico: "ico-emerald", llm: true, owner: "이동원", state: "done",
+        role: "같은 섹터 Peer를 추출해 PER·PBR·ROE 등으로 횡비교하고 상대적 위치(percentile)를 계산합니다. 3단계 폴백으로 데모가 멈추지 않습니다.",
+        input: ["CuratorResult (stock_code·sector)"],
+        output: ["CompetitorResult (peer_summary·peers·relative_position·percentile)"],
+        data: ["peer_tool (DB 정상 경로)", "MCP peer_data_server (pykrx 실시간 폴백)", "GLM narrative 병합"],
+        fallback: ["3단계: DB → MCP 실시간 시세(실데이터) → mock(최후) — #56"],
+        gap: ["MCP stdio 분리 시연(#6 1→2), Peer 선정 고도화, 비교 품질 회귀 평가"]
+      },
+      macro: {
+        name: "Macro Agent", kr: "거시경제", ico: "ico-emerald", llm: false, owner: "melinamuun", state: "done",
+        role: "금리·환율 등 거시지표를 수집해 시장 환경 맥락을 만들고 Strategist 종합에 가중 반영됩니다.",
+        input: ["AgentState (분석 컨텍스트)"],
+        output: ["MacroResult (reasons·지표)"],
+        data: ["macro_tool 거시지표", "Postgres raw_macro"],
+        fallback: ["수집 실패 시 fallback 결과 + 테스트 보유"],
+        gap: ["실데이터 폭 확대, LangGraph 노드 fan-out"]
+      },
+      strategist: {
+        name: "Strategist & Synthesizer", kr: "가중 종합", ico: "ico-violet", llm: false, owner: "백형준", state: "done",
+        role: "4개 워커 결과를 가중 합성해 BUY/HOLD/SELL 신호·신뢰도·적합도와 다음 액션·리스크를 만듭니다. 일부 워커가 비어도 가용분으로 재정규화합니다.",
+        input: ["QuantResult·QualResult·CompetitorResult·MacroResult"],
+        output: ["StrategistResult (signal·confidence·suitability·headline·next_actions·risks)"],
+        data: ["가중치 WITH_MACRO {quant .40, qual .25, competitor .20, macro .15}", "NO_MACRO {.45/.30/.25}"],
+        fallback: ["부분 실패 허용 — 워커 결손 시 가중 재정규화(#51), degraded·contributing_agents 기록"],
+        gap: ["전 케이스 HOLD 변별력 — BUY/SELL 임계값·골든셋 다양화"]
+      },
+      analyst: {
+        name: "InvestmentAnalyst Agent", kr: "GLM 최종 보정", ico: "ico-blue", llm: true, owner: "백형준", state: "gap",
+        role: "GLM으로 최종 분석 신호와 포트폴리오 적합도를 보정합니다. key 없거나 호출 실패 시 Strategist 결과로 fallback합니다.",
+        input: ["StrategistResult", "UserProfile·Portfolio"],
+        output: ["보정된 분석 신호·적합도"],
+        data: ["GLM (glm-4.5-flash)"],
+        fallback: ["GLM 실패 → rule-based / Strategist 결과 유지"],
+        gap: ["오픈웨이트 sLLM 실호출 + trace 증거 (루브릭 #3a — 남은 ×2 핵심 레버)"]
+      },
+      guardrail: {
+        name: "Guardrail & Evaluator", kr: "안전 게이팅", ico: "ico-red", llm: false, owner: "백형준 · 이동원 정비", state: "done",
+        role: "7개 게이트로 위험 표현을 검증하고, 차단(passed=False)·재합성·완화를 결정합니다. 투자권유 표현을 완화하고 근거 부족을 경고합니다.",
+        input: ["StrategistResult", "워커 결과(mock 감사용)"],
+        output: ["GuardrailResult (passed·warnings·revised_headline·disclaimer·trace_id)"],
+        data: ["7게이트: banned_phrase·pii·profanity·guarantee·evidence_sufficiency·signal_confidence·mock_audit", "observability.py span"],
+        fallback: ["passed=not blocked, 재합성 rewrite 루프(최대 2회), 예외 시 보수적 결과(#50·#55)"],
+        gap: ["langsmith/langfuse 관측 span 실연결 (루브릭 #3c)"]
+      },
+      output: {
+        name: "Output (AnalysisOutput)", kr: "결과 렌더", ico: "ico-cyan", llm: false, owner: "백형준 (UI)", state: "done",
+        role: "Tier 1(신호 카드)·Tier 2(근거: 정량·정성·Peer·적합도·리스크)·Tier 3(PB리포트 등 예정)으로 묶어 Streamlit UI에 렌더합니다.",
+        input: ["StrategistResult", "GuardrailResult", "워커 evidence"],
+        output: ["AnalysisOutput (tier1·tier2·tier3·state)"],
+        data: ["Streamlit st.status 단계 표시 → 카드 렌더"],
+        fallback: ["strategist·guardrail 누락 시 RuntimeError로 명시적 실패"],
+        gap: ["st.write_stream 토큰 스트리밍 (루브릭 #10)"]
+      }
+    };
+
+    const ORDER = ["investor","curator","classifier","quant","qual","competitor","macro","strategist","analyst","guardrail","output"];
+
+    function detailHtml(a) {
+      const llmBadge = a.llm ? '<span class="badge b-llm">LLM</span>' : '<span class="badge b-rule">RULE</span>';
+      const stateBadge = a.state === "done" ? '<span class="badge b-done">해소·동작</span>' : '<span class="badge b-gap">잔여 과제</span>';
+      const li = arr => arr.map(x => `<li>${x}</li>`).join("");
+      return `
+        <div class="ad-head">
+          <span class="ad-title">${a.name}</span>
+          <span class="node-name"><small>${a.kr}</small></span>
+          <span class="ad-tags">${llmBadge}<span class="badge b-owner">${a.owner}</span>${stateBadge}</span>
+        </div>
+        <p class="ad-role">${a.role}</p>
+        <div class="ad-grid">
+          <div class="ad-block io"><span class="lbl">▸ 입력</span><ul>${li(a.input)}</ul></div>
+          <div class="ad-block io"><span class="lbl">▸ 출력</span><ul>${li(a.output)}</ul></div>
+          <div class="ad-block data"><span class="lbl">▸ 데이터·LLM</span><ul>${li(a.data)}</ul></div>
+          <div class="ad-block fallback"><span class="lbl">▸ 폴백</span><ul>${li(a.fallback)}</ul></div>
+        </div>
+        <div class="ad-block gap" style="margin-top:12px;"><span class="lbl">▸ 다음 과제</span><ul>${li(a.gap)}</ul></div>
+      `;
+    }
+
+    function cardHtml(a) {
+      const llmBadge = a.llm ? '<span class="badge b-llm">LLM</span>' : '<span class="badge b-rule">RULE</span>';
+      const stateBadge = a.state === "done" ? '<span class="badge b-done">동작</span>' : '<span class="badge b-gap">잔여</span>';
+      return `
+        <article class="mini">
+          <h3><span class="node-ico ${a.ico}" style="width:24px;height:24px;font-size:12px;">${ORDER.indexOf(Object.keys(AGENTS).find(k=>AGENTS[k]===a))}</span> ${a.name} ${llmBadge}${stateBadge}</h3>
+          <p>${a.role}</p>
+          <ul>
+            <li><strong>데이터:</strong> ${a.data[0]}</li>
+            <li><strong>폴백:</strong> ${a.fallback[0]}</li>
+            <li><strong>담당:</strong> ${a.owner}</li>
+          </ul>
+        </article>`;
+    }
+
+    function setDetail(key) {
+      const a = AGENTS[key];
+      if (!a) return;
+      document.getElementById("agentDetail").innerHTML = detailHtml(a);
+      document.querySelectorAll(".flow-node").forEach(n => n.classList.toggle("active", n.dataset.agent === key));
+    }
+
+    document.querySelectorAll(".flow-node").forEach(node => {
+      const key = node.dataset.agent;
+      node.addEventListener("click", () => setDetail(key));
+      node.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetail(key); } });
+    });
+
+    document.getElementById("agentCards").innerHTML = ORDER.map(k => cardHtml(AGENTS[k])).join("");
+    setDetail("curator");
+  </script>
+</body>
+</html>
