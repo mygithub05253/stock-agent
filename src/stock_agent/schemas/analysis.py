@@ -147,6 +147,9 @@ class StrategistResult(BaseModel):
     key_reasons: list[str]
     risks: list[str]
     next_actions: list[str]
+    # 부분 실패 허용: 일부 워커 에이전트가 빠진 채 종합했는지와 실제 기여한 에이전트 목록.
+    degraded: bool = False
+    contributing_agents: list[str] = Field(default_factory=list)
 
 
 class GuardrailResult(BaseModel):
