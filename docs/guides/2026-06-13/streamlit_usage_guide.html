@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>stock-agent · Streamlit UI 사용 가이드 (2026-06-13)</title>
+<style>
+  :root {
+    --bg: #f7f9fc; --card: #ffffff; --text: #1a2233; --muted: #5b6b85;
+    --blue: #2563eb; --green: #16a34a; --amber: #d97706; --red: #dc2626;
+    --border: #e3e9f2; --code-bg: #eef2f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", "Malgun Gothic", sans-serif; background: var(--bg); color: var(--text); line-height: 1.65; }
+  main { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 26px; font-weight: 800; }
+  .subtitle { color: var(--muted); margin-top: 6px; font-size: 14px; }
+  section { margin-top: 36px; }
+  h2 { font-size: 20px; font-weight: 800; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 16px; font-weight: 700; margin-top: 20px; }
+  p, li { font-size: 14.5px; color: var(--text); }
+  ul, ol { padding-left: 22px; margin-top: 8px; }
+  li { margin-top: 4px; }
+  code { background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-size: 13px; font-family: Consolas, monospace; }
+  pre { background: #111827; color: #e5e7eb; border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin-top: 10px; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; color: inherit; padding: 0; }
+  .step { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 16px; }
+  .step-no { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: var(--blue); color: #fff; font-weight: 800; border-radius: 50%; font-size: 14px; margin-right: 8px; }
+  .shot { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot-caption { font-size: 12.5px; color: var(--muted); padding: 8px 12px; background: #fbfcfe; border-top: 1px solid var(--border); }
+  .callout { border-left: 4px solid var(--blue); background: #eff4ff; border-radius: 0 10px 10px 0; padding: 12px 16px; margin-top: 14px; font-size: 13.5px; }
+  .callout.warn { border-color: var(--amber); background: #fff8eb; }
+  .callout.danger { border-color: var(--red); background: #fef2f2; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13.5px; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0f4fa; }
+  footer { margin-top: 48px; font-size: 12px; color: var(--muted); text-align: center; }
+  @media (max-width: 600px) { h1 { font-size: 22px; } main { padding: 20px 12px 48px; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>🖥 Streamlit UI 사용 가이드</h1>
+  <p class="subtitle">
+    stock-agent 멀티에이전트 분석 데모를 직접 실행하고 테스트하는 방법 ·
+    스크린샷은 2026-06-13 실데이터 DB 연결 상태에서 캡처 · 작성: PM(이동원 트랙)
+  </p>
+
+  <!-- ===== 0. 사전 준비 ===== -->
+  <section>
+    <h2>0. 사전 준비</h2>
+    <h3>필수</h3>
+    <pre><code># 1) 가상환경 + 의존성 (최초 1회)
+python -m venv .venv
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+# 2) 환경 변수
+cp .env.example .env            # 필요한 키를 채워 넣기</code></pre>
+
+    <h3>.env 키별 효과 (없어도 실행은 됩니다)</h3>
+    <table>
+      <tr><th>키</th><th>있을 때</th><th>없을 때</th></tr>
+      <tr><td><code>DATABASE_URL</code></td><td>실제 DB에서 시세·재무·뉴스 조회 (정량·Peer 탭에 실수치)</td><td>각 에이전트가 mock fallback으로 동작 — 화면 흐름 확인은 가능</td></tr>
+      <tr><td><code>GLM_API_KEY</code></td><td>Curator·분류·최종 분석에 GLM 사용</td><td>rule-based fallback</td></tr>
+      <tr><td><code>OPENROUTER_API_KEY</code></td><td>Competitor narrative를 LLM이 생성</td><td>rule-based 요약 사용</td></tr>
+    </table>
+    <div class="callout danger">
+      <strong>주의</strong>: <code>.env</code>, API key, DB 비밀번호는 절대 커밋하지 마세요.
+      LLM 키가 있으면 <code>분석 실행</code> 1회당 소액 과금이 발생합니다 (OpenRouter 팀 크레딧 유의).
+    </div>
+  </section>
+
+  <!-- ===== 1. 실행 ===== -->
+  <section>
+    <h2>1. 앱 실행</h2>
+    <pre><code>streamlit run streamlit_app.py --server.port 8501</code></pre>
+    <p>브라우저에서 <code>http://localhost:8501</code> 접속.
+       첫 로딩은 임베딩 모델 체인 import 때문에 수십 초 걸릴 수 있습니다 (우상단 Running… 표시가 사라질 때까지 대기).</p>
+    <div class="callout">
+      Docker로 같은 환경을 띄우려면: <code>docker compose --profile app up --build</code>
+    </div>
+  </section>
+
+  <!-- ===== 2. 단계별 사용 ===== -->
+  <section>
+    <h2>2. 단계별 사용 방법</h2>
+
+    <div class="step">
+      <h3><span class="step-no">1</span>투자 성향 질문 카드 (7문항)</h3>
+      <p>투자 목적·기간·손실 감내 등 7개 질문에 라디오 버튼으로 답하고 <strong>다음</strong>을 누릅니다.
+         <strong>이전</strong>으로 수정, <strong>처음부터</strong>로 초기화할 수 있습니다.</p>
+      <div class="shot">
+        <img src="img/guide-01-onboarding.png" alt="투자 성향 질문 1/7 화면" />
+        <div class="shot-caption">질문 1/7 — 투자 목적 선택. 상단 진행바로 현재 위치를 확인할 수 있습니다.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-no">2</span>마지막 질문 → 성향 분석</h3>
+      <p>7번째 질문(관심 산업)까지 답하면 버튼이 <strong>성향 분석</strong>으로 바뀝니다.
+         클릭하면 <code>InvestorProfile Agent</code>가 답변을 구조화된 투자성향으로 변환합니다.</p>
+      <div class="shot">
+        <img src="img/guide-02-last-question.png" alt="질문 7/7 성향 분석 버튼" />
+        <div class="shot-caption">질문 7/7 — 관심 산업 선택 후 <strong>성향 분석</strong> 클릭.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-no">3</span>성향 결과 확인 + 보유 종목 입력</h3>
+      <p>추론된 투자성향(예: 안정형 · 3개월 · 손실감내 -5%)이 카드로 표시되고,
+         관심 산업의 시가총액 상위 후보 10개가 종목 카드로 나타납니다.
+         보유 중인 종목의 <strong>수량·평단가</strong>와 <strong>보유 현금</strong>을 입력하면
+         하단에 총 평가금액·손익률·섹터 비중이 실시간 계산됩니다.
+         입력이 끝나면 <strong>투자성향 확인</strong>을 클릭합니다.</p>
+      <div class="shot">
+        <img src="img/guide-03-profile-portfolio.png" alt="성향 결과와 보유 종목 입력 화면" />
+        <div class="shot-caption">성향 카드 + 종목별 수량/평단가 입력 + 포트폴리오 요약. 수량 0인 종목은 무시됩니다.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-no">4</span>에이전트 파이프라인 분석 결과</h3>
+      <p><strong>투자성향 확인</strong>을 누르면
+         <code>Curator → RequestClassifier → Quant/Qual/Competitor → Strategist → InvestmentAnalyst(GLM) → Guardrail</code>
+         전체 파이프라인이 실행됩니다. 결과는 3단으로 표시됩니다:</p>
+      <ul>
+        <li><strong>Tier 1</strong>: 신호(BUY/HOLD/SELL) + 신뢰도 + 포트폴리오 적합도 + 한 줄 헤드라인 + 책임 고지</li>
+        <li><strong>Tier 2</strong>: 정량/정성/Peer/적합도/리스크 탭별 근거</li>
+        <li><strong>상세 상태 보기</strong>: 에이전트별 원본 출력(JSON)</li>
+      </ul>
+      <div class="shot">
+        <img src="img/guide-04-analysis-result.png" alt="분석 결과 화면" />
+        <div class="shot-caption">실데이터 DB 연결 시 정량 탭에 실제 DART 수치(ROE·성장률)가 표시됩니다.</div>
+      </div>
+      <div class="shot">
+        <img src="img/guide-05-peer-tab.png" alt="Peer 탭" />
+        <div class="shot-caption">Peer 탭 — 같은 섹터 peer 대비 밸류에이션/ROE 분위와 데이터 완성도 점수.</div>
+      </div>
+      <div class="callout">
+        <strong>적합도와 신호는 별개입니다.</strong> 종목이 좋아도(신호 HOLD/BUY) 본인 성향 대비
+        비중이 높으면 적합도는 낮게 나옵니다 — 안정형 + 반도체 100% 포트폴리오가 대표 사례.
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-no">5</span>대화형 질문</h3>
+      <p>화면 하단 <strong>4. 대화형 질문</strong>에 자연어로 질문을 입력하고 <strong>분석 실행</strong>을 누르면,
+         질문 의도(intent)와 긴급도(urgency)를 분류한 뒤 해당 종목 기준으로 파이프라인을 다시 실행합니다.</p>
+      <div class="shot">
+        <img src="img/guide-06-chat-analysis.png" alt="대화형 질문 분석 결과" />
+        <div class="shot-caption">"삼성전자 급등했는데 안정형이면 어떻게 할까?" → holding_review / surge 분류 후 삼성전자 재분석.</div>
+      </div>
+      <p>질문 예시:</p>
+      <ul>
+        <li><code>SK하이닉스 비중 괜찮아?</code> — 보유 비중 점검</li>
+        <li><code>삼성전자 급락했는데 손절해야 해?</code> — 매도 판단 (urgency: drop)</li>
+        <li><code>삼성전자 공시 이슈 확인해줘</code> — 뉴스/공시 확인 (urgency: news)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== 3. 테스트 ===== -->
+  <section>
+    <h2>3. 테스트 방법</h2>
+    <h3>단위 테스트 (CI와 동일)</h3>
+    <pre><code>pytest -q</code></pre>
+    <h3>정량 평가 (RAGAS 벤치마크)</h3>
+    <pre><code>pip install -e .[eval]                    # 최초 1회
+python eval/run_benchmark.py --skip-ragas  # LLM 비용 0원
+python eval/run_benchmark.py               # faithfulness 채점 (소액 과금)</code></pre>
+    <p>리포트는 <code>eval/reports/</code>에 날짜별로 생성됩니다. 자세한 내용은 <code>eval/README.md</code> 참고.</p>
+  </section>
+
+  <!-- ===== 4. 문제 해결 ===== -->
+  <section>
+    <h2>4. 문제 해결 (FAQ)</h2>
+    <table>
+      <tr><th>증상</th><th>원인 / 해결</th></tr>
+      <tr>
+        <td>첫 화면이 한참 Running…</td>
+        <td>임베딩 모델 체인 import (최초 1회 bge-m3 다운로드 ~2GB). 기다리면 됩니다.</td>
+      </tr>
+      <tr>
+        <td>분석 실행 시 DB 오류로 크래시</td>
+        <td>Qual 경로가 DB·임베딩 모델을 무조건 요구하는 알려진 회귀입니다 (Qual 담당자 수정 예정).
+            <code>DATABASE_URL</code>을 유효한 DB로 설정하거나, 로컬 Docker DB(<code>docker compose up -d db</code>)를 띄우세요.
+            로컬 DB 사용 시 <code>news_chunks</code> 테이블이 db/init에 없어 수동 생성이 필요합니다.</td>
+      </tr>
+      <tr>
+        <td>정량 탭이 mock 추정치라고 표시</td>
+        <td>DB 미연결로 quant가 fallback 동작 중. 정상적인 안전 동작입니다.</td>
+      </tr>
+      <tr>
+        <td>8501 포트 충돌</td>
+        <td><code>--server.port 8502</code> 등으로 변경.</td>
+      </tr>
+      <tr>
+        <td>Supabase 연결 시 tenant not found</td>
+        <td>해당 Supabase 프로젝트가 일시중지(pause) 상태. 소유 계정 대시보드에서 Restore.</td>
+      </tr>
+    </table>
+  </section>
+
+  <footer>
+    stock-agent · Streamlit UI 사용 가이드 · 기준일 2026-06-13 (KST) · 스크린샷: Playwright 자동 캡처<br />
+    본 데모의 출력은 투자 권유가 아닙니다.
+  </footer>
+</main>
+</body>
+</html>
