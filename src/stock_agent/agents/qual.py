@@ -1,5 +1,67 @@
-from stock_agent.rag.retriever import retrieve_disclosures, retrieve_news
+from stock_agent.agents.fallback import ensure_database_available, fallback_reason, should_fallback
 from stock_agent.schemas.analysis import AgentState, QualResult
+
+
+def fallback_news_docs(ticker: str | None, reason: str) -> list[dict]:
+    return [
+        {
+            "title": "뉴스 검색 fallback",
+            "body": (
+                "뉴스 DB 또는 임베딩 검색 연결 실패로 실제 뉴스 검색을 수행하지 못했습니다. "
+                "정성 분석은 보수적인 fallback 근거로만 표시됩니다."
+            ),
+            "publisher": "fallback",
+            "stock_code": ticker or "",
+            "fallback_reason": reason,
+        }
+    ]
+
+
+def fallback_disclosure_docs(corp_code: str | None, reason: str) -> list[dict]:
+    return [
+        {
+            "report_nm": "공시 검색 fallback",
+            "body": (
+                "공시 DB 또는 임베딩 검색 연결 실패로 실제 공시 검색을 수행하지 못했습니다. "
+                "투자 판단 전 DART 원문과 최신 공시 확인이 필요합니다."
+            ),
+            "source_url": "fallback",
+            "corp_code": corp_code or "",
+            "fallback_reason": reason,
+        }
+    ]
+
+
+def retrieve_news_with_fallback(ticker: str | None) -> list[dict]:
+    try:
+        ensure_database_available()
+        from stock_agent.rag.retriever import retrieve_news
+
+        return retrieve_news(
+            ticker=ticker,
+            query="최근 호재 악재 실적 산업 트렌드 신사업 리스크",
+            k=5,
+        )
+    except Exception as exc:
+        if not should_fallback(exc):
+            raise
+        return fallback_news_docs(ticker, fallback_reason(exc))
+
+
+def retrieve_disclosures_with_fallback(corp_code: str | None) -> list[dict]:
+    try:
+        ensure_database_available()
+        from stock_agent.rag.retriever import retrieve_disclosures
+
+        return retrieve_disclosures(
+            corp_code=corp_code,
+            query="최근 공시 사업보고서 리스크 신사업 실적",
+            k=3,
+        )
+    except Exception as exc:
+        if not should_fallback(exc):
+            raise
+        return fallback_disclosure_docs(corp_code, fallback_reason(exc))
 
 
 def classify_event_types(texts: list[str]) -> list[str]:
@@ -69,11 +131,16 @@ def format_doc_as_evidence(doc: dict) -> str:
     title = doc.get("title") or doc.get("report_nm") or "제목 없음"
     body = doc.get("body", "")
     source = doc.get("publisher") or doc.get("source_url") or ""
+    fallback = doc.get("fallback_reason")
 
     if source:
-        return f"{title}: {body} (출처: {source})"
+        evidence = f"{title}: {body} (출처: {source})"
+    else:
+        evidence = f"{title}: {body}"
 
-    return f"{title}: {body}"
+    if fallback:
+        evidence = f"{evidence} [fallback_reason: {fallback}]"
+    return evidence
 
 
 def run_qual(state: AgentState) -> AgentState:
@@ -83,17 +150,8 @@ def run_qual(state: AgentState) -> AgentState:
     ticker = getattr(state.curator, "ticker", None) or getattr(state.curator, "stock_code", None)
     corp_code = getattr(state.curator, "corp_code", "")
 
-    news_docs = retrieve_news(
-        ticker=ticker,
-        query="최근 호재 악재 실적 산업 트렌드 신사업 리스크",
-        k=5,
-    )
-
-    disclosure_docs = retrieve_disclosures(
-        corp_code=corp_code,
-        query="최근 공시 사업보고서 리스크 신사업 실적",
-        k=3,
-    )
+    news_docs = retrieve_news_with_fallback(ticker)
+    disclosure_docs = retrieve_disclosures_with_fallback(corp_code)
 
     all_docs = news_docs + disclosure_docs
 

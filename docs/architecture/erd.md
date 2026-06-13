@@ -45,13 +45,18 @@
 ### 2.1 Postgres 테이블 관계
 
 ```mermaid
-erDiagram
+    erDiagram
+
     users ||--o{ holdings : "보유종목"
     users ||--o{ analysis_history : "분석이력"
-    company ||--o{ financial_data : "재무"
-    company ||--o{ disclosure : "공시"
+
+    company ||--o{ financial_statement : "재무제표"
+    company ||--o{ financial_ratio : "재무비율"
+    company ||--o{ disclosure_report : "공시"
     company ||--o{ stock_price : "시세"
-    company ||--o{ holdings : "보유 종목 매핑"
+    company ||--o{ holdings : "보유종목 매핑"
+
+    disclosure_report ||--|| disclosure_content : "원문"
 
     users {
         uuid id PK
@@ -59,11 +64,11 @@ erDiagram
         string password_hash
         string name
         date birth_date
-        string risk_profile "보수/중립/공격"
-        string investment_horizon "단기/중기/장기"
+        string risk_profile
+        string investment_horizon
         decimal target_return
         decimal max_drawdown_tolerance
-        json interest_sectors "[반도체, 금융, 소비재]"
+        json interest_sectors
         timestamp created_at
     }
 
@@ -71,41 +76,56 @@ erDiagram
         uuid id PK
         uuid user_id FK
         string stock_code FK
-        decimal weight "0.0~1.0"
+        decimal weight
         bigint avg_price
         int qty
         date bought_at
     }
 
     company {
-        varchar corp_code PK "DART 8자리"
-        varchar stock_code UK "종목 6자리"
+        varchar corp_code PK
+        varchar stock_code UK
         varchar corp_name
         varchar sector
         date listing_date
         timestamp created_at
-        timestamp updated_at
     }
 
-    financial_data {
+    financial_statement {
         bigint id PK
         varchar corp_code FK
         int bsns_year
-        varchar reprt_code "11011 등"
+        varchar reprt_code
+        varchar fs_div
         varchar account_nm
-        varchar std_account_nm
-        bigint thstrm_amount
+        bigint amount
         timestamp created_at
     }
 
-    disclosure {
-        varchar rcept_no PK "DART 14자리"
+    financial_ratio {
+        bigint id PK
+        varchar corp_code FK
+        int bsns_year
+        varchar reprt_code
+        varchar fs_div
+        decimal debt_ratio
+        decimal roe
+        timestamp created_at
+    }
+
+    disclosure_report {
+        varchar rcept_no PK
         varchar corp_code FK
         varchar report_nm
-        varchar flr_nm
         date rcept_dt
-        decimal sentiment_score "AI -1.0~1.0"
         timestamp created_at
+    }
+
+    disclosure_content {
+        varchar rcept_no PK
+        text content
+        text summary
+        timestamp updated_at
     }
 
     stock_price {
@@ -113,8 +133,14 @@ erDiagram
         varchar stock_code FK
         date base_date
         int close_price
-        bigint volume
         bigint market_cap
+        bigint volume
+        decimal per
+        decimal pbr
+        decimal dividend_yield
+        bigint foreign_net_buy
+        bigint institutional_net_buy
+        decimal short_ratio
         timestamp created_at
     }
 
@@ -122,7 +148,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         varchar stock_code
-        string action "BUY/HOLD/SELL"
+        string action
         decimal confidence
         decimal mos
         json tier1_output
@@ -130,7 +156,7 @@ erDiagram
     }
 ```
 
-> 📌 **데이터팀 확정 4 테이블** = `company`, `financial_data`, `disclosure`, `stock_price`
+> 📌 **데이터팀 확정 4 테이블** = `company`, `financial_statement`, `financial_ratio`, `disclosure_report`, `disclosure_content`, `stock_price`
 > 📌 **PM 추가 제안 3 테이블** = `users`, `holdings`, `analysis_history` (회원·포트·분석 이력 — 데이터팀 협의 후 확정)
 
 ### 2.2 RAG 문서/청크 (Postgres + pgvector)
@@ -160,21 +186,20 @@ rag_chunks
 
 ---
 
-## 3. 데이터팀 확정 4 테이블 — 상세 (변경 금지)
+## 3. 데이터팀 확정 6 테이블 — 상세 (변경 금지)
 
-### 3.1 `company` — 기업 기본 정보
+## 3.1 company
 
-DART 고유 번호(`corp_code`)는 모든 API 호출의 핵심 키.
+기업 기본 정보(Master Data)
 
-| 컬럼명 | 데이터 타입 | 제약 | 설명 | 비고 |
-|--------|-------------|------|------|------|
-| `corp_code` | VARCHAR(8) | **PK** | DART 고유번호 | API 호출 필수 키 |
-| `stock_code` | VARCHAR(6) | UNIQUE | 상장사 종목코드 | 주가 데이터 조인용 |
-| `corp_name` | VARCHAR(100) | NOT NULL | 법인명 | 기업명 |
-| `sector` | VARCHAR(50) | | 산업분류 | 동종 업계(Peer) 비교용 |
-| `listing_date` | DATE | | 상장일 | |
-| `created_at` | TIMESTAMP | DEFAULT NOW() | 생성일시 | |
-| `updated_at` | TIMESTAMP | DEFAULT NOW() ON UPDATE | 수정일시 | |
+| 컬럼명 | 타입 | 설명 |
+|---------|---------|---------|
+| corp_code | VARCHAR(8) | DART 고유번호(PK) |
+| stock_code | VARCHAR(6) | 종목코드(UNIQUE) |
+| corp_name | VARCHAR(100) | 기업명 |
+| sector | VARCHAR(50) | 산업분류 |
+| listing_date | DATE | 상장일 |
+| created_at | TIMESTAMPTZ | 생성일시 |
 
 ```sql
 CREATE TABLE company (
@@ -183,105 +208,191 @@ CREATE TABLE company (
     corp_name VARCHAR(100) NOT NULL,
     sector VARCHAR(50),
     listing_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### 3.2 `financial_data` — DART 재무 데이터
-
-연도별로 데이터를 쌓아 5개년 추이 분석. Quant Worker의 핵심 입력.
-
-| 컬럼명 | 타입 | 설명 | 비고 |
-|--------|------|------|------|
-| `id` | BIGINT | 고유 식별자 | PK, Auto Increment |
-| `corp_code` | VARCHAR(8) | DART 고유번호 | FK → `company` |
-| `bsns_year` | INT | 사업연도 | 예: 2024 |
-| `reprt_code` | VARCHAR(5) | 보고서 코드 | 11011=사업보고서 |
-| `account_nm` | VARCHAR(100) | 원본 계정과목명 | DART 응답 그대로 |
-| `std_account_nm` | VARCHAR(50) | 표준 계정과목명 | 시스템 매핑용 |
-| `thstrm_amount` | BIGINT | 당기 금액 | 조 단위 → BIGINT |
-| `created_at` | TIMESTAMP | | |
-
-```sql
-CREATE TABLE financial_data (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    corp_code VARCHAR(8) NOT NULL,
-    bsns_year INT NOT NULL,
-    reprt_code VARCHAR(5) NOT NULL,
-    account_nm VARCHAR(100) NOT NULL,
-    std_account_nm VARCHAR(50) NOT NULL,
-    thstrm_amount BIGINT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (corp_code) REFERENCES company(corp_code) ON DELETE CASCADE,
-    UNIQUE KEY uk_financial (corp_code, bsns_year, reprt_code, std_account_nm),
-    INDEX idx_quant_search (corp_code, std_account_nm, bsns_year)
-);
-```
-
-**핵심 인덱스 의도:**
-- `uk_financial`: 같은 회사·연도·계정 중복 적재 방지 (Upsert 활용)
-- `idx_quant_search`: Quant Agent 의 5개년 시계열 고속 조회
-
-### 3.3 `disclosure` — DART 공시·뉴스
-
-Qual Worker가 RAG로 분석할 공시 메타입니다. RAG 원문과 청크는 `rag_documents`, `rag_chunks`에 저장합니다.
-
-| 컬럼명 | 데이터 타입 | 제약 | 설명 |
-|--------|-------------|------|------|
-| `rcept_no` | VARCHAR(14) | **PK** | DART 접수번호 |
-| `corp_code` | VARCHAR(8) | **FK** | `company.corp_code` |
-| `report_nm` | VARCHAR(200) | NOT NULL | 예: 단일판매ㆍ공급계약체결 |
-| `flr_nm` | VARCHAR(50) | | 제출인명 |
-| `rcept_dt` | DATE | NOT NULL | 공시 접수일자 (최신순 정렬 기준) |
-| `sentiment_score` | DECIMAL(3,2) | | AI 센티먼트 (-1.0 ~ 1.0) |
-| `created_at` | TIMESTAMP | | |
-
-```sql
-CREATE TABLE disclosure (
-    rcept_no VARCHAR(14) PRIMARY KEY,
-    corp_code VARCHAR(8) NOT NULL,
-    report_nm VARCHAR(200) NOT NULL,
-    flr_nm VARCHAR(50),
-    rcept_dt DATE NOT NULL,
-    sentiment_score DECIMAL(3,2),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (corp_code) REFERENCES company(corp_code) ON DELETE CASCADE,
-    INDEX idx_qual_search (corp_code, rcept_dt DESC)
-);
-```
-
-### 3.4 `stock_price` — 가격·거래 데이터
-
-pykrx 수집 + 재무와 결합해 PER/PBR 도출.
-
-| 컬럼명 | 데이터 타입 | 제약 | 설명 |
-|--------|-------------|------|------|
-| `id` | BIGINT | **PK**, Auto Inc | |
-| `stock_code` | VARCHAR(6) | **FK** | `company.stock_code` |
-| `base_date` | DATE | NOT NULL | 영업일자 |
-| `close_price` | INT | NOT NULL | 종가 |
-| `volume` | BIGINT | | 거래량 |
-| `market_cap` | BIGINT | | 시가총액 (밸류에이션 필수) |
-| `created_at` | TIMESTAMP | | |
-
-```sql
-CREATE TABLE stock_price (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    stock_code VARCHAR(6) NOT NULL,
-    base_date DATE NOT NULL,
-    close_price INT NOT NULL,
-    volume BIGINT,
-    market_cap BIGINT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (stock_code) REFERENCES company(stock_code) ON DELETE CASCADE,
-    UNIQUE KEY uk_price (stock_code, base_date),
-    INDEX idx_price_search (stock_code, base_date DESC)
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
 ---
 
+## 3.2 stock_price
+
+일별 시세 및 투자/수급 지표
+
+| 컬럼명 | 타입 | 설명 |
+|---------|---------|---------|
+| id | BIGSERIAL | PK |
+| stock_code | VARCHAR(6) | 종목코드(FK) |
+| base_date | DATE | 거래일 |
+| close_price | INT | 종가 |
+| market_cap | BIGINT | 시가총액 |
+| volume | BIGINT | 거래량 |
+| per | NUMERIC | PER |
+| pbr | NUMERIC | PBR |
+| dividend_yield | NUMERIC | 배당수익률 |
+| foreign_net_buy | BIGINT | 외국인 순매수 |
+| institutional_net_buy | BIGINT | 기관 순매수 |
+| short_ratio | NUMERIC | 공매도 비율 |
+
+```sql
+CREATE TABLE stock_price (
+    id BIGSERIAL PRIMARY KEY,
+    stock_code VARCHAR(6) NOT NULL,
+    base_date DATE NOT NULL,
+    close_price INT NOT NULL,
+    market_cap BIGINT,
+    volume BIGINT,
+    per NUMERIC,
+    pbr NUMERIC,
+    dividend_yield NUMERIC,
+    foreign_net_buy BIGINT,
+    institutional_net_buy BIGINT,
+    short_ratio NUMERIC,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    FOREIGN KEY (stock_code)
+        REFERENCES company(stock_code)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uk_stock_price
+        UNIQUE (stock_code, base_date)
+);
+```
+
+---
+
+## 3.3 financial_statement
+
+원시 재무제표 데이터
+
+| 컬럼명 | 타입 | 설명 |
+|---------|---------|---------|
+| id | BIGSERIAL | PK |
+| corp_code | VARCHAR(8) | 기업코드(FK) |
+| bsns_year | INT | 사업연도 |
+| reprt_code | VARCHAR(5) | 보고서코드 |
+| fs_div | VARCHAR(3) | 연결/별도 |
+| account_nm | VARCHAR(100) | 계정과목 |
+| amount | BIGINT | 금액 |
+
+```sql
+CREATE TABLE financial_statement (
+    id BIGSERIAL PRIMARY KEY,
+    corp_code VARCHAR(8) NOT NULL,
+    bsns_year INT NOT NULL,
+    reprt_code VARCHAR(5) NOT NULL,
+    fs_div VARCHAR(3) NOT NULL,
+    account_nm VARCHAR(100) NOT NULL,
+    amount BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    FOREIGN KEY (corp_code)
+        REFERENCES company(corp_code)
+        ON DELETE CASCADE
+);
+```
+
+---
+
+## 3.4 financial_ratio
+
+파생 재무비율 데이터
+
+| 컬럼명 | 타입 | 설명 |
+|---------|---------|---------|
+| id | BIGSERIAL | PK |
+| corp_code | VARCHAR(8) | 기업코드(FK) |
+| bsns_year | INT | 사업연도 |
+| reprt_code | VARCHAR(5) | 보고서코드 |
+| fs_div | VARCHAR(3) | 연결/별도 |
+| debt_ratio | NUMERIC | 부채비율 |
+| roe | NUMERIC | 자기자본이익률 |
+
+```sql
+CREATE TABLE financial_ratio (
+    id BIGSERIAL PRIMARY KEY,
+    corp_code VARCHAR(8) NOT NULL,
+    bsns_year INT NOT NULL,
+    reprt_code VARCHAR(5) NOT NULL,
+    fs_div VARCHAR(3) NOT NULL,
+    debt_ratio NUMERIC,
+    roe NUMERIC,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    FOREIGN KEY (corp_code)
+        REFERENCES company(corp_code)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uk_financial_ratio
+        UNIQUE (corp_code, bsns_year, reprt_code, fs_div)
+);
+```
+
+---
+
+## 3.5 disclosure_report
+
+공시 메타데이터
+
+| 컬럼명 | 타입 | 설명 |
+|---------|---------|---------|
+| rcept_no | VARCHAR(14) | 접수번호(PK) |
+| corp_code | VARCHAR(8) | 기업코드(FK) |
+| report_nm | VARCHAR(200) | 공시명 |
+| rcept_dt | DATE | 공시일 |
+
+```sql
+CREATE TABLE disclosure_report (
+    rcept_no VARCHAR(14) PRIMARY KEY,
+    corp_code VARCHAR(8) NOT NULL,
+    report_nm VARCHAR(200) NOT NULL,
+    rcept_dt DATE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+
+    FOREIGN KEY (corp_code)
+        REFERENCES company(corp_code)
+        ON DELETE CASCADE
+);
+```
+
+---
+
+## 3.6 disclosure_content
+
+공시 원문 및 AI 요약
+
+| 컬럼명 | 타입 | 설명 |
+|---------|---------|---------|
+| rcept_no | VARCHAR(14) | 공시번호(PK/FK) |
+| content | TEXT | 공시 원문 |
+| summary | TEXT | AI 요약 |
+
+```sql
+CREATE TABLE disclosure_content (
+    rcept_no VARCHAR(14) PRIMARY KEY,
+    content TEXT,
+    summary TEXT,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    FOREIGN KEY (rcept_no)
+        REFERENCES disclosure_report(rcept_no)
+        ON DELETE CASCADE
+);
+```
+
+---
+
+# 인덱스
+
+```sql
+CREATE INDEX idx_stock_price_search
+ON stock_price (stock_code, base_date DESC);
+
+CREATE INDEX idx_fs_search
+ON financial_statement (corp_code, bsns_year, account_nm);
+
+CREATE INDEX idx_report_date
+ON disclosure_report (corp_code, rcept_dt DESC);
+```
 ## 4. 에이전트별 데이터 사용 케이스 (PM 정리)
 
 > 데이터팀 자료의 *에이전트별 수집 데이터* 를 표로 압축. 누가 어떤 데이터를 쓰는지 한눈에.
