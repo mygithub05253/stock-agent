@@ -54,7 +54,7 @@
 3. **RequestClassifier Agent** — 질문 → intent·scope·urgency 구조화
 4. **Qual Worker Agent ★** — 뉴스·공시 RAG로 호재/악재 분석 (현재 MVP mock)
 5. **Quant Worker Agent** — DART 재무 + pykrx 시세 기반 정량 분석 (현재 MVP mock)
-6. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교 (현재 MVP mock)
+6. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교 (DB→MCP 실시간 시세→mock 3단 폴백, 품질 회귀 골든셋·MCP 외부 노출 완비)
 7. **Strategist & Synthesizer Agent** — worker 결과와 포트폴리오 맥락 종합
 8. **InvestmentAnalyst Agent** — GLM으로 최종 분석 신호와 포트폴리오 적합도 보정
 9. **Guardrail & Evaluator Agent** — 위험 표현 차단 + 안전 문구 적용
@@ -76,11 +76,11 @@
 stock-agent/
 │
 ├── streamlit_app.py               🖥 Streamlit Cloud 진입점 (홈 페이지)
-├── pages/                         🖥 Streamlit 멀티페이지 (자동 인식)
-│   ├── 1_분석_진행중.py
-│   ├── 2_추천_결과.py
-│   ├── 3_상세_산출물.py
-│   └── 9_관리자_평가.py
+├── pages/                         🖥 Streamlit 멀티페이지 (자동 인식) — 페이지는 7~8주차 작성 예정(현재 .gitkeep)
+│   ├── 1_분석_진행중.py            (예정)
+│   ├── 2_추천_결과.py              (예정)
+│   ├── 3_상세_산출물.py            (예정)
+│   └── 9_관리자_평가.py            (예정)
 │
 ├── ui/                            🖥 재사용 UI 컴포넌트 (페이지에서 import)
 │   └── components/                액션 카드·근거 카드·진행 사이드바·책임고지
@@ -123,9 +123,11 @@ stock-agent/
 │   └── db.py                      DB 연결
 │
 ├── eval/                          🧪 평가 하네스
-│   ├── golden_set/                골든셋 (페르소나 입력·기대 결과)
+│   ├── golden_set/                파이프라인 골든셋 (페르소나 입력·기대 결과)
+│   ├── competitor_golden/         Competitor peer 비교 품질 회귀 골든셋
 │   ├── reports/                   일별 자동 평가 리포트
-│   └── run_benchmark.py           평가 실행 스크립트
+│   ├── run_benchmark.py           파이프라인 평가 (rule-based + RAGAS)
+│   └── run_competitor_eval.py     Competitor 회귀 평가 (순수 엔진, 비용 0)
 │
 ├── scripts/                       🛠 운영 스크립트 (cron·배치 분석 등)
 │   ├── apply_db_schema.py         기존 Docker 볼륨에 최신 DB 스키마 적용
@@ -248,7 +250,7 @@ python scripts/check_db.py
 streamlit run streamlit_app.py
 ```
 
-브라우저가 열리며 사이드바에 `pages/` 안의 페이지들이 자동 노출됩니다 (1_분석_진행중·2_추천_결과·3_상세_산출물·9_관리자_평가).
+브라우저가 열리며 홈(`streamlit_app.py`)이 표시됩니다. `pages/` 멀티페이지(1_분석_진행중·2_추천_결과·3_상세_산출물·9_관리자_평가)는 7~8주차 작성 예정이며, 작성되면 사이드바에 자동 노출됩니다.
 
 > Streamlit 멀티페이지는 `pages/` 가 *루트* 에 있어야 자동 인식됩니다. `ui/pages/` 같은 곳에 두면 안 됨.
 
@@ -432,7 +434,13 @@ PM이 주로 관리하는 문서들:
 | `docs/functional-spec/demo/D1_backtesting_validation_spec_v0.1.md` | 중간 시연용 백테스팅 검증 모드 기능 명세 | 개발팀·PM |
 | `docs/roadmap/<날짜>/roadmap_dashboard.html` | 주간 진행 현황·완료/할 일·의사결정을 한 화면에서 보는 인터랙티브 로드맵 대시보드 (예: `docs/roadmap/2026-05-23/`) | 전원 |
 | `docs/roadmap/2026-06-12/progress_dashboard.html` | 강사님 재검토 공식 점수와 팀원별 파트·에이전트별 구현도·집중 피드백·미배정 과제를 추적하는 인터랙티브 작업 현황 대시보드 (재검토 직후 스냅샷) | 전원 |
-| `docs/roadmap/2026-06-13/progress_dashboard.html` | **최신** — 강사 재검토 이후 머지(Qual·Strategist 폴백 #51·#52, Guardrail 게이팅 #50, Macro 연결 #49, Competitor MCP #56)를 반영해 6대 피드백 중 4건 해소·남은 ×2 레버(LangGraph·sLLM)를 강조한 EOD 대시보드 | 전원 |
+| `docs/roadmap/2026-06-13/progress_dashboard.html` | 강사 재검토 이후 머지(Qual·Strategist 폴백 #51·#52, Guardrail 게이팅 #50, Macro 연결 #49, Competitor MCP #56)를 반영한 EOD 대시보드 | 전원 |
+| `docs/roadmap/2026-06-14/progress_dashboard.html` | **최신** — Competitor 100% 마감(품질 회귀 골든셋 + MCP 외부 노출) 반영 작업 현황 대시보드 | 전원 |
+| `docs/roadmap/2026-06-14/readme_audit.md` | 전 폴더 README 정합 감사 리포트 (드리프트·담당 조율 항목) | PM·전원 |
+| `docs/architecture/erd_dashboard.html` | ERD 인터랙티브 시각화 (구현 상태 정합표·테이블·관계·에이전트 사용) | 데이터팀·전원 |
+| `docs/architecture/competitor_architecture.html` | Competitor Agent 아키텍처 시각화 (3단 폴백·복합 유사도·MCP 외부 노출·회귀) | 전원·발표 |
+| `docs/functional-spec/functional_spec_dashboard.html` | 기능 명세(B1~B5·A1~A6·D1) 클릭형 상세 대시보드 (트리거·입력·처리·출력·예외·KPI·구현상태) | 개발팀·전원 |
+| `docs/functional-spec/IMPLEMENTATION_STATUS.md` | 기능 명세 ↔ 실제 구현 정합 매트릭스 (코드 기준 SSOT) | 개발팀·PM |
 | `docs/guides/2026-06-13/streamlit_usage_guide.html` | Streamlit UI 실행·테스트 사용 가이드 — 실제 화면 스크린샷 6장과 단계별 설명, FAQ 포함 | 전원 (특히 신규 팀원) |
 | `docs/architecture/erd.md` | DB ERD | 데이터팀·백엔드 |
 | `docs/architecture/agent_design.md` | 6 에이전트 상세 설계 | 에이전트 담당 |
@@ -485,6 +493,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-14 | v1.12 | Competitor Agent 100% 마감 — peer 품질 회귀 골든셋·평가 하네스, 범용 MCP 외부 노출(A2A). 06-14 진행현황 대시보드·ERD/기능명세/Competitor HTML 시각화·README 감사 리포트 추가. 루트 README `pages/`·eval 구조 정합 |
 | 2026-06-13 | v1.11 | Competitor Peer 선정 복합 유사도 고도화(#62), CI 머지 충돌마커 게이트(#63), ERD 테이블명 코드 정합(#64). 대시보드·흐름도에 반영 |
 | 2026-06-13 | v1.10 | 발표·온보딩용 에이전트 흐름도(`docs/architecture/agent_flow_dashboard.html`) 추가 — 9 에이전트 파이프라인 + 노드 클릭 상세(입출력·데이터·폴백)·인프라 레이어·폴백 전략·현재 vs LangGraph 목표 |
 | 2026-06-13 | v1.9 | 강사 재검토 이후 머지(#49 Macro·#50 Guardrail·#51 Strategist·#52 Qual·#56 Competitor MCP) 반영한 06-13 EOD 대시보드 추가 — 6대 피드백 중 4건 코드 해소·남은 ×2 레버(LangGraph·sLLM) 강조 |

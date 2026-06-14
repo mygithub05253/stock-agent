@@ -72,7 +72,7 @@
 - 현재 구현 상태:
   - Quant: DB 연결 실패 시 보수적인 mock 지표와 risk를 반환합니다.
   - Qual: 뉴스/공시 RAG 검색 각각 실패 시 독립 fallback 문서를 반환합니다.
-  - Competitor: peer DB 연결 실패 시 mock peer 비교와 warning을 반환합니다.
+  - Competitor: peer DB 연결 실패 시 ① 자체 MCP 서버(stdio)로 pykrx 실시간 시세 기반 peer 비교(실데이터)를 시도하고, 그마저 불가하면 ② mock peer 비교와 warning을 반환합니다.
   - Macro: macro DB/tool 실패 시 mock 거시 지표와 risk를 반환합니다.
   - Guardrail: fallback 근거가 포함된 결과를 사용자 경고로 승격합니다.
 

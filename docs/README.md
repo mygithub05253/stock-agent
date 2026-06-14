@@ -23,7 +23,7 @@ docs/
 │   └── advanced/
 │       ├── A1_valuation_5y_spec_v0.7.md
 │       ├── A2_industry_qualitative_spec_v0.8.md
-│       ├── A3_peer_comparison_spec_v0.9.md
+│       ├── A3_peer_comparison_spec_v1.0.md
 │       ├── A4_action_recommendation_spec_v1.0.md
 │       └── A5_stock_recommendation_spec_v1.1.md
 ├── architecture/                           ← 시스템 설계
