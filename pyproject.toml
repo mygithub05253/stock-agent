@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings>=2.4.0",
     "requests>=2.32.0",
     "streamlit>=1.37.0",
+    "langgraph>=0.2.0",
     "pgvector>=0.3.0",
     "sentence-transformers>=3.0.0",
 ]
@@ -55,3 +56,6 @@ target-version = "py311"
 testpaths = ["tests"]
 # editable install 없이도 pytest가 src 레이아웃 패키지를 찾도록 경로 주입
 pythonpath = ["src"]
+markers = [
+    "openrouter_smoke: real OpenRouter Qwen smoke test, skipped unless OPENROUTER_API_KEY is set",
+]

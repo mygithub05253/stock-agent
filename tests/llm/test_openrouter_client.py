@@ -28,7 +28,7 @@ def test_strip_json_fence_leaves_clean_json():
 def _mock_settings(api_key: str | None = "test-key"):
     s = MagicMock()
     s.openrouter_api_key = api_key
-    s.openrouter_model = "google/gemini-flash-1.5"
+    s.openrouter_model = "qwen/qwen-2.5-7b-instruct"
     s.openrouter_base_url = "https://openrouter.ai/api/v1"
     s.openrouter_timeout_seconds = 30
     return s

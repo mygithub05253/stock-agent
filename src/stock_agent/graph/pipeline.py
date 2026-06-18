@@ -1,3 +1,10 @@
+from __future__ import annotations
+
+import operator
+from typing import Annotated, Any, Callable, TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
 from stock_agent.agents import (
     run_competitor,
     run_curator,
@@ -12,12 +19,52 @@ from stock_agent.agents import (
 from stock_agent.schemas.analysis import (
     AgentState,
     AnalysisOutput,
+    CompetitorResult,
+    CuratorResult,
+    GuardrailResult,
     Holding,
+    MacroResult,
     Portfolio,
+    QualResult,
+    QuantResult,
+    StrategistResult,
     Tier1Result,
     UserProfile,
     UserRequest,
 )
+
+
+class AnalysisGraphState(TypedDict, total=False):
+    user_query: str
+    user_request: UserRequest | None
+    user_profile: UserProfile
+    portfolio: Portfolio
+    as_of_date: str | None
+    curator: CuratorResult | None
+    quant: QuantResult | None
+    qual: QualResult | None
+    competitor: CompetitorResult | None
+    macro: MacroResult | None
+    strategist: StrategistResult | None
+    guardrail: GuardrailResult | None
+    graph_route: dict[str, Any]
+    trace_spans: Annotated[list[str], operator.add]
+    worker_errors: Annotated[list[str], operator.add]
+
+
+_AGENT_FIELDS = set(AgentState.model_fields)
+_EVENT_LABELS = {
+    "curator": "Curator",
+    "classifier": "RequestClassifier",
+    "quant": "Quant",
+    "qual": "Qual",
+    "competitor": "Competitor",
+    "macro": "Macro",
+    "strategist": "Strategist",
+    "investment_analyst": "InvestmentAnalyst",
+    "guardrail": "Guardrail",
+    "guardrail_apply": "Guardrail Apply",
+}
 
 
 def build_demo_profile() -> tuple[UserProfile, Portfolio]:
@@ -55,90 +102,337 @@ def build_demo_profile() -> tuple[UserProfile, Portfolio]:
     )
 
 
-def run_phase1_analysis(
+def _agent_state(state: AnalysisGraphState) -> AgentState:
+    return AgentState(**{key: value for key, value in state.items() if key in _AGENT_FIELDS})
+
+
+def _patch_from_agent(state: AgentState, *fields: str) -> dict[str, Any]:
+    return {field: getattr(state, field) for field in fields}
+
+
+def _node_span(name: str) -> dict[str, list[str]]:
+    return {"trace_spans": [name]}
+
+
+def _curator_node(state: AnalysisGraphState) -> dict[str, Any]:
+    next_state = run_curator(_agent_state(state))
+    return {**_patch_from_agent(next_state, "curator"), **_node_span("curator")}
+
+
+def _classifier_node(state: AnalysisGraphState) -> dict[str, Any]:
+    next_state = run_request_classifier(_agent_state(state))
+    request = next_state.user_request
+    route = {
+        "analysis_scope": request.analysis_scope if request else None,
+        "urgency_reason": request.urgency_reason if request else None,
+        "requested_depth": request.requested_depth if request else "summary",
+        "summary_only": bool(request and request.requested_depth == "summary"),
+        "worker_plan": _worker_plan(next_state),
+    }
+    return {
+        **_patch_from_agent(next_state, "user_request"),
+        "graph_route": route,
+        "trace_spans": ["classifier", "worker_fanout"],
+    }
+
+
+def _worker_plan(state: AgentState) -> list[str]:
+    scope = state.user_request.analysis_scope if state.user_request else None
+    workers = ["quant", "qual", "competitor"]
+    if scope in {"portfolio", "sector"}:
+        workers.append("macro")
+    return workers
+
+
+def _safe_worker_node(
+    name: str,
+    runner: Callable[[AgentState], AgentState],
+    *fields: str,
+) -> Callable[[AnalysisGraphState], dict[str, Any]]:
+    def _node(state: AnalysisGraphState) -> dict[str, Any]:
+        try:
+            next_state = runner(_agent_state(state))
+            return {**_patch_from_agent(next_state, *fields), **_node_span(name)}
+        except Exception as exc:
+            return {
+                "worker_errors": [f"{name}: {exc.__class__.__name__}: {exc}"],
+                **_node_span(name),
+            }
+
+    return _node
+
+
+def _route_workers(state: AnalysisGraphState) -> list[str]:
+    return ["quant", "qual", "competitor", "macro"]
+
+
+def _macro_node(state: AnalysisGraphState) -> dict[str, Any]:
+    if "macro" not in ((state.get("graph_route") or {}).get("worker_plan") or []):
+        return {"trace_spans": ["macro_skipped"]}
+    return _safe_worker_node("macro", run_macro, "macro")(state)
+
+
+def _strategist_node(state: AnalysisGraphState) -> dict[str, Any]:
+    try:
+        next_state = run_strategist(_agent_state(state))
+    except Exception as exc:
+        fallback = StrategistResult(
+            signal="HOLD",
+            confidence=30,
+            suitability=30,
+            headline="[부분 분석] 핵심 분석 결과가 부족해 보수적인 보유 검토로 제한합니다.",
+            key_reasons=["분석 워커 실패로 충분한 근거를 확보하지 못했습니다."],
+            risks=[
+                f"Strategist 합성 실패로 conservative fallback을 사용했습니다: {exc.__class__.__name__}: {exc}"
+            ],
+            next_actions=["데이터 연결 상태를 확인한 뒤 분석을 다시 실행합니다."],
+            degraded=True,
+            contributing_agents=[],
+            model_provider="fallback",
+            model="conservative-rule",
+            fallback_used=True,
+        )
+        return {"strategist": fallback, "worker_errors": [f"strategist: {exc}"], **_node_span("strategist")}
+
+    strategist = next_state.strategist
+    if strategist is not None and state.get("worker_errors"):
+        strategist = strategist.model_copy(
+            update={
+                "degraded": True,
+                "risks": [
+                    *strategist.risks,
+                    "일부 분석 노드 실패: " + " / ".join(state.get("worker_errors") or []),
+                ],
+            }
+        )
+    return {"strategist": strategist, **_node_span("strategist")}
+
+
+def _investment_analyst_node(state: AnalysisGraphState) -> dict[str, Any]:
+    next_state = run_investment_analyst(_agent_state(state))
+    return {**_patch_from_agent(next_state, "strategist"), **_node_span("investment_analyst")}
+
+
+def _guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
+    try:
+        next_state = run_guardrail(_agent_state(state))
+        return {**_patch_from_agent(next_state, "guardrail"), **_node_span("guardrail")}
+    except Exception as exc:  # pragma: no cover - defensive path
+        strategist = state.get("strategist")
+        return {
+            "guardrail": GuardrailResult(
+                passed=False,
+                warnings=[f"Guardrail failed with exception: {exc.__class__.__name__}: {exc}"],
+                revised_headline=(strategist.headline if strategist else "") or "",
+                disclaimer="Guardrail evaluation failed; 일부 출력이 제한될 수 있습니다.",
+                needs_revision=True,
+                risk_level="high",
+                checks=[
+                    {
+                        "name": "guardrail_exception",
+                        "passed": False,
+                        "severity": "block",
+                        "detail": exc.__class__.__name__,
+                    }
+                ],
+            ),
+            **_node_span("guardrail"),
+        }
+
+
+def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
+    strategist = state.get("strategist")
+    guardrail = state.get("guardrail")
+    if strategist is None or guardrail is None:
+        return _node_span("guardrail_apply")
+
+    if not guardrail.passed:
+        if any("PII" in warning or "Inappropriate language" in warning for warning in guardrail.warnings):
+            strategist = strategist.model_copy(
+                update={
+                    "headline": "출력 제한: 민감 콘텐츠가 검출되어 일부 내용이 숨겨졌습니다.",
+                    "signal": "HOLD",
+                    "confidence": max(0, strategist.confidence - 30),
+                    "suitability": max(0, strategist.suitability - 30),
+                    "degraded": True,
+                }
+            )
+            guardrail = guardrail.model_copy(update={"revised_headline": strategist.headline})
+        else:
+            strategist = strategist.model_copy(
+                update={"headline": guardrail.revised_headline, "degraded": True}
+            )
+    return {"strategist": strategist, "guardrail": guardrail, **_node_span("guardrail_apply")}
+
+
+def build_analysis_graph():
+    graph = StateGraph(AnalysisGraphState)
+    graph.add_node("curator", _curator_node)
+    graph.add_node("classifier", _classifier_node)
+    graph.add_node("quant", _safe_worker_node("quant", run_quant, "quant"))
+    graph.add_node("qual", _safe_worker_node("qual", run_qual, "qual"))
+    graph.add_node("competitor", _safe_worker_node("competitor", run_competitor, "competitor"))
+    graph.add_node("macro", _macro_node)
+    graph.add_node("strategist", _strategist_node)
+    graph.add_node("investment_analyst", _investment_analyst_node)
+    graph.add_node("guardrail", _guardrail_node)
+    graph.add_node("guardrail_apply", _apply_guardrail_node)
+
+    graph.add_edge(START, "curator")
+    graph.add_edge("curator", "classifier")
+    graph.add_conditional_edges(
+        "classifier",
+        _route_workers,
+        {
+            "quant": "quant",
+            "qual": "qual",
+            "competitor": "competitor",
+            "macro": "macro",
+        },
+    )
+    graph.add_edge(["quant", "qual", "competitor", "macro"], "strategist")
+    graph.add_edge("strategist", "investment_analyst")
+    graph.add_edge("investment_analyst", "guardrail")
+    graph.add_edge("guardrail", "guardrail_apply")
+    graph.add_edge("guardrail_apply", END)
+    return graph.compile()
+
+
+def _initial_state(user_query: str, user_profile: UserProfile, portfolio: Portfolio) -> AnalysisGraphState:
+    return {
+        "user_query": user_query,
+        "user_request": UserRequest(raw_query=user_query),
+        "user_profile": user_profile,
+        "portfolio": portfolio,
+        "as_of_date": "2026-05-21",
+        "graph_route": {},
+        "trace_spans": [],
+        "worker_errors": [],
+    }
+
+
+def _merge_graph_update(
+    state: AnalysisGraphState,
+    node_name: str,
+    patch: dict[str, Any],
+) -> AnalysisGraphState:
+    merged = dict(state)
+    for key, value in patch.items():
+        if key in {"trace_spans", "worker_errors"}:
+            merged[key] = [*(merged.get(key) or []), *value]
+        elif key == "graph_route":
+            merged[key] = {**(merged.get(key) or {}), **value}
+        else:
+            merged[key] = value
+
+    if node_name == "macro" and "macro" not in patch:
+        route = merged.get("graph_route") or {}
+        skipped = set(route.get("skipped_agents") or [])
+        skipped.add("macro")
+        merged["graph_route"] = {**route, "skipped_agents": sorted(skipped)}
+    return merged
+
+
+def _event_status(node_name: str, patch: dict[str, Any]) -> str:
+    if any(error.startswith(f"{node_name}:") for error in patch.get("worker_errors", [])):
+        return "error"
+    if node_name == "macro" and "macro" not in patch:
+        return "skipped"
+    return "done"
+
+
+def _event_detail(node_name: str, state: AnalysisGraphState, patch: dict[str, Any]) -> str:
+    if patch.get("worker_errors"):
+        return " / ".join(patch["worker_errors"])
+    if node_name == "classifier":
+        request = patch.get("user_request")
+        if request is None:
+            return "분류 결과 없음"
+        return (
+            f"{request.analysis_scope or 'unknown'} route, "
+            f"{request.urgency_reason or 'general'}, {request.requested_depth}"
+        )
+    if node_name == "macro" and "macro" not in patch:
+        return "single_stock route에서 생략"
+    if node_name == "investment_analyst":
+        strategist = patch.get("strategist")
+        if strategist is None:
+            return ""
+        return f"{strategist.model_provider}/{strategist.model}, fallback={strategist.fallback_used}"
+    if node_name == "guardrail":
+        guardrail = patch.get("guardrail")
+        if guardrail is None:
+            return ""
+        return f"passed={guardrail.passed}, risk={guardrail.risk_level}"
+    if node_name in {"quant", "qual", "competitor", "macro"}:
+        result = patch.get(node_name)
+        score = getattr(result, "score", None)
+        fallback = False
+        for attr in ("reasons", "evidence", "risks", "warnings", "data_quality_flags"):
+            values = getattr(result, attr, []) or []
+            fallback = fallback or any(
+                marker in str(value).lower()
+                for value in values
+                for marker in ("fallback", "mock")
+            )
+        detail = f"score={score}" if score is not None else ""
+        if fallback:
+            detail = f"{detail}, fallback/mock 포함" if detail else "fallback/mock 포함"
+        return detail
+    if node_name == "strategist":
+        strategist = patch.get("strategist")
+        if strategist is None:
+            return ""
+        return (
+            f"{strategist.signal}, confidence={strategist.confidence}, "
+            f"degraded={strategist.degraded}"
+        )
+    return ""
+
+
+def stream_phase1_analysis_events(
     user_query: str,
     user_profile: UserProfile | None = None,
     portfolio: Portfolio | None = None,
-) -> AnalysisOutput:
+):
     if user_profile is None or portfolio is None:
         demo_profile, demo_portfolio = build_demo_profile()
         user_profile = user_profile or demo_profile
         portfolio = portfolio or demo_portfolio
 
-    state = AgentState(
-        user_query=user_query,
-        user_request=UserRequest(raw_query=user_query),
-        user_profile=user_profile,
-        portfolio=portfolio,
-    )
-    state = run_curator(state)
-    state.as_of_date = "2026-05-21"
-    state = run_request_classifier(state)
+    graph = build_analysis_graph()
+    state = _initial_state(user_query, user_profile, portfolio)
+    for chunk in graph.stream(state):
+        for node_name, patch in chunk.items():
+            state = _merge_graph_update(state, node_name, patch)
+            yield {
+                "type": "node",
+                "node": node_name,
+                "label": _EVENT_LABELS.get(node_name, node_name),
+                "status": _event_status(node_name, patch),
+                "detail": _event_detail(node_name, state, patch),
+                "state": _agent_state(state),
+            }
 
-    # Phase 1 uses local mock workers. The contract mirrors the future LangGraph
-    # fan-out: Quant, Qual, and Competitor only depend on Curator output.
-    state = run_quant(state)
-    state = run_qual(state)
-    state = run_competitor(state)
-    state = run_macro(state)
-    state = run_strategist(state)
-    state = run_investment_analyst(state)
-    # Guardrail is critical but must not crash the pipeline; capture exceptions.
-    try:
-        state = run_guardrail(state)
-    except Exception as exc:  # pragma: no cover - defensive path
-        # populate a conservative GuardrailResult on failure
-        from stock_agent.schemas.analysis import GuardrailResult
+    output = _to_output(_agent_state(state))
+    yield {
+        "type": "complete",
+        "node": "complete",
+        "label": "Complete",
+        "status": "done",
+        "detail": "분석 완료",
+        "output": output,
+        "state": output.state,
+    }
 
-        state.guardrail = GuardrailResult(
-            passed=False,
-            warnings=[f"Guardrail failed with exception: {exc.__class__.__name__}: {exc}"],
-            revised_headline=(state.strategist.headline if state.strategist else "") or "",
-            disclaimer="Guardrail evaluation failed; 일부 출력이 제한될 수 있습니다.",
-        )
 
-    # If guardrail softening/guarantee issues were detected, attempt an automatic rewrite
-    # up to a small number of retries to see if the content can be safely softened.
-    from stock_agent.agents import guardrail as guardrail_module
+def _tier_items(items: list[str], state: AgentState) -> list[str]:
+    if state.user_request and state.user_request.requested_depth == "summary":
+        return items[:1]
+    return items
 
-    max_rewrites = 2
-    rewrite_attempts = 0
-    if state.guardrail and state.strategist:
-        gw = state.guardrail
-        # determine whether it's worth attempting an automatic rewrite
-        while rewrite_attempts < max_rewrites and not gw.passed and any(
-            kw in w.lower() for w in gw.warnings for kw in ("guarantee", "soften", "insufficient")
-        ):
-            rewrite_attempts += 1
-            # perform a conservative rewrite of the headline and re-evaluate
-            try:
-                strat = state.strategist
-                new_headline = guardrail_module._soften_headline(strat.headline or "")
-                strat.headline = new_headline
-                state = run_guardrail(state)
-                gw = state.guardrail
-                if gw.passed:
-                    break
-            except Exception:
-                break
 
-    # Apply Guardrail decisions to strategist output: soften or redact as needed
-    if state.guardrail and state.strategist:
-        gw = state.guardrail
-        strat = state.strategist
-        if not gw.passed:
-            # If PII or profanity detected, redact and downgrade signal
-            if any("PII" in w or "Inappropriate language" in w for w in gw.warnings):
-                strat.headline = "출력 제한: 민감 콘텐츠가 검출되어 일부 내용이 숨겨졌습니다."
-                strat.signal = "HOLD"
-                strat.confidence = max(0, strat.confidence - 30)
-                strat.suitability = max(0, strat.suitability - 30)
-                # reflect redact in guardrail revised_headline as well
-                gw.revised_headline = strat.headline
-            else:
-                # Otherwise, adopt the guardrail-revised headline (softened)
-                strat.headline = gw.revised_headline
-
+def _to_output(state: AgentState) -> AnalysisOutput:
     if state.strategist is None or state.guardrail is None:
         raise RuntimeError("analysis pipeline finished without strategist or guardrail output")
 
@@ -153,9 +447,10 @@ def run_phase1_analysis(
     return AnalysisOutput(
         tier1=tier1,
         tier2={
-            "정량 근거": state.quant.reasons if state.quant else [],
-            "정성 근거": state.qual.evidence if state.qual else [],
-            "Peer 비교": state.competitor.evidence if state.competitor else [],
+            "정량 근거": _tier_items(state.quant.reasons if state.quant else [], state),
+            "정성 근거": _tier_items(state.qual.evidence if state.qual else [], state),
+            "Peer 비교": _tier_items(state.competitor.evidence if state.competitor else [], state),
+            "거시경제": _tier_items(state.macro.reasons if state.macro else [], state),
             "포트폴리오 적합도": state.strategist.next_actions,
             "리스크": state.strategist.risks,
         },
@@ -166,3 +461,22 @@ def run_phase1_analysis(
         },
         state=state,
     )
+
+
+def run_phase1_analysis(
+    user_query: str,
+    user_profile: UserProfile | None = None,
+    portfolio: Portfolio | None = None,
+) -> AnalysisOutput:
+    if user_profile is None or portfolio is None:
+        demo_profile, demo_portfolio = build_demo_profile()
+        user_profile = user_profile or demo_profile
+        portfolio = portfolio or demo_portfolio
+
+    output: AnalysisOutput | None = None
+    for event in stream_phase1_analysis_events(user_query, user_profile, portfolio):
+        if event["type"] == "complete":
+            output = event["output"]
+    if output is None:
+        raise RuntimeError("analysis pipeline did not produce output")
+    return output
