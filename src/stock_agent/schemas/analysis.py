@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -150,6 +150,9 @@ class StrategistResult(BaseModel):
     # 부분 실패 허용: 일부 워커 에이전트가 빠진 채 종합했는지와 실제 기여한 에이전트 목록.
     degraded: bool = False
     contributing_agents: list[str] = Field(default_factory=list)
+    model_provider: str = "strategist"
+    model: str = "local-rule"
+    fallback_used: bool = False
 
 
 class GuardrailResult(BaseModel):
@@ -197,6 +200,9 @@ class AgentState(BaseModel):
     macro: MacroResult | None = None
     strategist: StrategistResult | None = None
     guardrail: GuardrailResult | None = None
+    graph_route: dict[str, Any] = Field(default_factory=dict)
+    trace_spans: list[str] = Field(default_factory=list)
+    worker_errors: list[str] = Field(default_factory=list)
 
 
 class AnalysisOutput(BaseModel):

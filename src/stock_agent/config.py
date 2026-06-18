@@ -30,8 +30,7 @@ class Settings(BaseSettings):
 
     openrouter_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    # 주의: gemini-flash-1.5는 OpenRouter에서 퇴역(404)해 기본값을 저가 현행 모델로 교체 (2026-06-12)
-    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_model: str = "qwen/qwen-2.5-7b-instruct"
     openrouter_timeout_seconds: int = 30
 
     # Competitor의 DB 미연결 폴백이 자체 MCP 서버(mcp_bridge)를 통해 pykrx 실시간 시세로

@@ -63,6 +63,14 @@ def _detect_analysis_scope(query: str, curator_intent: str) -> str:
     return "single_stock"
 
 
+def _detect_requested_depth(query: str, current_depth: str | None) -> str:
+    if any(keyword in query for keyword in ("자세", "상세", "깊게", "전체", "리포트")):
+        return "deep"
+    if any(keyword in query for keyword in ("간단", "요약", "짧게", "핵심")):
+        return "summary"
+    return current_depth or "standard"
+
+
 def _build_default_request(state: AgentState, query: str) -> dict[str, str | None]:
     analysis_scope = _detect_analysis_scope(query, state.curator.intent)
     target_sector = _detect_sector(query, state.curator.sector, state.user_profile.preferred_sectors)
@@ -73,7 +81,10 @@ def _build_default_request(state: AgentState, query: str) -> dict[str, str | Non
         "target_sector": target_sector,
         "analysis_scope": analysis_scope,
         "urgency_reason": _detect_urgency_reason(query),
-        "requested_depth": state.user_request.requested_depth if state.user_request else "summary",
+        "requested_depth": _detect_requested_depth(
+            query,
+            state.user_request.requested_depth if state.user_request else None,
+        ),
     }
 
 
