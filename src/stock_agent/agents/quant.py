@@ -1,11 +1,17 @@
+import os
 import time
-
+from dotenv import load_dotenv
 import psycopg2
 
+from psycopg2 import OperationalError  
+from stock_agent.agents.fallback import ensure_database_available
 from stock_agent.config import get_settings
 from stock_agent.schemas.analysis import AgentState, QuantResult
 from stock_agent.tools.financial_tool import get_financial_metrics
 from stock_agent.tools.price_tool import get_price_metrics
+
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL") or get_settings().resolved_database_url
 
 _RETRYABLE_DB_CONNECT_ATTEMPTS = 3
 _DB_CONNECT_BACKOFF_SECONDS = (0.5, 1.0)
@@ -21,7 +27,6 @@ _DEFAULT_FIN_METRICS = {
     "operating_margin": 12.0,
     "debt_ratio": 90.0,
 }
-
 
 def _connect_with_retry() -> tuple[object | None, list[str]]:
     settings = get_settings()
@@ -64,7 +69,6 @@ def run_quant(state: AgentState) -> AgentState:
     as_of_date = getattr(state, "as_of_date", None)
     if not as_of_date:
         from datetime import datetime
-
         as_of_date = datetime.now().strftime("%Y-%m-%d")
 
     price_metrics: dict[str, float | int] = _DEFAULT_PRICE_METRICS.copy()

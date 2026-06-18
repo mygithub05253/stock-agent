@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+import re
+from typing import Optional
+
+from stock_agent.observability import Trace, flush
+from stock_agent.schemas.analysis import AgentState, GuardrailResult, StrategistResult
+
 """Guardrail 에이전트 — 출력 게이팅 + 안전성 검출 + 관측.
 
 7개 게이트를 수행하고 결함 유형에 따라 ① 출력 차단(passed=False) ② Strategist 재합성 요청
@@ -12,14 +20,6 @@
 `graph/pipeline.py`의 재작성 루프가 경고 문구("PII", "Inappropriate language",
 "guarantee")와 `_soften_headline`을 키로 사용하므로 해당 계약을 유지한다.
 """
-
-from __future__ import annotations
-
-import re
-from typing import Optional
-
-from stock_agent.observability import Trace, flush
-from stock_agent.schemas.analysis import AgentState, GuardrailResult
 
 # 한국어 투자 권유성 표현 완화 매핑(정보성 게이트). 명시적 치환으로 자연스러운 문구를 유지한다.
 _BANNED_PHRASES = {
@@ -99,6 +99,45 @@ def run_guardrail(
     """
     if state.strategist is None:
         raise ValueError("strategist result is required before guardrail")
+
+    strat: StrategistResult = state.strategist
+    passed = True
+    warnings: list[str] = []
+    revised_headline = strat.headline or ""
+
+    # PII checks
+    if _contains_pii(str(state.user_query)):
+        passed = False
+        warnings.append("PII detected in user query — input rejected or redacted")
+
+    if _contains_pii(revised_headline) or any(_contains_pii(r) for r in strat.key_reasons):
+        passed = False
+        warnings.append("PII detected in strategist output — redaction required")
+
+    # Profanity checks
+    if _contains_profanity(str(state.user_query)) or _contains_profanity(revised_headline) or any(_contains_profanity(r) for r in strat.key_reasons):
+        passed = False
+        warnings.append("Inappropriate language detected in inputs/outputs")
+
+    # Guarantee / absolute claim detection
+    guarantee_found = _contains_guarantee(revised_headline) or any(_contains_guarantee(r) for r in strat.key_reasons)
+    if guarantee_found:
+        passed = False
+        warnings.append("Potential investment-guarantee or absolute claim detected and softened")
+        revised_headline = _soften_headline(revised_headline or strat.headline)
+
+    # Evidence sufficiency: require at least one key reason and non-empty next_actions
+    if not strat.key_reasons or len(strat.key_reasons) < 1:
+        warnings.append("Insufficient explicit supporting reasons provided by strategist")
+
+    # Build disclaimer
+    disclaimer_lines = []
+    disclaimer_lines.append("본 분석은 교육 및 정보 제공 목적이며 투자 권유가 아닙니다.")
+    disclaimer_lines.append("투자 결정은 본인의 판단과 책임으로 진행하시기 바랍니다.")
+    if not passed:
+        disclaimer_lines.append("일부 문구가 위험 검출로 인해 완화되었거나 출력이 제한되었습니다.")
+
+    disclaimer = " ".join(disclaimer_lines)
 
     trace = Trace(name="guardrail")
     strategist = state.strategist
