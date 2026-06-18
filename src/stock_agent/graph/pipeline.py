@@ -4,6 +4,7 @@ import operator
 from typing import Annotated, Any, Callable, TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Send
 
 from stock_agent.agents import (
     run_competitor,
@@ -64,6 +65,17 @@ _EVENT_LABELS = {
     "investment_analyst": "InvestmentAnalyst",
     "guardrail": "Guardrail",
     "guardrail_apply": "Guardrail Apply",
+}
+
+# ==========================================
+# worker 이름 → 실행 함수 / 결과 필드 매핑
+# Send API fan-out에서 동적으로 참조
+# ==========================================
+_WORKER_RUNNERS: dict[str, tuple[Callable, str]] = {
+    "quant":      (run_quant,       "quant"),
+    "qual":       (run_qual,        "qual"),
+    "competitor": (run_competitor,  "competitor"),
+    "macro":      (run_macro,       "macro"),
 }
 
 
@@ -137,9 +149,14 @@ def _classifier_node(state: AnalysisGraphState) -> dict[str, Any]:
 
 
 def _worker_plan(state: AgentState) -> list[str]:
+    """
+    worker_plan 결정 — single_stock도 업종 확인 시 macro 포함
+    근거: 개별 종목도 업종 거시경제 환경에 직접 영향받음
+    """
     scope = state.user_request.analysis_scope if state.user_request else None
     workers = ["quant", "qual", "competitor"]
-    if scope in {"portfolio", "sector"}:
+    has_sector = bool(state.curator and state.curator.sector)
+    if scope in {"portfolio", "sector"} or (scope == "single_stock" and has_sector):
         workers.append("macro")
     return workers
 
@@ -162,13 +179,41 @@ def _safe_worker_node(
     return _node
 
 
-def _route_workers(state: AnalysisGraphState) -> list[str]:
-    return ["quant", "qual", "competitor", "macro"]
+# ==========================================
+# Send API fan-out 라우터
+# classifier 이후 worker_plan 기반으로
+# 각 worker 노드에 Send 메시지를 병렬 발송
+# ==========================================
+def _fanout_workers(state: AnalysisGraphState) -> list[Send]:
+    """
+    LangGraph Send API 기반 동적 fan-out.
+    worker_plan에 있는 에이전트만 병렬 실행.
+    macro는 업종 확인 시에만 포함됨.
+    """
+    plan = (state.get("graph_route") or {}).get("worker_plan") or [
+        "quant", "qual", "competitor"
+    ]
+    return [Send(worker, state) for worker in plan]
+
+
+def _quant_node(state: AnalysisGraphState) -> dict[str, Any]:
+    return _safe_worker_node("quant", run_quant, "quant")(state)
+
+
+def _qual_node(state: AnalysisGraphState) -> dict[str, Any]:
+    return _safe_worker_node("qual", run_qual, "qual")(state)
+
+
+def _competitor_node(state: AnalysisGraphState) -> dict[str, Any]:
+    return _safe_worker_node("competitor", run_competitor, "competitor")(state)
 
 
 def _macro_node(state: AnalysisGraphState) -> dict[str, Any]:
-    if "macro" not in ((state.get("graph_route") or {}).get("worker_plan") or []):
-        return {"trace_spans": ["macro_skipped"]}
+    """
+    Macro Agent 노드.
+    Send API fan-out으로 worker_plan에 있을 때만 호출되므로
+    내부 스킵 로직 불필요.
+    """
     return _safe_worker_node("macro", run_macro, "macro")(state)
 
 
@@ -266,35 +311,52 @@ def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
 
 
 def build_analysis_graph():
+    """
+    LangGraph StateGraph 빌드.
+
+    핵심 변경: Send API fan-out 적용
+    - 기존: _route_workers → conditional_edges (4개 고정 라우팅)
+    - 변경: _fanout_workers → Send API (worker_plan 기반 동적 병렬 실행)
+
+    효과:
+    - macro가 worker_plan에 없으면 실행 자체를 안 함 (스킵 로직 불필요)
+    - quant/qual/competitor/macro 진짜 병렬 실행
+    - strategist는 실행된 worker가 모두 끝난 후 join
+    """
     graph = StateGraph(AnalysisGraphState)
+
+    # 노드 등록
     graph.add_node("curator", _curator_node)
     graph.add_node("classifier", _classifier_node)
-    graph.add_node("quant", _safe_worker_node("quant", run_quant, "quant"))
-    graph.add_node("qual", _safe_worker_node("qual", run_qual, "qual"))
-    graph.add_node("competitor", _safe_worker_node("competitor", run_competitor, "competitor"))
+    graph.add_node("quant", _quant_node)
+    graph.add_node("qual", _qual_node)
+    graph.add_node("competitor", _competitor_node)
     graph.add_node("macro", _macro_node)
     graph.add_node("strategist", _strategist_node)
     graph.add_node("investment_analyst", _investment_analyst_node)
     graph.add_node("guardrail", _guardrail_node)
     graph.add_node("guardrail_apply", _apply_guardrail_node)
 
+    # 엣지 연결
     graph.add_edge(START, "curator")
     graph.add_edge("curator", "classifier")
-    graph.add_conditional_edges(
-        "classifier",
-        _route_workers,
-        {
-            "quant": "quant",
-            "qual": "qual",
-            "competitor": "competitor",
-            "macro": "macro",
-        },
-    )
-    graph.add_edge(["quant", "qual", "competitor", "macro"], "strategist")
+
+    # ── Send API fan-out ──────────────────────────────────────
+    # classifier → worker_plan 기반 동적 병렬 실행
+    # macro는 업종 확인 시에만 Send 발송 → 실행됨
+    graph.add_conditional_edges("classifier", _fanout_workers)
+
+    # worker들이 끝나면 strategist로 join
+    graph.add_edge("quant", "strategist")
+    graph.add_edge("qual", "strategist")
+    graph.add_edge("competitor", "strategist")
+    graph.add_edge("macro", "strategist")
+
     graph.add_edge("strategist", "investment_analyst")
     graph.add_edge("investment_analyst", "guardrail")
     graph.add_edge("guardrail", "guardrail_apply")
     graph.add_edge("guardrail_apply", END)
+
     return graph.compile()
 
 
@@ -324,20 +386,12 @@ def _merge_graph_update(
             merged[key] = {**(merged.get(key) or {}), **value}
         else:
             merged[key] = value
-
-    if node_name == "macro" and "macro" not in patch:
-        route = merged.get("graph_route") or {}
-        skipped = set(route.get("skipped_agents") or [])
-        skipped.add("macro")
-        merged["graph_route"] = {**route, "skipped_agents": sorted(skipped)}
     return merged
 
 
 def _event_status(node_name: str, patch: dict[str, Any]) -> str:
     if any(error.startswith(f"{node_name}:") for error in patch.get("worker_errors", [])):
         return "error"
-    if node_name == "macro" and "macro" not in patch:
-        return "skipped"
     return "done"
 
 
@@ -352,8 +406,6 @@ def _event_detail(node_name: str, state: AnalysisGraphState, patch: dict[str, An
             f"{request.analysis_scope or 'unknown'} route, "
             f"{request.urgency_reason or 'general'}, {request.requested_depth}"
         )
-    if node_name == "macro" and "macro" not in patch:
-        return "single_stock route에서 생략"
     if node_name == "investment_analyst":
         strategist = patch.get("strategist")
         if strategist is None:
