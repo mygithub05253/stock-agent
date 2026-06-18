@@ -26,6 +26,13 @@ dev = [
     "pytest>=8.0.0",
     "ruff>=0.6.0",
 ]
+# MCP 데이터 브리지(mcp_bridge/) 전용. Competitor의 DB 미연결 폴백이 자체 MCP 서버를
+# in-process로 호출해 pykrx 실시간 시세 기반 peer 비교를 확보한다(루브릭 #6 "실동작 1경로").
+# 본 앱의 DB 정상 경로 실행에는 불필요해 분리한다. 미설치 시 모듈이 graceful하게 비활성화된다.
+mcp = [
+    "mcp>=1.2.0",
+    "pykrx>=1.0.45",
+]
 # RAGAS 평가 하네스(eval/run_benchmark.py) 전용. 본 앱 실행에는 불필요해 분리한다.
 # 주의: ragas 0.4.x는 langchain 1.x와 비호환 → langchain 계열을 0.3.x로 고정한다.
 eval = [

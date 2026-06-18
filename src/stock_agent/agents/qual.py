@@ -131,12 +131,31 @@ def format_doc_as_evidence(doc: dict) -> str:
     title = doc.get("title") or doc.get("report_nm") or "제목 없음"
     body = doc.get("body", "")
     source = doc.get("publisher") or doc.get("source_url") or ""
+    source_url = doc.get("source_url")
+    retrieval_method = doc.get("retrieval_method")
+    rrf_score = doc.get("rrf_score")
+    similarity = doc.get("similarity")
+    keyword_score = doc.get("keyword_score")
     fallback = doc.get("fallback_reason")
 
     if source:
         evidence = f"{title}: {body} (출처: {source})"
     else:
         evidence = f"{title}: {body}"
+
+    retrieval_parts = []
+    if retrieval_method:
+        retrieval_parts.append(f"method={retrieval_method}")
+    if rrf_score is not None:
+        retrieval_parts.append(f"rrf_score={rrf_score:.4f}")
+    if similarity is not None:
+        retrieval_parts.append(f"similarity={similarity:.4f}")
+    if keyword_score is not None:
+        retrieval_parts.append(f"keyword_score={keyword_score:.4f}")
+    if source_url and source_url != source:
+        retrieval_parts.append(f"url={source_url}")
+    if retrieval_parts:
+        evidence = f"{evidence} [{' | '.join(retrieval_parts)}]"
 
     if fallback:
         evidence = f"{evidence} [fallback_reason: {fallback}]"

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>데이터 ERD 대시보드 · stock-agent</title>
+  <style>
+    :root{--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
+      --blue:#2563eb;--blue-soft:#eff6ff;--emerald:#059669;--emerald-soft:#ecfdf5;
+      --amber:#d97706;--amber-soft:#fffbeb;--red:#dc2626;--red-soft:#fef2f2;
+      --violet:#7c3aed;--violet-soft:#f5f3ff;--slate-soft:#f1f5f9;--radius:12px}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Pretendard,"Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
+      background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+    code{border-radius:5px;background:var(--slate-soft);padding:1px 5px;color:#334155;font-size:.88em}
+    header{border-bottom:1px solid var(--border);background:#fff}
+    .header-inner{max-width:1120px;margin:0 auto;padding:16px}
+    .eyebrow{color:var(--blue);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    h1{font-size:26px;font-weight:800;margin-top:4px}
+    .sub{color:var(--muted);margin-top:6px;font-size:14px;max-width:840px}
+    main{max-width:1120px;margin:0 auto;padding:24px 16px 64px}
+    section{margin-top:32px}
+    .label{color:var(--blue);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    h2{font-size:20px;font-weight:800;margin-top:4px}
+    .desc{color:var(--muted);font-size:14px;margin-top:4px;max-width:860px}
+    .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:12px;color:var(--muted)}
+    .legend span{display:inline-flex;align-items:center;gap:6px}
+    .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+    .d-ok{background:var(--emerald)}.d-no{background:var(--amber)}
+    .grid{display:grid;gap:14px;margin-top:16px}
+    @media(min-width:680px){.cols-2{grid-template-columns:1fr 1fr}}
+    @media(min-width:980px){.cols-3{grid-template-columns:repeat(3,1fr)}}
+    .tbl-card{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);overflow:hidden}
+    .tbl-card.impl{border-color:#a7f3d0}
+    .tbl-card.plan{border-color:#fde68a;background:#fffdf7}
+    .tbl-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border)}
+    .tbl-name{font-weight:800;font-size:15px}
+    .badge{display:inline-flex;border-radius:999px;font-size:11px;font-weight:700;padding:3px 8px;white-space:nowrap}
+    .b-ok{background:var(--emerald-soft);color:var(--emerald)}
+    .b-no{background:var(--amber-soft);color:var(--amber)}
+    .tbl-card .role{padding:8px 14px;color:var(--muted);font-size:12px;border-bottom:1px dashed var(--border)}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    td{padding:5px 14px;border-bottom:1px solid var(--slate-soft)}
+    td:last-child{color:var(--muted)}
+    tr:last-child td{border-bottom:0}
+    .key{font-weight:700;color:var(--blue)}
+    .key.fk{color:var(--violet)}
+    .rel-table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .rel-table th,.rel-table td{padding:9px 12px;border-bottom:1px solid var(--border);text-align:left}
+    .rel-table th{background:var(--slate-soft);font-weight:700}
+    .note{margin-top:14px;border-left:4px solid var(--blue);border-radius:0 8px 8px 0;background:var(--blue-soft);padding:11px 14px;color:#1e3a8a;font-size:13px}
+    .note.warn{border-left-color:var(--amber);background:var(--amber-soft);color:#92400e}
+    footer{max-width:1120px;margin:32px auto 0;padding:0 16px;color:var(--muted);font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <p class="eyebrow">stock-agent · Data ERD</p>
+      <h1>데이터 ERD 대시보드</h1>
+      <p class="sub">데이터팀 확정 스키마를 코드(<code>db/init/</code> 실제 SQL) 기준으로 정합한 시각화입니다. 상충 시 실제 SQL이 우선입니다. 원본: <code>docs/architecture/erd.md</code> (v0.2)</p>
+      <div class="legend">
+        <span><i class="dot d-ok"></i>db/init DDL 존재(구현됨)</span>
+        <span><i class="dot d-no"></i>설계안(DDL 미작성)</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <p class="label">Implementation Status</p>
+      <h2>구현 상태 정합표 (강사 #4 반영)</h2>
+      <p class="desc">본 ERD의 각 테이블이 실제 <code>db/init/</code> DDL에 존재하는지를 코드 기준으로 정리했습니다.</p>
+      <table class="rel-table">
+        <tr><th>테이블</th><th>db/init DDL</th><th>정의 위치</th><th>비고</th></tr>
+        <tr><td><code>company</code></td><td>✅ 존재</td><td>001_create_raw_tables.sql</td><td>종목 마스터</td></tr>
+        <tr><td><code>stock_price</code></td><td>✅ 존재</td><td>001_…sql</td><td>일별 시세·시총</td></tr>
+        <tr><td><code>financial_statement</code></td><td>✅ 존재</td><td>001_…sql</td><td>DART 재무(구 표기 financial_data 아님)</td></tr>
+        <tr><td><code>disclosure_report</code></td><td>✅ 존재</td><td>001_…sql</td><td>공시 메타</td></tr>
+        <tr><td><code>disclosure_content</code></td><td>✅ 존재</td><td>001_…sql</td><td>공시 원문</td></tr>
+        <tr><td><code>rag_documents</code> / <code>rag_chunks</code></td><td>✅ 존재</td><td>002_*.sql</td><td>RAG 문서·청크 vector(1024)</td></tr>
+        <tr><td><code>raw_news</code> / <code>raw_macro</code></td><td>✅ 존재</td><td>001_…sql</td><td>수집 원천</td></tr>
+        <tr><td><code>financial_ratio</code></td><td>❌ 미구현</td><td>(DDL 없음)</td><td>설계안 — financial_statement에서 파생 계산</td></tr>
+        <tr><td><code>users</code> / <code>holdings</code> / <code>analysis_history</code></td><td>❌ 미구현</td><td>(DDL 없음)</td><td>런타임 Pydantic 객체만 존재</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <p class="label">Core Tables (구현됨)</p>
+      <h2>데이터팀 확정 핵심 테이블</h2>
+      <p class="desc">정의는 데이터팀 확정 원본입니다. 스키마 변경은 데이터팀 협의가 필요합니다.</p>
+      <div class="grid cols-3">
+        <div class="tbl-card impl">
+          <div class="tbl-head"><span class="tbl-name">company</span><span class="badge b-ok">구현됨</span></div>
+          <div class="role">기업 기본 정보(Master)</div>
+          <table>
+            <tr><td class="key">corp_code</td><td>VARCHAR(8) PK</td></tr>
+            <tr><td class="key">stock_code</td><td>VARCHAR(6) UK</td></tr>
+            <tr><td>corp_name</td><td>VARCHAR(100)</td></tr>
+            <tr><td>sector</td><td>VARCHAR(50)</td></tr>
+            <tr><td>listing_date</td><td>DATE</td></tr>
+          </table>
+        </div>
+        <div class="tbl-card impl">
+          <div class="tbl-head"><span class="tbl-name">stock_price</span><span class="badge b-ok">구현됨</span></div>
+          <div class="role">일별 시세·수급 지표</div>
+          <table>
+            <tr><td class="key">id</td><td>BIGSERIAL PK</td></tr>
+            <tr><td class="key fk">stock_code</td><td>VARCHAR(6) FK</td></tr>
+            <tr><td>base_date</td><td>DATE</td></tr>
+            <tr><td>close_price / market_cap</td><td>INT / BIGINT</td></tr>
+            <tr><td>per / pbr / volume</td><td>NUMERIC / BIGINT</td></tr>
+          </table>
+        </div>
+        <div class="tbl-card impl">
+          <div class="tbl-head"><span class="tbl-name">financial_statement</span><span class="badge b-ok">구현됨</span></div>
+          <div class="role">원시 재무제표</div>
+          <table>
+            <tr><td class="key">id</td><td>BIGSERIAL PK</td></tr>
+            <tr><td class="key fk">corp_code</td><td>VARCHAR(8) FK</td></tr>
+            <tr><td>bsns_year / reprt_code</td><td>INT / VARCHAR(5)</td></tr>
+            <tr><td>fs_div / account_nm</td><td>VARCHAR</td></tr>
+            <tr><td>amount</td><td>BIGINT</td></tr>
+          </table>
+        </div>
+        <div class="tbl-card impl">
+          <div class="tbl-head"><span class="tbl-name">disclosure_report</span><span class="badge b-ok">구현됨</span></div>
+          <div class="role">공시 메타데이터</div>
+          <table>
+            <tr><td class="key">rcept_no</td><td>VARCHAR(14) PK</td></tr>
+            <tr><td class="key fk">corp_code</td><td>VARCHAR(8) FK</td></tr>
+            <tr><td>report_nm</td><td>VARCHAR(200)</td></tr>
+            <tr><td>rcept_dt</td><td>DATE</td></tr>
+          </table>
+        </div>
+        <div class="tbl-card impl">
+          <div class="tbl-head"><span class="tbl-name">disclosure_content</span><span class="badge b-ok">구현됨</span></div>
+          <div class="role">공시 원문·AI 요약</div>
+          <table>
+            <tr><td class="key fk">rcept_no</td><td>VARCHAR(14) PK/FK</td></tr>
+            <tr><td>content</td><td>TEXT</td></tr>
+            <tr><td>summary</td><td>TEXT</td></tr>
+          </table>
+        </div>
+        <div class="tbl-card impl">
+          <div class="tbl-head"><span class="tbl-name">rag_chunks</span><span class="badge b-ok">구현됨</span></div>
+          <div class="role">RAG 청크 + pgvector</div>
+          <table>
+            <tr><td class="key">id</td><td>UUID PK</td></tr>
+            <tr><td class="key fk">document_id</td><td>rag_documents FK</td></tr>
+            <tr><td>content</td><td>TEXT</td></tr>
+            <tr><td>embedding</td><td>vector(1024)</td></tr>
+            <tr><td>embedding_model</td><td>BGE-m3 / Solar</td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">Design-only Tables</p>
+      <h2>설계안 (DDL 미작성)</h2>
+      <p class="desc">아래는 향후 도입 시 설계안이며 현재 코드에는 DDL이 없습니다. 비율은 <code>financial_statement</code>에서 파생 계산하고, 회원·포트·이력은 런타임 Pydantic 객체로만 존재합니다.</p>
+      <div class="grid cols-3">
+        <div class="tbl-card plan">
+          <div class="tbl-head"><span class="tbl-name">financial_ratio</span><span class="badge b-no">설계안</span></div>
+          <div class="role">파생 재무비율</div>
+          <table>
+            <tr><td>corp_code / bsns_year</td><td>FK / INT</td></tr>
+            <tr><td>debt_ratio / roe</td><td>NUMERIC</td></tr>
+          </table>
+        </div>
+        <div class="tbl-card plan">
+          <div class="tbl-head"><span class="tbl-name">users</span><span class="badge b-no">설계안</span></div>
+          <div class="role">회원·투자성향</div>
+          <table>
+            <tr><td>id / email</td><td>UUID PK / UK</td></tr>
+            <tr><td>risk_profile / horizon</td><td>string</td></tr>
+            <tr><td>interest_sectors</td><td>json</td></tr>
+          </table>
+        </div>
+        <div class="tbl-card plan">
+          <div class="tbl-head"><span class="tbl-name">holdings / analysis_history</span><span class="badge b-no">설계안</span></div>
+          <div class="role">보유종목·분석이력</div>
+          <table>
+            <tr><td>user_id / stock_code</td><td>FK</td></tr>
+            <tr><td>weight / qty / avg_price</td><td>decimal / int</td></tr>
+            <tr><td>action / confidence</td><td>string / decimal</td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">Relationships</p>
+      <h2>테이블 관계</h2>
+      <table class="rel-table">
+        <tr><th>부모</th><th>관계</th><th>자식</th><th>상태</th></tr>
+        <tr><td><code>company</code></td><td>1 : N</td><td><code>financial_statement</code></td><td>✅</td></tr>
+        <tr><td><code>company</code></td><td>1 : N</td><td><code>stock_price</code></td><td>✅</td></tr>
+        <tr><td><code>company</code></td><td>1 : N</td><td><code>disclosure_report</code></td><td>✅</td></tr>
+        <tr><td><code>disclosure_report</code></td><td>1 : 1</td><td><code>disclosure_content</code></td><td>✅</td></tr>
+        <tr><td><code>rag_documents</code></td><td>1 : N</td><td><code>rag_chunks</code></td><td>✅</td></tr>
+        <tr><td><code>company</code></td><td>1 : N</td><td><code>financial_ratio</code></td><td>⚠ 설계안</td></tr>
+        <tr><td><code>users</code></td><td>1 : N</td><td><code>holdings</code> / <code>analysis_history</code></td><td>⚠ 설계안</td></tr>
+      </table>
+      <div class="note warn">정합 기준: 상충 시 실제 SQL(<code>db/init/</code>)이 우선입니다. 회원·포트·이력 테이블 추가 여부는 데이터팀/백엔드 확인 대기 항목(erd.md §7).</div>
+    </section>
+
+    <section>
+      <p class="label">Agent Usage</p>
+      <h2>에이전트별 데이터 사용</h2>
+      <table class="rel-table">
+        <tr><th>에이전트</th><th>주 사용 테이블</th><th>용도</th></tr>
+        <tr><td>Curator</td><td>company · stock_price · rag_documents</td><td>universe 필터·후보 선정</td></tr>
+        <tr><td>Quant ⭐</td><td>financial_statement · stock_price</td><td>5y 추세·PER/PBR·모멘텀</td></tr>
+        <tr><td>Qual ⭐</td><td>rag_chunks · rag_documents · disclosure_report</td><td>뉴스·공시 RAG, 출처 인용</td></tr>
+        <tr><td>Competitor</td><td>company.sector · financial_statement · stock_price</td><td>Peer 추출·횡비교</td></tr>
+        <tr><td>Strategist</td><td>State(메모리) · users · holdings · 매크로</td><td>종합·적합도·거시 맥락</td></tr>
+        <tr><td>Guardrail</td><td>코드 상수 · eval/golden_set</td><td>출력 필터·RAGAS 채점</td></tr>
+      </table>
+    </section>
+  </main>
+  <footer>stock-agent · 데이터 ERD 대시보드 · erd.md v0.2 기반 · 코드 정합 2026-06-13 · 시각화 2026-06-14 (KST)</footer>
+</body>
+</html>

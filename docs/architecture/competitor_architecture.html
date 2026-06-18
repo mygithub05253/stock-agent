@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Competitor Agent 아키텍처 · stock-agent</title>
+  <style>
+    :root {
+      --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --text:#0f172a; --muted:#64748b;
+      --blue:#2563eb; --blue-soft:#eff6ff; --emerald:#059669; --emerald-soft:#ecfdf5;
+      --amber:#d97706; --amber-soft:#fffbeb; --red:#dc2626; --red-soft:#fef2f2;
+      --violet:#7c3aed; --violet-soft:#f5f3ff; --slate-soft:#f1f5f9; --radius:12px;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Pretendard,"Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
+      background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+    code{border-radius:5px;background:var(--slate-soft);padding:1px 5px;color:#334155;font-size:.9em}
+    header{border-bottom:1px solid var(--border);background:#fff}
+    .header-inner{max-width:1080px;margin:0 auto;padding:16px}
+    .eyebrow{color:var(--blue);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    h1{font-size:26px;font-weight:800;margin-top:4px}
+    .sub{color:var(--muted);margin-top:6px;font-size:14px}
+    .pill-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+    .pill{border:1px solid var(--border);border-radius:999px;background:#fff;padding:4px 10px;color:var(--muted);font-size:12px}
+    .pill.ok{border-color:#a7f3d0;background:var(--emerald-soft);color:var(--emerald)}
+    main{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+    section{margin-top:32px}
+    .label{color:var(--blue);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    h2{font-size:20px;font-weight:800;margin-top:4px}
+    .desc{color:var(--muted);font-size:14px;margin-top:4px;max-width:820px}
+    .card{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);padding:18px}
+    .grid{display:grid;gap:14px;margin-top:16px}
+    @media(min-width:760px){.cols-2{grid-template-columns:1fr 1fr}.cols-3{grid-template-columns:repeat(3,1fr)}}
+    /* 폴백 체인 */
+    .flow{display:grid;gap:10px;margin-top:16px}
+    .flow-step{display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:start}
+    .flow-badge{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+      font-weight:800;color:#fff;font-size:13px}
+    .b-db{background:var(--emerald)} .b-mcp{background:var(--blue)} .b-mock{background:var(--amber)}
+    .flow-body{border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:#fff}
+    .flow-body h3{font-size:15px;font-weight:800;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .flow-body p{color:var(--muted);font-size:13px;margin-top:4px}
+    .tag{display:inline-flex;border-radius:999px;font-size:11px;font-weight:700;padding:2px 8px}
+    .t-real{background:var(--emerald-soft);color:var(--emerald)}
+    .t-live{background:var(--blue-soft);color:var(--blue)}
+    .t-demo{background:var(--amber-soft);color:var(--amber)}
+    /* 파이프 */
+    .pipe{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px;font-size:13px}
+    .node{border:1px solid var(--border);border-radius:8px;padding:7px 11px;background:#fff;font-weight:600}
+    .node.me{border-color:#bfdbfe;background:var(--blue-soft);color:var(--blue)}
+    .arrow{color:var(--muted);font-weight:700}
+    table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+    th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+    th{background:var(--slate-soft);font-weight:700}
+    .w-list{margin:8px 0 0 18px;color:var(--muted);font-size:13px}
+    .w-list li{margin-top:3px}
+    .note{margin-top:14px;border-left:4px solid var(--blue);border-radius:0 8px 8px 0;background:var(--blue-soft);
+      padding:11px 14px;color:#1e3a8a;font-size:13px}
+    .bars{display:grid;gap:8px;margin-top:8px}
+    .bar-row{display:grid;grid-template-columns:130px 1fr 44px;align-items:center;gap:8px;font-size:12px}
+    .bar-track{height:10px;border-radius:999px;background:var(--slate-soft);overflow:hidden}
+    .bar-fill{height:100%;border-radius:999px;background:var(--blue)}
+    .bar-val{text-align:right;font-weight:700}
+    footer{max-width:1080px;margin:32px auto 0;padding:0 16px;color:var(--muted);font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <p class="eyebrow">stock-agent · Agent Architecture</p>
+      <h1>Competitor Agent 아키텍처</h1>
+      <p class="sub">동종업계 Peer를 선정하고 대상 종목의 상대 위치를 계산하는 에이전트 · 담당: 이동원 · 2026-06-14 기준 구현도 100%</p>
+      <div class="pill-row">
+        <span class="pill ok">3단 폴백 (DB → MCP 실시간 → mock)</span>
+        <span class="pill ok">복합 유사도 peer 선정 (#62)</span>
+        <span class="pill ok">품질 회귀 골든셋 6케이스</span>
+        <span class="pill ok">MCP 외부 노출 (A2A)</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <p class="label">Pipeline Position</p>
+      <h2>파이프라인 내 위치</h2>
+      <p class="desc">Curator가 종목을 확정하면 Quant·Qual과 함께 Phase 1 워커로 실행되고, 결과 <code>CompetitorResult</code>는 Strategist 종합에 소비됩니다.</p>
+      <div class="pipe">
+        <span class="node">InvestorProfile</span><span class="arrow">→</span>
+        <span class="node">Curator</span><span class="arrow">→</span>
+        <span class="node">RequestClassifier</span><span class="arrow">→</span>
+        <span class="node">Quant · Qual</span><span class="arrow">+</span>
+        <span class="node me">Competitor</span><span class="arrow">→</span>
+        <span class="node">Strategist</span><span class="arrow">→</span>
+        <span class="node">InvestmentAnalyst</span><span class="arrow">→</span>
+        <span class="node">Guardrail</span>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">Fallback Strategy</p>
+      <h2>데이터 가용성 3단 폴백</h2>
+      <p class="desc">데이터 소스가 실패해도 데모 흐름이 끊기지 않도록 우선순위를 둡니다. 실데이터(①②)와 mock(③)을 데이터 품질 플래그로 정직하게 구분합니다.</p>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-badge b-db">DB</div>
+          <div class="flow-body">
+            <h3>① Postgres 실데이터 <span class="tag t-real">실데이터</span></h3>
+            <p><code>build_peer_comparison(conn, …)</code> — <code>company</code>·<code>stock_price</code>·<code>financial_statement</code>에서 PER/PBR/ROE/성장률/마진/부채비율 계산. 기본 경로.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-badge b-mcp">MCP</div>
+          <div class="flow-body">
+            <h3>② MCP 실시간 시세 <span class="tag t-live">실데이터·라이브</span></h3>
+            <p>DB 실패 시 자체 FastMCP 서버를 <strong>stdio 자식 프로세스</strong>로 띄워 pykrx 시세 기반 peer 비교. <code>mcp_live_market_data</code> 마커 부여. <code>build_comparison_from_market_rows</code>가 동일 점수 엔진 재사용.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-badge b-mock">MOCK</div>
+          <div class="flow-body">
+            <h3>③ 하드코딩 mock <span class="tag t-demo">데모 최후 보루</span></h3>
+            <p>MCP까지 불가하면 <code>mock_data_fallback</code> 반환. 데모 중단 방지용이며 실제 투자 분석값이 아님을 <code>data_quality_flags</code>로 명시.</p>
+          </div>
+        </div>
+      </div>
+      <div class="note">실데이터(MCP)는 <code>"mock"</code>/<code>"fallback"</code>/<code>"데모용"</code> 문자열을 의도적으로 배제해, Guardrail <code>mock_data_audit</code>가 실데이터를 mock으로 오판하지 않게 합니다.</div>
+    </section>
+
+    <section>
+      <p class="label">Peer Selection Engine</p>
+      <h2>복합 유사도 peer 선정 (#62)</h2>
+      <p class="desc">데이터 완성도만 1순위로 보던 한계를, 시총 band 1차 거름 후 복합 유사도 정렬로 개선했습니다. 결측 지표는 가용 항목으로 가중치를 재정규화합니다.</p>
+      <div class="card">
+        <div class="bars">
+          <div class="bar-row"><span>시가총액 근접(규모)</span><div class="bar-track"><div class="bar-fill" style="width:45%"></div></div><span class="bar-val">0.45</span></div>
+          <div class="bar-row"><span>영업이익률(사업 경제성)</span><div class="bar-track"><div class="bar-fill" style="width:30%;background:var(--emerald)"></div></div><span class="bar-val">0.30</span></div>
+          <div class="bar-row"><span>데이터 완성도</span><div class="bar-track"><div class="bar-fill" style="width:25%;background:var(--violet)"></div></div><span class="bar-val">0.25</span></div>
+        </div>
+        <p class="desc" style="margin-top:10px">1차 거름: 시총 band 0.25x~4x (내 시총의 ¼~4배). 이상치(중앙값 10배 초과)는 <code>outlier_*</code> 플래그.
+          종합 score = 밸류 20 · 수익성 25 · 성장 20 · 마진 15 · 재무안정 10 · 완성도 10 (0~100).</p>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">MCP / A2A</p>
+      <h2>MCP 외부 노출 (루브릭 #6)</h2>
+      <p class="desc">Competitor 폴백 전용이 아니라, 다른 에이전트·외부 MCP 클라이언트가 소비할 수 있는 표준 stdio 서버로 노출합니다.</p>
+      <div class="grid cols-2">
+        <div class="card">
+          <h3 style="font-size:15px;font-weight:800">노출 Tool</h3>
+          <table>
+            <tr><th>Tool</th><th>반환</th></tr>
+            <tr><td><code>sector_roster(sector)</code></td><td>섹터 비교군 후보(정적, 오프라인 동작)</td></tr>
+            <tr><td><code>market_metrics(stock_codes,…)</code></td><td>pykrx 실시간 PER/PBR/ROE/시총</td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <h3 style="font-size:15px;font-weight:800">공개 클라이언트 표면</h3>
+          <ul class="w-list">
+            <li><code>discover_tools()</code> — tools/list 핸드셰이크</li>
+            <li><code>call_mcp_tool(tool, args)</code> — 범용 A2A 진입점</li>
+            <li><code>fetch_mcp_peer_data(…)</code> — Competitor 폴백 헬퍼</li>
+            <li>외부 소비자 데모: <code>scripts/mcp_external_consumer_demo.py</code></li>
+          </ul>
+        </div>
+      </div>
+      <div class="note">외부 MCP 클라이언트(Claude Desktop·Cursor)의 <code>mcpServers</code>에 <code>python -m stock_agent.mcp_bridge.peer_data_server</code>로 등록 가능. 상세: <code>src/stock_agent/mcp_bridge/README.md</code></div>
+    </section>
+
+    <section>
+      <p class="label">Quality Regression</p>
+      <h2>품질 회귀 골든셋 (CI 고정, 비용 0)</h2>
+      <p class="desc">점수 엔진은 순수 함수이므로 고정 시나리오로 회귀를 차단합니다. <code>eval/run_competitor_eval.py</code> · <code>tests/test_competitor_eval.py</code>.</p>
+      <table>
+        <tr><th>케이스</th><th>검증 의도</th><th>기대</th></tr>
+        <tr><td>C1 정상 비교</td><td>가까운 peer 3개 정상 선정</td><td>경고 없음</td></tr>
+        <tr><td>C2 시총 band 거름</td><td>4배 초과 대형 peer 제외</td><td>GIANT 제외 + peer 부족 경고</td></tr>
+        <tr><td>C3 이상치 표기</td><td>중앙값 10배 초과 PER</td><td><code>outlier_per</code></td></tr>
+        <tr><td>C4 비교군 없음</td><td>peer 후보 0</td><td>score 0, <code>no_comparable_peers</code></td></tr>
+        <tr><td>C5 저품질 타깃 캡</td><td>완성도 60 미만</td><td>score ≤ 55</td></tr>
+        <tr><td>C6 복합 유사도(#62)</td><td>시총·사업 동일 peer 우선</td><td>SIZEMATCH &gt; QUALONLY</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <p class="label">Files</p>
+      <h2>주요 파일</h2>
+      <table>
+        <tr><th>파일</th><th>역할</th></tr>
+        <tr><td><code>src/stock_agent/agents/competitor.py</code></td><td>오케스트레이션 + 3단 폴백 + LLM narrative 병합</td></tr>
+        <tr><td><code>src/stock_agent/tools/peer_tool.py</code></td><td>peer 선정·상대위치 점수 엔진(순수)</td></tr>
+        <tr><td><code>src/stock_agent/mcp_bridge/</code></td><td>FastMCP 서버 + stdio 클라이언트(외부 노출)</td></tr>
+        <tr><td><code>eval/competitor_golden/</code> · <code>eval/run_competitor_eval.py</code></td><td>품질 회귀 골든셋·하네스</td></tr>
+        <tr><td><code>docs/agents/competitor_agent_mvp.md</code></td><td>상세 설명서</td></tr>
+      </table>
+    </section>
+  </main>
+  <footer>stock-agent · Competitor Agent 아키텍처 · 2026-06-14 (KST) · 담당 이동원</footer>
+</body>
+</html>

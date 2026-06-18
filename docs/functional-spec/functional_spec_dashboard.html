@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>기능 명세 대시보드 · stock-agent</title>
+  <style>
+    :root{--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
+      --blue:#2563eb;--blue-soft:#eff6ff;--emerald:#059669;--emerald-soft:#ecfdf5;
+      --amber:#d97706;--amber-soft:#fffbeb;--violet:#7c3aed;--violet-soft:#f5f3ff;
+      --slate-soft:#f1f5f9;--radius:12px}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Pretendard,"Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif;
+      background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+    code{border-radius:5px;background:var(--slate-soft);padding:1px 5px;color:#334155;font-size:.86em}
+    header{border-bottom:1px solid var(--border);background:#fff}
+    .header-inner{max-width:1120px;margin:0 auto;padding:16px}
+    .eyebrow{color:var(--blue);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    h1{font-size:26px;font-weight:800;margin-top:4px}
+    .sub{color:var(--muted);margin-top:6px;font-size:14px;max-width:880px}
+    main{max-width:1120px;margin:0 auto;padding:24px 16px 64px}
+    section{margin-top:30px}
+    .label{color:var(--blue);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+    h2{font-size:20px;font-weight:800;margin-top:4px}
+    .desc{color:var(--muted);font-size:14px;margin-top:4px;max-width:880px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+    .fbtn{cursor:pointer;border:1px solid var(--border);border-radius:999px;background:#fff;padding:6px 12px;color:var(--muted);font-size:12px;font-weight:700}
+    .fbtn:hover,.fbtn.active{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+    .std{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+    .chip{border:1px solid var(--border);border-radius:999px;background:#fff;padding:5px 11px;font-size:12px;color:var(--muted)}
+    .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font-size:12px;color:var(--muted)}
+    .legend b{font-weight:700}
+    .grid{display:grid;gap:12px;margin-top:16px}
+    @media(min-width:720px){.grid{grid-template-columns:1fr 1fr}}
+    details.spec{border:1px solid var(--border);border-radius:var(--radius);background:var(--card);overflow:hidden}
+    details.spec[hidden]{display:none}
+    details.spec.a3{border-color:#bfdbfe}
+    summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    summary::-webkit-details-marker{display:none}
+    .s-left{display:flex;flex-direction:column;gap:3px}
+    .s-id{font-size:11px;font-weight:800;color:var(--violet);background:var(--violet-soft);border-radius:6px;padding:2px 7px;align-self:flex-start}
+    .s-name{font-size:15px;font-weight:800}
+    .s-owner{color:var(--muted);font-size:12px}
+    .s-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+    .badge{display:inline-flex;border-radius:999px;font-size:10.5px;font-weight:700;padding:3px 8px;white-space:nowrap}
+    .b-done{background:var(--emerald-soft);color:var(--emerald)}
+    .b-part{background:var(--amber-soft);color:var(--amber)}
+    .b-plan{background:var(--slate-soft);color:var(--muted)}
+    .b-phase{background:var(--blue-soft);color:var(--blue)}
+    .caret{color:var(--muted);font-size:12px;font-weight:700}
+    details[open] .caret::after{content:"접기 ▲"}
+    details:not([open]) .caret::after{content:"상세 ▼"}
+    .body{padding:0 16px 16px;border-top:1px solid var(--border)}
+    .block{margin-top:13px}
+    .block h4{font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--blue)}
+    .block ul{margin:5px 0 0 17px}
+    .block li{margin-top:3px;color:#334155;font-size:13px}
+    .impl{margin-top:13px;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;background:var(--amber-soft);padding:10px 13px;font-size:13px;color:#92400e}
+    .impl.ok{border-left-color:var(--emerald);background:var(--emerald-soft);color:#065f46}
+    .filelink{margin-top:12px;font-size:12px}
+    .filelink a{color:var(--blue);font-weight:600}
+    .note{margin-top:14px;border-left:4px solid var(--blue);border-radius:0 8px 8px 0;background:var(--blue-soft);padding:11px 14px;color:#1e3a8a;font-size:13px}
+    footer{max-width:1120px;margin:32px auto 0;padding:0 16px;color:var(--muted);font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <p class="eyebrow">stock-agent · Functional Spec</p>
+      <h1>기능 명세 대시보드</h1>
+      <p class="sub">PRD 기준 기능별 명세서(기능 1개 = md 1개)를 클릭해 트리거·입력·처리·출력·예외·KPI·구현 상태까지 펼쳐 봅니다. 명세 본문은 Markdown, 현황·정합은 본 HTML로 관리합니다. 정합 SSOT: <code>IMPLEMENTATION_STATUS.md</code></p>
+      <div class="legend">
+        <span><b>상태</b></span>
+        <span><span class="badge b-done">✅ 구현</span></span>
+        <span><span class="badge b-part">🟡 부분</span></span>
+        <span><span class="badge b-plan">⚠ 설계안</span></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <p class="label">7대 표준 양식</p>
+      <h2>모든 명세서 공통 골격</h2>
+      <p class="desc">한 파일에 여러 기능을 섞지 않고 아래 순서를 유지합니다. 고급 기능은 <code>as_of_date·data_version·sources·warnings·guardrail·evaluation</code>을 추가합니다.</p>
+      <div class="std">
+        <span class="chip">① 트리거</span><span class="chip">② 전제조건</span><span class="chip">③ 입력</span>
+        <span class="chip">④ 처리 흐름</span><span class="chip">⑤ 출력</span><span class="chip">⑥ 예외 처리</span><span class="chip">⑦ 담당</span>
+      </div>
+    </section>
+
+    <section>
+      <p class="label">Feature Specs</p>
+      <h2>기능별 상세 (클릭하여 펼치기)</h2>
+      <div class="toolbar" id="filters">
+        <button class="fbtn active" data-f="all">전체</button>
+        <button class="fbtn" data-f="basic">기본(B)</button>
+        <button class="fbtn" data-f="advanced">고급(A)</button>
+        <button class="fbtn" data-f="demo">데모(D)</button>
+        <button class="fbtn" data-f="done">✅ 구현</button>
+      </div>
+      <div class="note">🟡 부분·⚠ 설계안 항목의 상태는 코드 기준 PM 추정으로 해당 담당 확인이 필요합니다(<code>담당확인</code>). A3(Competitor)는 담당 직접 작성으로 확정입니다.</div>
+      <div class="grid" id="grid"></div>
+    </section>
+  </main>
+  <footer>stock-agent · 기능 명세 대시보드 · functional-spec/ + IMPLEMENTATION_STATUS.md 기반 · 2026-06-14 (KST)</footer>
+
+  <script>
+    const F = [
+      {
+        id:"B1", name:"회원가입 / 로그인", group:"basic", phase:"Phase 1", owner:"InvestorProfile · UI",
+        status:"part", file:"basic/B1_signup_login_spec_v0.3.md",
+        trigger:["홈에서 회원가입/로그인 클릭","세션 만료 후 보호 메뉴 접근","데모 계정 로그인"],
+        pre:["users 테이블·이메일 중복 체크·bcrypt 해싱 준비","st.session_state 세션 저장","PII 로그 마스킹 정책"],
+        input:["email·password(8자+)·name·birth_date","risk_profile·investment_horizon·target_return·max_drawdown","interest_sectors(1+)·약관/개인정보 동의"],
+        flow:["입력 검증 → PII 마스킹 → 이메일 중복 확인","bcrypt 해싱 → users 저장 → 세션 발급","로그인: 계정 조회 → 상태 확인 → 해시 검증 → 세션"],
+        output:["회원가입 완료·세션·사용자 프로필","PII 마스킹 이벤트 로그(원문 저장 금지)"],
+        exception:["이메일 중복/형식 오류 → 폼 유지","로그인 실패 → 일반화 메시지(계정존재 비노출)","반복 실패 → 임시 잠금, DB 실패 → 재시도 안내"],
+        kpi:["LLM 호출 0회","비밀번호 평문 저장 0건·PII 원문 로그 0건","회원가입 성공률 95%+"],
+        impl:{ok:false, text:"🟡 부분 — 온보딩→UserProfile 구조화 동작. users DDL 미구현으로 영속화·인증 미구현(담당확인)."}
+      },
+      {
+        id:"B2", name:"보유 종목 등록 / 조회", group:"basic", phase:"Phase 1", owner:"Curator · UI",
+        status:"part", file:"basic/B2_holdings_manage_spec_v0.4.md",
+        trigger:["보유 종목 관리 화면 진입","포트폴리오 입력 폼 제출"],
+        pre:["종목 코드 검증(company)","세션/DB 보유 종목 저장소"],
+        input:["stock_code·수량·평단가·보유 현금 비중"],
+        flow:["종목 검증 → 보유 항목 구성 → 세션 보관(현재) → (설계: holdings 영속화)"],
+        output:["보유 종목 목록·포트폴리오 요약(세션)"],
+        exception:["미존재 종목 → 검색 유도","수량/평단가 형식 오류 → 재입력"],
+        kpi:["입력→반영 즉시성","LLM 호출 0회"],
+        impl:{ok:false, text:"🟡 부분 — Streamlit 입력 동작(test_streamlit_intake). holdings DDL 미구현으로 DB 영속화 없음(담당확인)."}
+      },
+      {
+        id:"B3", name:"종목 검색", group:"basic", phase:"Phase 1", owner:"Curator",
+        status:"part", file:"basic/B3_stock_search_spec_v0.5.md",
+        trigger:["검색창에 종목명/코드 입력","후보 종목 선택"],
+        pre:["company 종목 마스터 적재","corp_code/stock_code 매핑"],
+        input:["검색어(종목명 또는 코드)"],
+        flow:["입력 정규화 → company 조회 → corp_code 보정 → 후보 반환"],
+        output:["확정 종목·후보 목록"],
+        exception:["미확정 → 후보 제시","결과 없음 → 안내"],
+        kpi:["종목 확정 정확도","검색 응답 시간"],
+        impl:{ok:false, text:"🟡 부분 — Curator 큐레이션·corp_code 보정 동작. 전체 universe 검색 UI 부분(담당확인)."}
+      },
+      {
+        id:"B4", name:"종목 기본 정보 조회", group:"basic", phase:"Phase 1", owner:"Curator · Quant",
+        status:"part", file:"basic/B4_stock_basic_info_spec_v0.6.md",
+        trigger:["종목 상세 진입","기본 정보 카드 요청"],
+        pre:["company·stock_price 적재"],
+        input:["stock_code"],
+        flow:["company 메타 조회 → stock_price 최신 시세/시총 → 기본 지표 구성"],
+        output:["종목명·섹터·시세·시총·PER/PBR 카드","동종업계 비교 보기(A3) 진입점"],
+        exception:["시세 결손 → 해당 지표 제외","미존재 종목 → 안내"],
+        kpi:["기본 정보 표시 완전성"],
+        impl:{ok:false, text:"🟡 부분 — company·stock_price 실데이터 + 일부 mock 폴백(담당확인)."}
+      },
+      {
+        id:"B5", name:"포트폴리오 일괄 안내", group:"basic", phase:"Phase 1", owner:"Strategist",
+        status:"part", file:"basic/B5_portfolio_bulk_advice_spec_v0.2.md",
+        trigger:["포트폴리오 일괄 안내 실행"],
+        pre:["보유 종목·투자성향","워커 결과(Quant/Qual/Competitor/Macro)"],
+        input:["holdings·user_profile·cash_weight"],
+        flow:["종목별 워커 분석 → Strategist 종합 → 포트폴리오 맥락 적합도 → 일괄 요약"],
+        output:["종목별 신호·적합도·현금비중 제안","포트폴리오 종합 코멘트"],
+        exception:["워커 일부 결손 → 부분실패 허용(graceful degradation)","근거 부족 → 보수 표현"],
+        kpi:["종합 일관성","부분실패 시 완주율"],
+        impl:{ok:false, text:"🟡 부분 — Strategist 종합·부분실패 허용(#51) 동작. 다수 종목 일괄 UI 부분(담당확인)."}
+      },
+      {
+        id:"A1", name:"5개년 밸류에이션", group:"advanced", phase:"Phase 2", owner:"Quant",
+        status:"part", file:"advanced/A1_valuation_5y_spec_v0.7.md",
+        trigger:["밸류에이션 보기","A4 통합 분석 선행"],
+        pre:["financial_statement 다년치·stock_price"],
+        input:["stock_code·lookback_years·기준일"],
+        flow:["재무 로딩 → 추세/추정 → 상대가치(A3 Peer Multiple 연계) → 적정가 밴드"],
+        output:["5y 추세·적정가 밴드·상대가치 근거"],
+        exception:["재무 결손 → 기간 축소/제외","적자 → PER 비교 제외"],
+        kpi:["계산 재현성","결측 처리 정직성"],
+        impl:{ok:false, text:"🟡 부분 — Quant 계산·fallback(#53). MVP 3개년, 5개년 확장 전(담당확인)."}
+      },
+      {
+        id:"A2", name:"산업·정성 분석", group:"advanced", phase:"Phase 2", owner:"Qual",
+        status:"part", file:"advanced/A2_industry_qualitative_spec_v0.8.md",
+        trigger:["산업/정성 분석 보기","A4 통합 분석 선행"],
+        pre:["rag_chunks·rag_documents(뉴스·공시 임베딩)"],
+        input:["stock_code·검색 범위·기간"],
+        flow:["RAG 검색 → 호재/악재·이벤트 분류 → 출처 부착 → 정성 요약"],
+        output:["호재/악재 카드·이벤트 유형·출처 인용"],
+        exception:["검색 실패 → 독립 fallback 문서","출처 없음 → 요약 보수화"],
+        kpi:["출처 부착률","RAGAS faithfulness"],
+        impl:{ok:false, text:"🟡 부분 — Qual RAG + try/except 폴백(#52). pgvector 단독, Hybrid/Reranker 미고도화(#9, 담당확인)."}
+      },
+      {
+        id:"A3", name:"동종업계 횡비교", group:"advanced", phase:"Phase 2", owner:"Competitor (이동원)",
+        status:"done", file:"advanced/A3_peer_comparison_spec_v1.0.md", a3:true,
+        trigger:["B4/A1 화면의 동종업계 비교 보기","A4 플로우의 Competitor 호출","B5에서 경쟁사 대비 위치 보기"],
+        pre:["company.sector·Peer 재무·시세 적재","peer 계산 모듈(peer_tool)"],
+        input:["stock_code·sector·metric_set(PER/PBR/ROE/성장률/마진)","min/max_peer_count·lookback_years"],
+        flow:["종목·섹터 검증 → 같은 섹터 후보 추출","지표 계산 + 이상치(중앙값 10배) outlier_* 플래깅","시총 band(0.25x~4x) 1차 거름 → 복합 유사도(시총0.45·영업이익률0.30·완성도0.25) 정렬(#62)","상대 위치·분위수·0~100 종합 score(calculate_relative_position)","LLM 위치 요약 병합(수치 미생성, 키 부재 시 rule-based)","DB 실패 시 ① MCP 실시간 시세(실데이터) → ② mock 3단 폴백"],
+        output:["comparison_table·peer_list·relative_position(percentile)","peer_summary·data_quality_flags·a1_peer_multiple_payload","CompetitorResult (Strategist·A4 소비)"],
+        exception:["섹터/Peer 없음 → 분석 중단·안내","Peer 3개 미만 → peer_count_below_minimum, 신뢰도↓","적자 PER not_applicable·결손 *_missing","저품질 타깃(완성도<60) → score≤55 캡","DB 실패 → MCP→mock(실데이터/데모 플래그 구분)"],
+        kpi:["품질 회귀 골든셋 6/6(CI, eval/run_competitor_eval.py)","수치 계산 재현성 100%","MCP tools/list round-trip 실측","LLM 호출 ≤2회·월 5만원 상한"],
+        impl:{ok:true, text:"✅ 구현 100% — 3단 폴백·복합 유사도(#62)·이상치 플래깅·품질 회귀 골든셋·MCP 외부 노출. 미구현(향후): analysis_cache·manual peer·Heatmap. 상세 §0.1."}
+      },
+      {
+        id:"A4", name:"BUY/HOLD/SELL 분석 신호", group:"advanced", phase:"Phase 2", owner:"Strategist · Guardrail",
+        status:"part", file:"advanced/A4_action_recommendation_spec_v1.0.md",
+        trigger:["통합 분석 신호 요청"],
+        pre:["워커 결과(Quant/Qual/Competitor/Macro)·투자성향"],
+        input:["stock_code·user_profile·워커 결과"],
+        flow:["워커 종합 → signal·suitability 분리 산정 → confidence → Guardrail 게이팅 → 면책 부착"],
+        output:["signal(BUY/HOLD/SELL)·suitability·confidence·근거·면책"],
+        exception:["근거 부족 → 단정 금지","과장/투자권유 표현 → 완화·차단","워커 결손 → 부분 종합"],
+        kpi:["신호 변별력","Guardrail 차단 정확도","면책 100% 부착"],
+        impl:{ok:false, text:"🟡 부분 — 신호 생성 + Guardrail 게이팅(#50) 동작. 전 케이스 HOLD 변별력 과제(담당확인)."}
+      },
+      {
+        id:"A5", name:"종목 추천", group:"advanced", phase:"Phase 2", owner:"Curator",
+        status:"part", file:"advanced/A5_stock_recommendation_spec_v1.1.md",
+        trigger:["종목 추천 요청"],
+        pre:["company universe·관심 섹터·시총/유동성 필터"],
+        input:["user_profile·interest_sectors·필터 기준"],
+        flow:["universe 필터(시총/거래대금) → 섹터 매칭 → 후보 랭킹 → 추천 목록"],
+        output:["추천 종목 후보·선정 근거"],
+        exception:["후보 부족 → 기준 완화/안내","데이터 결손 종목 제외"],
+        kpi:["추천 적합도","후보 다양성"],
+        impl:{ok:false, text:"🟡 부분 — Curator 후보 반환 동작. 추천 랭킹 고도화 부분(담당확인)."}
+      },
+      {
+        id:"D1", name:"백테스팅 예측 검증 데모", group:"demo", phase:"Demo", owner:"PM · 개발팀",
+        status:"plan", file:"demo/D1_backtesting_validation_spec_v0.1.md",
+        trigger:["시연용 백테스팅 검증 모드 실행"],
+        pre:["타깃 예측일 기준 데이터 마스킹","과거 시점 스냅샷"],
+        input:["타깃일·종목·마스킹 기간(1/2/4주)"],
+        flow:["과거 시점 마스킹 → 분석 실행 → 실제 결과와 대조 → 정확도 리포트"],
+        output:["예측 vs 실제 비교·검증 리포트"],
+        exception:["데이터 누락 → 검증 제외","마스킹 누수 차단"],
+        kpi:["검증 재현성","마스킹 무결성"],
+        impl:{ok:false, text:"⚠ 설계안 — backtesting_demo_architecture.md 설계 존재, 자동화 경로는 데모 수준."}
+      }
+    ];
+
+    const BADGE = {done:["b-done","✅ 구현"], part:["b-part","🟡 부분"], plan:["b-plan","⚠ 설계안"]};
+
+    function blockHtml(h, items){
+      if(!items || !items.length) return "";
+      return `<div class="block"><h4>${h}</h4><ul>${items.map(i=>`<li>${i}</li>`).join("")}</ul></div>`;
+    }
+
+    function render(filter){
+      const grid = document.getElementById("grid");
+      grid.innerHTML = F.map(f=>{
+        const show = filter==="all" || f.group===filter || (filter==="done" && f.status==="done");
+        const [bc,bt] = BADGE[f.status];
+        return `<details class="spec ${f.a3?"a3":""}" data-group="${f.group}" data-status="${f.status}" ${show?"":"hidden"} ${f.a3?"open":""}>
+          <summary>
+            <span class="s-left">
+              <span class="s-id">${f.id}</span>
+              <span class="s-name">${f.name}</span>
+              <span class="s-owner">담당: ${f.owner} · ${f.phase}</span>
+            </span>
+            <span class="s-right"><span class="badge ${bc}">${bt}</span><span class="caret"></span></span>
+          </summary>
+          <div class="body">
+            ${blockHtml("① 트리거", f.trigger)}
+            ${blockHtml("② 전제조건", f.pre)}
+            ${blockHtml("③ 입력", f.input)}
+            ${blockHtml("④ 처리 흐름", f.flow)}
+            ${blockHtml("⑤ 출력", f.output)}
+            ${blockHtml("⑥ 예외 처리", f.exception)}
+            ${blockHtml("⑦ KPI / 비용", f.kpi)}
+            <div class="impl ${f.impl.ok?"ok":""}"><strong>구현 상태:</strong> ${f.impl.text}</div>
+            <div class="filelink">📄 명세 원문: <a href="${f.file}">${f.file}</a></div>
+          </div>
+        </details>`;
+      }).join("");
+    }
+
+    document.getElementById("filters").addEventListener("click", e=>{
+      if(!e.target.classList.contains("fbtn")) return;
+      document.querySelectorAll(".fbtn").forEach(b=>b.classList.remove("active"));
+      e.target.classList.add("active");
+      render(e.target.dataset.f);
+    });
+    render("all");
+  </script>
+</body>
+</html>

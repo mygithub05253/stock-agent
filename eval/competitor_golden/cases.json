@@ -1,0 +1,429 @@
+{
+  "_doc": "Competitor peer 비교 품질 회귀 골든셋. target/peers는 PeerMetricRow 입력 필드, expect는 기대 스냅샷. selected/score는 run_competitor_eval.py --update 로 베이스라인을 재기록한다. must_have_flags/must_not_have_flags/peer_outlier_flags 는 회귀 의도를 사람이 직접 고정한 불변식이다.",
+  "cases": [
+    {
+      "case_id": "C1_normal_comparison",
+      "description": "정상 비교 — 시총·지표가 가까운 peer 3개, 충분한 데이터 품질",
+      "target": {
+        "corp_code": "T1",
+        "stock_code": "AAA001",
+        "corp_name": "타깃반도체",
+        "sector": "반도체",
+        "market_cap": 1000000,
+        "close_price": 50000,
+        "per": 15.0,
+        "pbr": 1.5,
+        "roe": 0.1,
+        "revenue_growth": 0.05,
+        "operating_margin": 0.15,
+        "debt_ratio": 0.5,
+        "data_quality_score": 95
+      },
+      "peers": [
+        {
+          "corp_code": "P1",
+          "stock_code": "BBB001",
+          "corp_name": "피어B",
+          "sector": "반도체",
+          "market_cap": 1100000,
+          "close_price": 52000,
+          "per": 14.0,
+          "pbr": 1.4,
+          "roe": 0.12,
+          "revenue_growth": 0.06,
+          "operating_margin": 0.16,
+          "debt_ratio": 0.45,
+          "data_quality_score": 90
+        },
+        {
+          "corp_code": "P2",
+          "stock_code": "CCC001",
+          "corp_name": "피어C",
+          "sector": "반도체",
+          "market_cap": 950000,
+          "close_price": 48000,
+          "per": 16.0,
+          "pbr": 1.6,
+          "roe": 0.09,
+          "revenue_growth": 0.04,
+          "operating_margin": 0.14,
+          "debt_ratio": 0.55,
+          "data_quality_score": 85
+        },
+        {
+          "corp_code": "P3",
+          "stock_code": "DDD001",
+          "corp_name": "피어D",
+          "sector": "반도체",
+          "market_cap": 1050000,
+          "close_price": 51000,
+          "per": 13.0,
+          "pbr": 1.3,
+          "roe": 0.13,
+          "revenue_growth": 0.07,
+          "operating_margin": 0.15,
+          "debt_ratio": 0.4,
+          "data_quality_score": 95
+        }
+      ],
+      "expect": {
+        "must_have_flags": [],
+        "must_not_have_flags": [
+          "peer_count_below_minimum",
+          "target_data_quality_low",
+          "no_comparable_peers"
+        ],
+        "selected": [
+          "DDD001",
+          "CCC001",
+          "BBB001"
+        ],
+        "score": 54
+      }
+    },
+    {
+      "case_id": "C2_market_cap_band_filter",
+      "description": "시총 band 거름 — 4배 초과 대형 peer는 비교군에서 제외되어 peer 부족 경고 발생",
+      "target": {
+        "corp_code": "T2",
+        "stock_code": "AAA002",
+        "corp_name": "타깃중형",
+        "sector": "반도체",
+        "market_cap": 1000000,
+        "close_price": 40000,
+        "per": 15.0,
+        "pbr": 1.5,
+        "roe": 0.1,
+        "revenue_growth": 0.05,
+        "operating_margin": 0.15,
+        "debt_ratio": 0.5,
+        "data_quality_score": 90
+      },
+      "peers": [
+        {
+          "corp_code": "P1",
+          "stock_code": "BBB002",
+          "corp_name": "중형B",
+          "sector": "반도체",
+          "market_cap": 1200000,
+          "close_price": 45000,
+          "per": 14.0,
+          "pbr": 1.4,
+          "roe": 0.12,
+          "revenue_growth": 0.06,
+          "operating_margin": 0.16,
+          "debt_ratio": 0.45,
+          "data_quality_score": 88
+        },
+        {
+          "corp_code": "P2",
+          "stock_code": "CCC002",
+          "corp_name": "중형C",
+          "sector": "반도체",
+          "market_cap": 900000,
+          "close_price": 38000,
+          "per": 16.0,
+          "pbr": 1.6,
+          "roe": 0.09,
+          "revenue_growth": 0.04,
+          "operating_margin": 0.14,
+          "debt_ratio": 0.55,
+          "data_quality_score": 86
+        },
+        {
+          "corp_code": "P3",
+          "stock_code": "GIANT9",
+          "corp_name": "초대형",
+          "sector": "반도체",
+          "market_cap": 10000000,
+          "close_price": 700000,
+          "per": 22.0,
+          "pbr": 2.0,
+          "roe": 0.08,
+          "revenue_growth": 0.03,
+          "operating_margin": 0.2,
+          "debt_ratio": 0.3,
+          "data_quality_score": 99
+        }
+      ],
+      "expect": {
+        "must_have_flags": [
+          "peer_count_below_minimum"
+        ],
+        "must_not_have_flags": [],
+        "selected": [
+          "CCC002",
+          "BBB002"
+        ],
+        "score": 61
+      }
+    },
+    {
+      "case_id": "C3_outlier_metric_flag",
+      "description": "이상치 표기 — peer 중앙값 10배 초과 PER 후보에 outlier_per 플래그 부여",
+      "target": {
+        "corp_code": "T3",
+        "stock_code": "AAA003",
+        "corp_name": "타깃",
+        "sector": "반도체",
+        "market_cap": 1000000,
+        "close_price": 50000,
+        "per": 15.0,
+        "pbr": 1.5,
+        "roe": 0.1,
+        "revenue_growth": 0.05,
+        "operating_margin": 0.15,
+        "debt_ratio": 0.5,
+        "data_quality_score": 92
+      },
+      "peers": [
+        {
+          "corp_code": "P1",
+          "stock_code": "BBB003",
+          "corp_name": "정상B",
+          "sector": "반도체",
+          "market_cap": 1100000,
+          "close_price": 52000,
+          "per": 14.0,
+          "pbr": 1.4,
+          "roe": 0.12,
+          "revenue_growth": 0.06,
+          "operating_margin": 0.16,
+          "debt_ratio": 0.45,
+          "data_quality_score": 90
+        },
+        {
+          "corp_code": "P2",
+          "stock_code": "CCC003",
+          "corp_name": "정상C",
+          "sector": "반도체",
+          "market_cap": 950000,
+          "close_price": 48000,
+          "per": 16.0,
+          "pbr": 1.6,
+          "roe": 0.09,
+          "revenue_growth": 0.04,
+          "operating_margin": 0.14,
+          "debt_ratio": 0.55,
+          "data_quality_score": 88
+        },
+        {
+          "corp_code": "P3",
+          "stock_code": "OUTL03",
+          "corp_name": "이상치",
+          "sector": "반도체",
+          "market_cap": 1050000,
+          "close_price": 51000,
+          "per": 300.0,
+          "pbr": 1.5,
+          "roe": 0.11,
+          "revenue_growth": 0.05,
+          "operating_margin": 0.15,
+          "debt_ratio": 0.5,
+          "data_quality_score": 91
+        }
+      ],
+      "expect": {
+        "must_have_flags": [],
+        "must_not_have_flags": [
+          "peer_count_below_minimum"
+        ],
+        "peer_outlier_flags": [
+          "outlier_per"
+        ],
+        "selected": [
+          "OUTL03",
+          "CCC003",
+          "BBB003"
+        ],
+        "score": 64
+      }
+    },
+    {
+      "case_id": "C4_no_comparable_peers",
+      "description": "비교군 없음 — peer 후보가 전혀 없어 score 0, no_comparable_peers",
+      "target": {
+        "corp_code": "T4",
+        "stock_code": "AAA004",
+        "corp_name": "단독종목",
+        "sector": "반도체",
+        "market_cap": 1000000,
+        "close_price": 50000,
+        "per": 15.0,
+        "pbr": 1.5,
+        "roe": 0.1,
+        "revenue_growth": 0.05,
+        "operating_margin": 0.15,
+        "debt_ratio": 0.5,
+        "data_quality_score": 90
+      },
+      "peers": [],
+      "expect": {
+        "must_have_flags": [
+          "no_comparable_peers",
+          "peer_count_below_minimum"
+        ],
+        "must_not_have_flags": [],
+        "selected": [],
+        "score": 0
+      }
+    },
+    {
+      "case_id": "C5_low_quality_target_cap",
+      "description": "저품질 타깃 캡 — 타깃 데이터 완성도 60 미만이면 score 55로 상한",
+      "target": {
+        "corp_code": "T5",
+        "stock_code": "AAA005",
+        "corp_name": "정보부족타깃",
+        "sector": "반도체",
+        "market_cap": 1000000,
+        "close_price": null,
+        "per": null,
+        "pbr": null,
+        "roe": null,
+        "revenue_growth": null,
+        "operating_margin": null,
+        "debt_ratio": null,
+        "data_quality_score": 40
+      },
+      "peers": [
+        {
+          "corp_code": "P1",
+          "stock_code": "BBB005",
+          "corp_name": "피어B",
+          "sector": "반도체",
+          "market_cap": 1100000,
+          "close_price": 52000,
+          "per": 14.0,
+          "pbr": 1.4,
+          "roe": 0.12,
+          "revenue_growth": 0.06,
+          "operating_margin": 0.16,
+          "debt_ratio": 0.45,
+          "data_quality_score": 90
+        },
+        {
+          "corp_code": "P2",
+          "stock_code": "CCC005",
+          "corp_name": "피어C",
+          "sector": "반도체",
+          "market_cap": 950000,
+          "close_price": 48000,
+          "per": 16.0,
+          "pbr": 1.6,
+          "roe": 0.09,
+          "revenue_growth": 0.04,
+          "operating_margin": 0.14,
+          "debt_ratio": 0.55,
+          "data_quality_score": 85
+        },
+        {
+          "corp_code": "P3",
+          "stock_code": "DDD005",
+          "corp_name": "피어D",
+          "sector": "반도체",
+          "market_cap": 1050000,
+          "close_price": 51000,
+          "per": 13.0,
+          "pbr": 1.3,
+          "roe": 0.13,
+          "revenue_growth": 0.07,
+          "operating_margin": 0.15,
+          "debt_ratio": 0.4,
+          "data_quality_score": 95
+        }
+      ],
+      "expect": {
+        "must_have_flags": [
+          "target_data_quality_low"
+        ],
+        "must_not_have_flags": [],
+        "selected": [
+          "DDD005",
+          "CCC005",
+          "BBB005"
+        ],
+        "score": 49
+      }
+    },
+    {
+      "case_id": "C6_similarity_ordering",
+      "description": "복합 유사도 정렬(#62) — 시총·사업경제성이 동일한 peer가 데이터완성도만 높은 peer보다 우선",
+      "target": {
+        "corp_code": "T6",
+        "stock_code": "AAA006",
+        "corp_name": "타깃",
+        "sector": "반도체",
+        "market_cap": 1000000,
+        "close_price": 50000,
+        "per": 15.0,
+        "pbr": 1.5,
+        "roe": 0.1,
+        "revenue_growth": 0.05,
+        "operating_margin": 0.15,
+        "debt_ratio": 0.5,
+        "data_quality_score": 90
+      },
+      "peers": [
+        {
+          "corp_code": "P1",
+          "stock_code": "SIZEMATCH",
+          "corp_name": "규모사업동일",
+          "sector": "반도체",
+          "market_cap": 1000000,
+          "close_price": 50000,
+          "per": 15.0,
+          "pbr": 1.5,
+          "roe": 0.1,
+          "revenue_growth": 0.05,
+          "operating_margin": 0.15,
+          "debt_ratio": 0.5,
+          "data_quality_score": 70
+        },
+        {
+          "corp_code": "P2",
+          "stock_code": "MIDPEER",
+          "corp_name": "중간",
+          "sector": "반도체",
+          "market_cap": 1200000,
+          "close_price": 55000,
+          "per": 14.0,
+          "pbr": 1.4,
+          "roe": 0.12,
+          "revenue_growth": 0.06,
+          "operating_margin": 0.16,
+          "debt_ratio": 0.45,
+          "data_quality_score": 80
+        },
+        {
+          "corp_code": "P3",
+          "stock_code": "QUALONLY",
+          "corp_name": "완성도만높음",
+          "sector": "반도체",
+          "market_cap": 3500000,
+          "close_price": 200000,
+          "per": 25.0,
+          "pbr": 2.5,
+          "roe": 0.08,
+          "revenue_growth": 0.02,
+          "operating_margin": 0.3,
+          "debt_ratio": 0.2,
+          "data_quality_score": 100
+        }
+      ],
+      "expect": {
+        "must_have_flags": [],
+        "must_not_have_flags": [
+          "peer_count_below_minimum"
+        ],
+        "selected_first": "SIZEMATCH",
+        "selected": [
+          "SIZEMATCH",
+          "MIDPEER",
+          "QUALONLY"
+        ],
+        "score": 61
+      }
+    }
+  ]
+}

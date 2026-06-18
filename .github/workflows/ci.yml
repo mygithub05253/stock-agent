@@ -1,6 +1,7 @@
 # CI 안전망 — 머지 충돌 마커/문법 오류 커밋과 테스트 깨짐의 main 유입을 차단한다.
 # 배경: 강사님 검토 리포트에서 peer_tool.py 머지 충돌 마커가 커밋되어
-#       전체 파이프라인이 파싱조차 되지 않았던 사고의 재발 방지 목적.
+#       전체 파이프라인이 파싱조차 되지 않았던 사고(및 #54 guardrail/test 손상)의 재발 방지.
+# 게이트: (0) 추적 파일 전체 충돌 마커 스캔 → (1) compileall 문법 → (2) pytest 단위 테스트.
 name: CI
 
 on:
@@ -22,6 +23,19 @@ jobs:
 
       - name: 의존성 설치
         run: python -m pip install -r requirements-dev.txt
+
+      # 0차 게이트: 머지 충돌 마커 검출 (추적된 모든 파일 — tests/·md·yml·sql·html 포함)
+      #
+      # compileall은 .py만 보고 tests/는 대상이 아니라, #54처럼 test 파일이나 비-py 파일에
+      # 남은 충돌 마커를 놓친다. 추적 파일 전체를 git grep으로 직접 스캔해 main 유입을 막는다.
+      # 패턴은 정규식 quantifier로 적어 이 워크플로 파일 자신이 매칭되지 않게 한다.
+      - name: 머지 충돌 마커 검사
+        run: |
+          if git grep -nP '^(<{7}|={7}|>{7})(\s|$)' -- ':!.github/workflows/ci.yml'; then
+            echo '::error::머지 충돌 마커(<<<<<<<, =======, >>>>>>>)가 발견되었습니다. 해결 후 다시 커밋하세요.'
+            exit 1
+          fi
+          echo '충돌 마커 없음 — OK'
 
       # 1차 게이트: 모든 파이썬 파일이 최소한 파싱되는지 확인 (머지 충돌 마커 차단)
       - name: 문법 검사 (compileall)

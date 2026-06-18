@@ -9,9 +9,13 @@ eval/
 ├── golden_set/
 │   ├── personas.json              ✅ 페르소나 5개 케이스 (질문 + 투자성향 + 포트폴리오)
 │   └── expected_outputs.json      ✅ 케이스별 기대 결과 (intent·urgency·종목·공통 계약)
+├── competitor_golden/
+│   └── cases.json                 ✅ Competitor peer 비교 품질 회귀 스냅샷 6케이스 (DB·LLM 미사용)
 ├── reports/
-│   └── YYYY-MM-DD_benchmark.md    ✅ 실행 시 자동 생성 (md + json 쌍)
-└── run_benchmark.py               ✅ 한 명령으로 전체 평가 실행
+│   ├── YYYY-MM-DD_benchmark.md         ✅ 파이프라인 평가 (md + json 쌍)
+│   └── YYYY-MM-DD_competitor_eval.md   ✅ Competitor 회귀 평가 (md + json 쌍)
+├── run_benchmark.py               ✅ 파이프라인 전체 평가 (rule-based + RAGAS)
+└── run_competitor_eval.py         ✅ Competitor peer 비교 품질 회귀 (순수 엔진, 비용 0원)
 ```
 
 ## 측정 지표
@@ -40,6 +44,29 @@ python eval/run_benchmark.py --with-relevancy # answer_relevancy 추가
 - judge 모델은 `OPENROUTER_MODEL` 설정을 따릅니다 (기본: 저비용 flash 계열).
 - 임베딩은 비용이 들지 않는 로컬 bge-m3 (Qual RAG와 동일 모델)를 사용합니다.
 - **팀 OpenRouter 크레딧이 한정되어 있으니 전체 케이스 + relevancy 실행은 하루 1회 이내를 권장합니다.**
+
+## Competitor peer 비교 품질 회귀 (`run_competitor_eval.py`)
+
+peer 선정·상대위치 점수 엔진(`peer_tool.select_peer_rows`·`calculate_relative_position`)은
+DB·LLM 없이 입력만으로 결정되는 순수 함수입니다. 고정된 비교 시나리오를 흘려 출력
+(선정 peer 순서·종합 score·핵심 플래그)이 베이스라인 스냅샷과 일치하는지 검사합니다.
+
+```bash
+python eval/run_competitor_eval.py            # 비교 모드 (불일치 시 exit 1)
+python eval/run_competitor_eval.py --update    # 의도된 로직 변경 후 스냅샷 재기록(베이스라인)
+```
+
+| 케이스 | 검증 의도 |
+|--------|-----------|
+| C1 정상 비교 | 가까운 peer 3개 정상 선정, 경고 없음 |
+| C2 시총 band 거름 | 4배 초과 대형 peer 제외 + peer 부족 경고 |
+| C3 이상치 표기 | 중앙값 10배 초과 PER에 `outlier_per` 플래그 |
+| C4 비교군 없음 | score 0, `no_comparable_peers` |
+| C5 저품질 타깃 캡 | 데이터 완성도 60 미만 → score ≤ 55 |
+| C6 복합 유사도(#62) | 시총·사업경제성 동일 peer가 완성도만 높은 peer보다 우선 |
+
+CI는 `tests/test_competitor_eval.py`로 이 스위트를 매번 실행합니다(비용 0원).
+로직을 의도적으로 바꾼 경우에만 `--update`로 스냅샷을 갱신하고 변경을 리뷰하세요.
 
 ## 골든셋 확장 규칙
 
