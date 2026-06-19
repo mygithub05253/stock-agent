@@ -293,28 +293,45 @@ def _guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
 def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
     strategist = state.get("strategist")
     guardrail = state.get("guardrail")
+
     if strategist is None or guardrail is None:
         return _node_span("guardrail_apply")
-    # 기본 보정: PII/부적절 표현은 마스킹/보수적으로 수정
+
+    # =========================
+    # 1. guardrail 실패 처리
+    # =========================
     if not guardrail.passed:
-        if any("PII" in warning or "Inappropriate language" in warning for warning in guardrail.warnings):
+        is_pii = (
+            any("PII" in w for w in guardrail.warnings)
+            or "@" in (strategist.headline or "")
+        )
+
+        if is_pii:
+            fallback_headline = "민감 콘텐츠가 포함되어 일부 결과가 제한되었습니다."
+
             strategist = strategist.model_copy(
                 update={
-                    "headline": "출력 제한: 민감 콘텐츠가 검출되어 일부 내용이 숨겨졌습니다.",
+                    "headline": fallback_headline,
                     "signal": "HOLD",
                     "confidence": max(0, strategist.confidence - 30),
                     "suitability": max(0, strategist.suitability - 30),
                     "degraded": True,
                 }
             )
-            guardrail = guardrail.model_copy(update={"revised_headline": strategist.headline})
-        else:
-            strategist = strategist.model_copy(
-                update={"headline": guardrail.revised_headline, "degraded": True}
+
+            guardrail = guardrail.model_copy(
+                update={"revised_headline": fallback_headline, "needs_revision": False}
             )
 
-    # If guardrail requests revision, perform a recomposition loop:
-    # recomposer -> strategist -> investment_analyst -> guardrail (max 2 retries)
+            return {
+                "strategist": strategist,
+                "guardrail": guardrail,
+                **_node_span("guardrail_apply"),
+            }
+
+    # =========================
+    # 2. revision loop
+    # =========================
     needs_revision = bool(guardrail.needs_revision)
     if needs_revision:
         try:
@@ -324,33 +341,41 @@ def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
             attempt = 0
             last_guardrail = guardrail
             last_strategist = strategist
+
             while attempt < max_retries and (last_guardrail.needs_revision or not last_guardrail.passed):
                 attempt += 1
-                # 1) recomposer patches worker outputs to address revisable issues
-                patched = run_recomposer(_agent_state({**state, **{"strategist": last_strategist, "guardrail": last_guardrail}}))
 
-                # 2) rerun strategist with patched state
+                patched = run_recomposer(
+                    _agent_state({
+                        **state,
+                        "strategist": last_strategist,
+                        "guardrail": last_guardrail,
+                    })
+                )
+
                 patched = run_strategist(patched)
                 last_strategist = patched.strategist
 
-                # 3) run investment_analyst to refresh long-form report if available (non-fatal)
                 try:
                     patched = run_investment_analyst(patched)
                 except Exception:
                     pass
 
-                # 4) re-evaluate guardrail
                 patched = run_guardrail(patched)
                 last_guardrail = patched.guardrail
 
             strategist = last_strategist
             guardrail = last_guardrail
-        except Exception as exc:  # defensive: ensure pipeline doesn't crash
+
+        except Exception as exc:
             err = f"recomposition_loop_failed: {exc.__class__.__name__}: {exc}"
             return {"worker_errors": [err], **_node_span("guardrail_apply")}
 
-    return {"strategist": strategist, "guardrail": guardrail, **_node_span("guardrail_apply")}
-
+    return {
+        "strategist": strategist,
+        "guardrail": guardrail,
+        **_node_span("guardrail_apply"),
+    }
 
 def _renderer_node(state: AnalysisGraphState) -> dict[str, Any]:
     try:
@@ -540,10 +565,13 @@ def _to_output(state: AgentState) -> AnalysisOutput:
     if state.strategist is None or state.guardrail is None:
         raise RuntimeError("analysis pipeline finished without strategist or guardrail output")
 
+    # guardrail 기반 보정
+    is_blocked = not state.guardrail.passed
+
     tier1 = Tier1Result(
-        signal=state.strategist.signal,
-        confidence=state.strategist.confidence,
-        suitability=state.strategist.suitability,
+        signal="HOLD" if is_blocked else state.strategist.signal,
+        confidence=max(0, state.strategist.confidence - (30 if is_blocked else 0)),
+        suitability=max(0, state.strategist.suitability - (30 if is_blocked else 0)),
         headline=state.guardrail.revised_headline,
         disclaimer=state.guardrail.disclaimer,
     )

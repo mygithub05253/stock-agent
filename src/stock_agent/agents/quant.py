@@ -174,9 +174,9 @@ def run_quant(state: AgentState) -> AgentState:
         risks.append(
             "현재 정량 결과에는 일부 mock/기본값이 포함되어 있으므로 검증이 필요합니다."
         )
-        # DB 에러는 risks에 넣어 근거(reasons)와 분리
+        # 상세 실패 사유는 UI의 정량 근거 섹션과 테스트 계약에서 reasons로 노출한다.
         for fallback_reason in fallback_reasons:
-            risks.append(f"[데이터 연결] {fallback_reason}")
+            reasons.append(fallback_reason)
 
     if score >= 70:
         valuation_signal = "BUY"
