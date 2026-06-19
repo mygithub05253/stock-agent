@@ -32,7 +32,5 @@
 
 ```bash
 GLM_API_KEY=... \
-GLM_BASE_URL=https://api.z.ai/api/paas/v4 \
-GLM_MODEL=glm-4.5-flash \
-streamlit run streamlit_app.py
+scripts/run_local_streamlit.sh
 ```

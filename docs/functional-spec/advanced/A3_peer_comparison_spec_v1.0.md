@@ -1,10 +1,11 @@
-# 기능 명세서 v0.9 - A3. 동종업계 횡비교
+# 기능 명세서 v1.0 - A3. 동종업계 횡비교
 
 | 항목 | 값 |
 |------|-----|
-| 작성자 | PM |
+| 작성자 | PM (Competitor 담당) |
 | 작성일 | 2026-05-23 |
-| 버전 | v0.9 |
+| 버전 | v1.0 |
+| 코드 정합 | 2026-06-14 — 실제 구현(`agents/competitor.py`·`tools/peer_tool.py`·`mcp_bridge/`)과 정합. 3단 폴백·복합 유사도(#62)·이상치 플래깅·품질 회귀 골든셋·MCP 외부 노출 반영. 미구현(`analysis_cache`·manual peer·Heatmap) 명시 |
 | 상위 문서 | `docs/prd/PRD_v0.6.md` |
 | 참조 문서 | `docs/functional-spec/overview/functional_spec_all_features_v0.1.md`, `docs/functional-spec/advanced/A1_valuation_5y_spec_v0.7.md`, `docs/functional-spec/advanced/A2_industry_qualitative_spec_v0.8.md`, `docs/architecture/system_flow.md`, `docs/architecture/erd.md`, `docs/operations/llm_cost_guide.md` |
 | 대상 사용자 | 개인투자자, PM, 개발팀, 데이터팀 |
@@ -18,6 +19,32 @@
 본 문서는 PRD 기준 고급 기능 `A3. 동종업계 횡비교`의 상세 기능 명세서다. 기존 통합 초안의 7대 표준 양식인 **트리거 / 전제조건 / 입력 / 처리 흐름 / 출력 / 예외 처리 / 담당** 순서를 유지하고, Competitor Agent가 국내 동종업계 Peer를 추출해 대상 종목의 상대적 위치를 비교하는 흐름을 구체화한다.
 
 `A3`는 사용자가 절대 수치만 보지 않고 같은 산업 내 경쟁사 대비 PER, PBR, ROE, 매출성장률, 영업이익률, 시가총액 위치를 비교하도록 돕는 기능이다. Peer 선정과 지표 계산은 Python/DB 기반 규칙으로 수행하며, LLM은 이미 계산된 비교 결과를 사용자 친화적인 위치 요약으로 바꾸는 데만 사용한다.
+
+---
+
+## 0.1 구현 상태 (코드 기준, 2026-06-14)
+
+> 강사 #4(ERD↔실제 SQL 불일치, 코드 우선) 정합 원칙을 본 명세에도 적용한다. 아래 표는 §4 처리 흐름의 각 설계 항목이 **실제 코드에 구현되어 있는지**를 정리한 것이다. **상충 시 실제 코드가 우선**이며, 본 명세 §4는 일부 항목이 목표 설계(향후)임을 전제로 읽는다.
+
+| 설계 항목 | 코드 상태 | 구현 위치 / 비고 |
+|-----------|:---------:|------------------|
+| 종목·섹터 검증 → Peer 후보 추출 | ✅ 구현 | `peer_tool.load_target_company`·`load_peer_candidates` (같은 섹터) |
+| 재무·시세 로딩, 지표 계산(PER/PBR/ROE/성장률/마진/부채비율) | ✅ 구현 | `peer_tool.calculate_metric_row` (`company`·`stock_price`·`financial_statement`) |
+| **복합 유사도 peer 선정** (시총 0.45·영업이익률 0.30·완성도 0.25, 시총 band 0.25x~4x 1차 거름) | ✅ 구현 (#62) | `peer_tool.peer_similarity`·`select_peer_rows` — 단순 데이터완성도 1순위 방식에서 고도화 |
+| 랭킹·분위수·상대 위치, 0~100 종합 score | ✅ 구현 | `peer_tool.calculate_relative_position` |
+| 이상치 표기 (중앙값 10배 초과) | ✅ 구현 | `peer_tool._mark_outliers` → `outlier_*` 플래그 (명세 4.6 Winsorize는 플래깅으로 구현) |
+| LLM 위치 요약 병합 (수치 미생성) | ✅ 구현 | `competitor._generate_narrative`/`_apply_narrative` (key 부재·실패 시 rule-based) |
+| 적자기업 PER 제외·결손 not_applicable·데이터 품질 플래그 | ✅ 구현 | `*_not_applicable`·`*_missing`·`data_quality_flags` |
+| **DB 실패 시 폴백** | ✅ 구현 (강화) | **DB→① MCP 실시간 시세(실데이터)→② mock 3단**. `competitor._mcp_fallback_result`·`mcp_bridge/` |
+| **MCP 외부 노출 (A2A)** | ✅ 구현 (#6) | `mcp_bridge` stdio 서버 + `call_mcp_tool` 범용 진입점 + 외부 소비자 데모 |
+| **품질 회귀 평가** | ✅ 구현 | `eval/run_competitor_eval.py` 골든셋 6케이스 + `tests/test_competitor_eval.py` (CI) |
+| 24시간 분석 캐시 (`analysis_cache`) | ❌ 미구현 | DDL 없음. 현재 narrative만 프로세스 메모리 일일 캐시(`_narrative_cache`) |
+| 분석 이력 저장 (`analysis_history`) | ❌ 미구현 | DDL 없음(런타임 Pydantic만). erd.md §0.1 참고 |
+| `peer_selection_mode = manual` (수동 Peer 지정) | ❌ 미구현 | 현재 `same_sector` 단일 경로 |
+| Peer Heatmap 렌더링 | ❌ 미구현 | `relative_position` percentile 데이터는 제공, Heatmap UI 미구현 |
+| 월 LLM 비용 임계(3/4/5만원) 단계 제어 | ⚠ 부분 | 키 부재 시 LLM 생략은 구현. 당월 누적액 기반 단계 제어는 미구현(`llm_cost_log` 없음) |
+
+> 표기: `financial_data`는 실제 SQL 기준 **`financial_statement`** 로 통일한다(구 표기는 §4·§5에 잔존할 수 있으나 코드 기준 `financial_statement`가 정답).
 
 ---
 
@@ -56,7 +83,7 @@ MVP 화면은 대상 종목과 국내 Peer 기업 3개 이상의 비교 표, Pee
 | 주요 입력 | `stock_code`, `peer_selection_mode`, `metric_set`, 재무·시세 데이터 |
 | 메인 에이전트 | Competitor Agent |
 | 보조 에이전트 | Quant Worker, Strategist, Guardrail |
-| 주요 DB | `company`, `financial_data`, `financial_statement`, `stock_price`, `analysis_cache`, `analysis_history` |
+| 주요 DB | `company`, `financial_statement`, `stock_price` (구현). `analysis_cache`·`analysis_history`는 미구현 — §0.1 참고 |
 | 주요 출력 | Peer 비교표, Heatmap, 지표별 랭킹, 분위수, Peer 위치 요약, `CompetitorReport` |
 | LLM 비용 정책 | 24시간 내 동일 종목 A3 결과 캐시 우선, 캐시 미스 시 최대 2회 |
 | 월 비용 상한 | 전체 서비스 월 LLM 비용 50,000원 초과 방지 |
@@ -265,5 +292,6 @@ MVP 화면은 대상 종목과 국내 Peer 기업 3개 이상의 비교 표, Pee
 
 | 날짜 | 버전 | 변경 내용 |
 |------|------|-----------|
+| 2026-06-14 | v1.0 | 실제 구현 정합 — §0.1 구현 상태(코드 기준) 추가. 3단 폴백(DB→MCP 실시간→mock)·복합 유사도(#62)·이상치 플래깅·품질 회귀 골든셋·MCP 외부 노출 반영. `financial_data`→`financial_statement` 정정, `analysis_cache`·manual peer·Heatmap 미구현 명시 |
 | 2026-05-23 | v0.9 | A3. 동종업계 횡비교 기능별 상세 명세서 초안 작성 |
 

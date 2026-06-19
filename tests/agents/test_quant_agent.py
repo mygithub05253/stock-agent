@@ -1,70 +1,153 @@
-import os
-import sys
-from pprint import pprint
+from unittest.mock import MagicMock
 
-# 💡 [경로 수정] test/ 폴더에서 상위 디렉토리의 src/ 폴더를 명확히 바라보도록 설정
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, ".."))
-sys.path.insert(0, os.path.join(project_root, "src"))
+import pytest
 
-from stock_agent.schemas.analysis import AgentState
-from stock_agent.agents.quant import run_quant
+from stock_agent.agents import quant as quant_module
+from stock_agent.schemas.analysis import AgentState, CuratorResult, Portfolio, UserProfile
 
-# Pydantic 모델을 우회하기 위한 가짜(Mock) 큐레이터 클래스
-class MockCurator:
-    def __init__(self, stock_code, corp_code, corp_name):
-        self.stock_code = stock_code
-        self.corp_code = corp_code
-        self.corp_name = corp_name
 
-def test_quant_isolation():
-    print("🚀 [TEST] Quant Agent 단독 테스트 가동 (test/ 환경)...")
-
-    # 1. 가짜 초입 데이터 생성 (큐레이터 역할 모킹)
-    mock_curator = MockCurator(
-        stock_code="005930",
-        corp_code="00126380",
-        corp_name="삼성전자"
-    )
-
-    # 2. AgentState 메모리장부 생성 및 세팅
-    # 💡 Pydantic 검증을 우회하고 가짜 State를 강제로 띄웁니다.
-    state = AgentState.model_construct(
+def _make_state() -> AgentState:
+    return AgentState(
         user_query="삼성전자 퀀트 테스트",
-        user_profile=None,
-        portfolio=None
+        user_profile=UserProfile(),
+        portfolio=Portfolio(),
+        curator=CuratorResult(
+            intent="stock_analysis",
+            corp_name="삼성전자",
+            stock_code="005930",
+            corp_code="00126380",
+            sector="semiconductor",
+        ),
+        as_of_date="2026-05-26",
     )
-    state.curator = mock_curator
-    state.as_of_date = "2026-05-26" # 백테스트 타깃 날짜 고정
 
-    try:
-        # 3. Quant Agent 단독 슛!
-        print(f"🤖 Quant Agent에게 {mock_curator.corp_name} 분석을 지시합니다...\n")
-        result_state = run_quant(state)
-        quant_result = result_state.quant
 
-        # 4. 결과 출력
-        print("==================================================")
-        print("✅ [TEST SUCCESS] Quant Agent 실행 완료!")
-        print("==================================================")
-        print(f"📊 [종합 점수] : {quant_result.score} 점")
-        print(f"🚦 [투자 신호] : {quant_result.valuation_signal}")
-        
-        print("\n📈 [산출된 정량 메트릭스]")
-        pprint(quant_result.metrics)
-        
-        print("\n🟢 [긍정적 요인 (Reasons)]")
-        for reason in quant_result.reasons:
-            print(f"  - {reason}")
-            
-        print("\n🔴 [리스크 요인 (Risks)]")
-        for risk in quant_result.risks:
-            print(f"  - {risk}")
-        print("==================================================")
+def test_run_quant_returns_db_metrics_when_tools_succeed(monkeypatch):
+    conn = MagicMock()
+    conn.close = MagicMock()
 
-    except Exception as e:
-        print(f"\n❌ [TEST FAILED] 에러 발생: {e}")
-        raise e  # pytest가 에러를 정확히 캐치할 수 있도록 예외를 던집니다.
+    monkeypatch.setattr(quant_module, "_connect_with_retry", lambda: (conn, []))
+    monkeypatch.setattr(
+        quant_module,
+        "get_price_metrics",
+        lambda _conn, stock_code, as_of_date: {
+            "per": 10.0,
+            "pbr": 1.1,
+            "close_price": 65000,
+        },
+    )
+    monkeypatch.setattr(
+        quant_module,
+        "get_financial_metrics",
+        lambda _conn, corp_code, as_of_date: {
+            "roe": 12.0,
+            "revenue_growth_yoy": 6.0,
+            "operating_margin": 15.0,
+            "debt_ratio": 80.0,
+        },
+    )
 
-if __name__ == "__main__":
-    test_quant_isolation()
+    state = _make_state()
+    result = quant_module.run_quant(state)
+
+    assert result is state
+    assert result.quant is not None
+    assert result.quant.score == 80
+    assert result.quant.valuation_signal == "BUY"
+    assert result.quant.metrics["per"] == 10.0
+    assert result.quant.metrics["pbr"] == 1.1
+    assert result.quant.metrics["close_price"] == 65000
+    assert any("DB에서 조회했습니다" in reason for reason in result.quant.reasons)
+    assert not any("fallback" in reason.lower() for reason in result.quant.reasons + result.quant.risks)
+
+
+def test_run_quant_partial_price_tool_failure_uses_fallback(monkeypatch):
+    conn = MagicMock()
+    conn.close = MagicMock()
+
+    monkeypatch.setattr(quant_module, "_connect_with_retry", lambda: (conn, []))
+    monkeypatch.setattr(
+        quant_module,
+        "get_price_metrics",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("no price data")),
+    )
+    monkeypatch.setattr(
+        quant_module,
+        "get_financial_metrics",
+        lambda _conn, corp_code, as_of_date: {
+            "roe": 12.0,
+            "revenue_growth_yoy": 6.0,
+            "operating_margin": 15.0,
+            "debt_ratio": 80.0,
+        },
+    )
+
+    state = _make_state()
+    result = quant_module.run_quant(state)
+
+    assert result.quant is not None
+    assert result.quant.metrics["per"] == 18.0
+    assert result.quant.metrics["pbr"] == 1.3
+    assert result.quant.metrics["roe"] == 12.0
+    assert any("시세 도구 오류" in reason for reason in result.quant.reasons)
+    assert any("fallback" in reason.lower() or "기본값" in reason for reason in result.quant.reasons + result.quant.risks)
+    assert result.quant.valuation_signal == "BUY"
+
+
+def test_run_quant_partial_fin_tool_failure_uses_fallback(monkeypatch):
+    conn = MagicMock()
+    conn.close = MagicMock()
+
+    monkeypatch.setattr(quant_module, "_connect_with_retry", lambda: (conn, []))
+    monkeypatch.setattr(
+        quant_module,
+        "get_price_metrics",
+        lambda _conn, stock_code, as_of_date: {
+            "per": 10.0,
+            "pbr": 1.1,
+            "close_price": 65000,
+        },
+    )
+    monkeypatch.setattr(
+        quant_module,
+        "get_financial_metrics",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("DART data missing")),
+    )
+
+    state = _make_state()
+    result = quant_module.run_quant(state)
+
+    assert result.quant is not None
+    assert result.quant.metrics["per"] == 10.0
+    assert result.quant.metrics["roe"] == 8.0
+    assert any("DART 재무 도구 오류" in reason for reason in result.quant.reasons)
+    assert any("fallback" in reason.lower() or "기본값" in reason for reason in result.quant.reasons + result.quant.risks)
+    assert result.quant.valuation_signal == "HOLD"
+
+
+def test_run_quant_db_connection_failure_uses_fallback_reasons(monkeypatch):
+    monkeypatch.setattr(
+        quant_module,
+        "_connect_with_retry",
+        lambda: (None, ["DB 연결 시도 1 실패: OperationalError: connection refused"]),
+    )
+
+    state = _make_state()
+    result = quant_module.run_quant(state)
+
+    assert result.quant is not None
+    assert result.quant.metrics["per"] == 18.0
+    assert result.quant.metrics["roe"] == 8.0
+    assert any("DB 연결 시도 1 실패" in reason for reason in result.quant.reasons)
+    assert any("fallback" in reason.lower() for reason in result.quant.reasons + result.quant.risks)
+
+
+def test_run_quant_raises_without_curator():
+    state = AgentState(user_query="테스트", user_profile=UserProfile(), portfolio=Portfolio())
+
+    with pytest.raises(ValueError, match="Curator result is required"):
+        quant_module.run_quant(state)
+
+
+
+print("test end")

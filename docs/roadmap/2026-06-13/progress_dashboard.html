@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 팀 작업 현황 대시보드 · 2026-06-13 EOD</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --emerald: #059669;
+      --emerald-soft: #ecfdf5;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --red: #dc2626;
+      --red-soft: #fef2f2;
+      --violet: #7c3aed;
+      --violet-soft: #f5f3ff;
+      --slate-soft: #f1f5f9;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: Pretendard, "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    a { color: inherit; text-decoration: none; }
+    code {
+      border-radius: 5px;
+      background: var(--slate-soft);
+      padding: 1px 5px;
+      color: #334155;
+      font-size: 0.92em;
+    }
+    button { font: inherit; }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(6px);
+    }
+    .header-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--blue);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .logo-title { font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .logo-sub { font-size: 12px; color: var(--muted); }
+    nav.topnav { display: none; gap: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
+    nav.topnav a { padding: 6px 9px; border-radius: 8px; }
+    nav.topnav a:hover { background: var(--slate-soft); color: var(--text); }
+    @media (min-width: 900px) { nav.topnav { display: flex; } }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+    section { margin-top: 34px; scroll-margin-top: 82px; }
+    .card, .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+    }
+    .card { padding: 20px; }
+    .section-label {
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .section-title { margin-top: 4px; font-size: 22px; font-weight: 800; }
+    .section-desc { max-width: 850px; margin-top: 6px; color: var(--muted); font-size: 14px; }
+    .section-note {
+      margin-top: 14px;
+      border-left: 4px solid var(--blue);
+      border-radius: 0 10px 10px 0;
+      background: var(--blue-soft);
+      padding: 11px 14px;
+      color: #1e3a8a;
+      font-size: 13px;
+    }
+
+    .hero { display: grid; gap: 16px; margin-top: 0; }
+    @media (min-width: 920px) { .hero { grid-template-columns: 1.45fr 0.55fr; } }
+    .hero h1 { margin-top: 10px; font-size: 27px; font-weight: 800; line-height: 1.35; }
+    @media (min-width: 640px) { .hero h1 { font-size: 34px; } }
+    .hero .lede { max-width: 760px; margin-top: 12px; color: var(--muted); }
+    .score-journey {
+      margin-top: 20px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      align-items: stretch;
+      gap: 6px;
+    }
+    .score-step { border-radius: 10px; padding: 12px 10px; text-align: center; }
+    .score-step .lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+    .score-step .val { margin-top: 2px; font-size: 22px; font-weight: 800; }
+    .score-step .sub { color: var(--muted); font-size: 11px; }
+    .score-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 18px; font-weight: 700; }
+    .step-report { border: 1px solid #fecaca; background: var(--red-soft); }
+    .step-report .lbl, .step-report .val { color: var(--red); }
+    .step-now { border: 1px solid #bfdbfe; background: var(--blue-soft); }
+    .step-now .lbl, .step-now .val { color: var(--blue); }
+    .step-target { border: 1px solid #a7f3d0; background: var(--emerald-soft); }
+    .step-target .lbl, .step-target .val { color: var(--emerald); }
+    @media (max-width: 600px) {
+      .score-journey { grid-template-columns: 1fr; }
+      .score-arrow { transform: rotate(90deg); min-height: 18px; }
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; color: var(--muted); font-size: 12px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .dot-report { background: #f87171; }
+    .dot-now { background: var(--blue); }
+    .dot-target { background: #34d399; }
+    aside.meta dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    aside.meta .stat { border-radius: 10px; background: var(--slate-soft); padding: 10px 12px; }
+    aside.meta dt { color: var(--muted); font-size: 12px; }
+    aside.meta dd { margin-top: 2px; font-size: 18px; font-weight: 800; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      padding: 4px 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .method-grid, .team-grid, .agent-grid, .rubric-grid, .focus-grid, .unassigned-grid {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    @media (min-width: 760px) {
+      .method-grid { grid-template-columns: repeat(4, 1fr); }
+      .team-grid, .agent-grid, .rubric-grid, .focus-grid { grid-template-columns: 1fr 1fr; }
+      .unassigned-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    .method-card { padding: 15px; }
+    .method-card strong { display: block; font-size: 14px; }
+    .method-card p { margin-top: 5px; color: var(--muted); font-size: 12px; }
+
+    .team-card, .agent-card, .rubric-card, .focus-card, .unassigned-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      padding: 16px;
+    }
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .card-title { font-size: 16px; font-weight: 800; }
+    .card-subtitle { margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .percent { color: var(--blue); font-size: 22px; font-weight: 800; white-space: nowrap; }
+    .progress-track { height: 10px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: var(--slate-soft); }
+    .progress-fill { width: 0; height: 100%; border-radius: 999px; background: var(--blue); transition: width 700ms ease; }
+    .progress-fill.strong { background: var(--emerald); }
+    .progress-fill.risk { background: var(--red); }
+    .progress-fill.watch { background: var(--amber); }
+    .detail-block { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+    .detail-label { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+    .detail-block p, .detail-block ul { margin-top: 5px; color: var(--muted); font-size: 13px; }
+    .detail-block ul { margin-left: 17px; }
+    .detail-block li { margin-top: 3px; }
+    .focus-line {
+      margin-top: 12px;
+      border-left: 4px solid var(--amber);
+      border-radius: 0 8px 8px 0;
+      background: var(--amber-soft);
+      padding: 9px 11px;
+      color: #92400e;
+      font-size: 13px;
+    }
+    .done-line {
+      margin-top: 12px;
+      border-left: 4px solid var(--emerald);
+      border-radius: 0 8px 8px 0;
+      background: var(--emerald-soft);
+      padding: 9px 11px;
+      color: #065f46;
+      font-size: 13px;
+    }
+
+    .badge, .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge { padding: 3px 8px; }
+    .tag { padding: 2px 8px; }
+    .badge-strong, .tag-done { background: var(--emerald-soft); color: var(--emerald); }
+    .badge-progress, .tag-now { background: var(--blue-soft); color: var(--blue); }
+    .badge-watch, .tag-owner { background: var(--amber-soft); color: var(--amber); }
+    .badge-risk, .tag-risk { background: var(--red-soft); color: var(--red); }
+    .badge-unassigned, .badge-weight { background: var(--violet-soft); color: var(--violet); }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+    .filter-button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      padding: 6px 11px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .filter-button:hover, .filter-button.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
+    .agent-card[hidden] { display: none; }
+    .agent-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .evidence { margin-top: 10px; color: var(--muted); font-size: 12px; }
+    .evidence strong { color: var(--text); }
+
+    .rubric-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .rubric-name { font-size: 15px; font-weight: 700; }
+    .rubric-no { margin-right: 4px; color: var(--muted); font-weight: 600; }
+    .badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .bars { display: grid; gap: 8px; margin-top: 12px; }
+    .bar-row { display: grid; grid-template-columns: 62px 1fr 64px; align-items: center; gap: 8px; font-size: 12px; }
+    .bar-label { color: var(--muted); font-weight: 600; }
+    .bar-track { height: 10px; overflow: hidden; border-radius: 999px; background: var(--slate-soft); }
+    .bar-fill { width: 0; height: 100%; border-radius: 999px; transition: width 700ms ease; }
+    .bar-fill.report { background: #f87171; }
+    .bar-fill.now { background: var(--blue); }
+    .bar-fill.code { background: var(--violet); }
+    .bar-fill.target { background: #34d399; }
+    .bar-val { text-align: right; font-weight: 700; }
+    .rubric-evidence { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; color: var(--muted); font-size: 13px; }
+    .rubric-evidence strong { color: var(--text); font-weight: 600; }
+
+    .focus-card { border-left: 4px solid var(--amber); }
+    .focus-card.high { border-left-color: var(--red); }
+    .focus-card.done { border-left-color: var(--emerald); }
+    .focus-card h3, .unassigned-card h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 14px; }
+    .focus-card p, .unassigned-card p { margin-top: 7px; color: var(--muted); font-size: 13px; }
+    .focus-card ul, .unassigned-card ul { margin: 8px 0 0 18px; color: var(--muted); font-size: 13px; }
+    .focus-card li, .unassigned-card li { margin-top: 3px; }
+
+    .timeline { display: grid; gap: 0; margin-top: 18px; }
+    .tl-item { display: grid; grid-template-columns: 36px 1fr; gap: 12px; }
+    .tl-rail { display: flex; flex-direction: column; align-items: center; }
+    .tl-dot {
+      width: 27px;
+      height: 27px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--blue);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .tl-item.current .tl-dot { background: var(--red); }
+    .tl-item.done .tl-dot { background: var(--emerald); }
+    .tl-line { width: 2px; flex: 1; margin: 4px 0; background: var(--border); }
+    .tl-item:last-child .tl-line { display: none; }
+    .tl-body { padding-bottom: 19px; }
+    .tl-body h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 14px; }
+    .tl-body p { margin-top: 4px; color: var(--muted); font-size: 13px; }
+
+    .source-list { margin-top: 16px; overflow: hidden; }
+    .source-row {
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      padding: 11px 0;
+      font-size: 13px;
+    }
+    .source-row:first-child { border-top: 0; }
+    .source-row strong { color: var(--muted); }
+    .source-row a { color: var(--blue); font-weight: 600; }
+    footer { margin-top: 42px; text-align: center; color: var(--muted); font-size: 12px; }
+    @media (max-width: 600px) {
+      .source-row { grid-template-columns: 1fr; gap: 3px; }
+      .bar-row { grid-template-columns: 54px 1fr 55px; }
+      .team-card, .agent-card, .rubric-card, .focus-card, .unassigned-card { padding: 14px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .progress-fill, .bar-fill { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <a class="logo" href="#top">
+        <span class="logo-badge">SA</span>
+        <span>
+          <span class="logo-title">stock-agent</span><br />
+          <span class="logo-sub">팀 작업 현황 대시보드 · 2026-06-13 EOD</span>
+        </span>
+      </a>
+      <nav class="topnav">
+        <a href="#team">팀원별</a>
+        <a href="#agents">에이전트별</a>
+        <a href="#rubric">루브릭</a>
+        <a href="#feedback">집중 피드백</a>
+        <a href="#roadmap">실행 순서</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="card">
+        <p class="section-label">2026-06-13 EOD · 강사 재검토 이후 코드 진척 반영</p>
+        <h1>강사 재검토 6대 피드백 중 4개를 코드로 닫았다 — 남은 건 LangGraph와 오픈웨이트 sLLM 두 레버</h1>
+        <p class="lede">
+          강사 공식 재검토는 커밋 <strong>93487d3</strong> 기준 <strong>32/70 · D등급</strong>입니다(점수 자체는 다음 재검토 전까지 불변).
+          그러나 그 이후 main(<strong>4790f2d</strong>)에 <strong>Qual·Strategist 폴백 복원(#51·#52), Guardrail 실게이팅(#50),
+          Macro 파이프라인 연결(#49), Competitor MCP 실시간 시세(#56)</strong>가 머지되어
+          <strong>P0 2건 포함 6대 피드백 중 4건이 코드상 해소</strong>됐습니다.
+          이제 가중 ×2 핵심 차별축인 <strong>LangGraph 오케스트레이션(#1)·오픈웨이트 sLLM(#3)</strong> 두 가지가 점수의 거의 전부를 좌우합니다.
+        </p>
+        <div class="score-journey">
+          <div class="score-step step-report">
+            <div class="lbl">최초 검토 (05-31)</div>
+            <div class="val">20 / 70</div>
+            <div class="sub">F등급 · RAGAS 게이트</div>
+          </div>
+          <div class="score-arrow">→</div>
+          <div class="score-step step-now">
+            <div class="lbl">공식 재검토 (06-13)</div>
+            <div class="val">32 / 70</div>
+            <div class="sub">D등급 · 게이트 없음</div>
+          </div>
+          <div class="score-arrow">→</div>
+          <div class="score-step step-target">
+            <div class="lbl">코드 현재 추정</div>
+            <div class="val">~40 / 70</div>
+            <div class="sub">폴백·게이팅·Macro 머지분</div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="dot dot-report"></i>최초 공식 점수</span>
+          <span><i class="dot dot-now"></i>최신 공식 점수</span>
+          <span><i class="dot dot-target"></i>재검증 시 기대(미확정)</span>
+        </div>
+      </div>
+
+      <aside class="card meta">
+        <h2 style="font-size:15px; font-weight:700;">이번 대시보드 기준</h2>
+        <div class="pill-row">
+          <span class="pill">강사 재검토 93487d3</span>
+          <span class="pill">코드 기준 main 4790f2d</span>
+          <span class="pill">GitHub 협업자 5명</span>
+        </div>
+        <dl>
+          <div class="stat"><dt>코드 해소(재검토 후)</dt><dd>4건</dd></div>
+          <div class="stat"><dt>남은 핵심 레버</dt><dd>2건</dd></div>
+          <div class="stat"><dt>에이전트 모듈</dt><dd>10</dd></div>
+          <div class="stat"><dt>미배정 과제</dt><dd>2</dd></div>
+        </dl>
+        <p style="margin-top:12px; font-size:12px; color:var(--muted);">
+          공식 점수(32)는 강사 재검토 결과만 사용합니다. 이후 머지된 폴백·게이팅·Macro·MCP는
+          <strong>"코드상 해소, 재검증 대기"</strong>로 표시하며 점수 상승은 다음 강사 재검토 전까지 확정하지 않습니다.
+        </p>
+      </aside>
+    </section>
+
+    <section id="method">
+      <p class="section-label">Reading Guide</p>
+      <h2 class="section-title">구현도 산정 기준</h2>
+      <p class="section-desc">구현도는 코드 줄 수나 커밋 수가 아니라, 실제 서비스 경로에서 동작하는 정도를 네 축으로 판단한 작업 계획용 지표입니다.</p>
+      <div class="method-grid">
+        <article class="panel method-card"><strong>핵심 로직 30%</strong><p>에이전트 책임에 맞는 계산·판단 로직과 입출력 계약이 있는가.</p></article>
+        <article class="panel method-card"><strong>실행 경로 연결 30%</strong><p>파이프라인과 UI에서 실제 호출되고 다음 에이전트가 결과를 소비하는가.</p></article>
+        <article class="panel method-card"><strong>폴백·테스트 20%</strong><p>DB·LLM 실패 시 안전하게 동작하고 회귀 테스트가 있는가.</p></article>
+        <article class="panel method-card"><strong>검증 증거 20%</strong><p>강사 채점 기준으로 실행 결과·리포트·문서 정합을 증명할 수 있는가.</p></article>
+      </div>
+    </section>
+
+    <section id="team">
+      <p class="section-label">Team Ownership</p>
+      <h2 class="section-title">팀원별 파트 구현도</h2>
+      <p class="section-desc">GitHub 협업자와 실제 파일 기여 이력으로 담당 파트를 추정했습니다. 퍼센트는 개인 역량 평가가 아니라 현재 담당 코드 영역의 완성도입니다.</p>
+      <div class="team-grid" id="teamGrid"></div>
+    </section>
+
+    <section id="agents">
+      <p class="section-label">Agent Readiness</p>
+      <h2 class="section-title">에이전트별 구현 현황</h2>
+      <p class="section-desc">에이전트 코드 존재 여부보다 파이프라인 연결과 강사 채점 가능한 실동작을 더 크게 반영했습니다. 06-13 EOD 코드(main 4790f2d) 기준입니다.</p>
+      <div class="toolbar" aria-label="에이전트 상태 필터">
+        <button class="filter-button active" type="button" data-filter="all">전체</button>
+        <button class="filter-button" type="button" data-filter="strong">강점</button>
+        <button class="filter-button" type="button" data-filter="focus">집중 피드백</button>
+        <button class="filter-button" type="button" data-filter="disconnected">미연결</button>
+      </div>
+      <div class="agent-grid" id="agentGrid"></div>
+    </section>
+
+    <section id="rubric">
+      <p class="section-label">Official Rubric Scoreboard</p>
+      <h2 class="section-title">루브릭 10항목 — 공식 점수 + 코드 현재</h2>
+      <p class="section-desc">공식 현재(파란 막대)는 2026-06-13 강사 재검토의 확정 점수입니다. 코드 현재(보라 막대)는 이후 main에 머지된 변경을 반영한 자체 추정이며, 다음 재검토 전까지 비공식입니다.</p>
+      <p class="section-note">
+        강사 재검토 이후 머지로 <strong>#2 에러핸들링·#3(게이팅)·#6 MCP</strong>의 코드 근거가 올라갔습니다.
+        막대의 보라색(코드 현재)이 파란색(공식 현재)보다 높은 항목이 "재검증 시 점수 상승 후보"입니다.
+      </p>
+      <div class="rubric-grid" id="rubricGrid"></div>
+    </section>
+
+    <section id="feedback">
+      <p class="section-label">Instructor Feedback</p>
+      <h2 class="section-title">집중 피드백 — 해소분과 남은 레버</h2>
+      <p class="section-desc">강사 6대 피드백을 06-13 EOD 코드 기준으로 재분류했습니다. 초록 카드는 코드상 해소(재검증 대기), 빨강·주황 카드는 남은 작업입니다.</p>
+      <div class="focus-grid">
+        <article class="focus-card done">
+          <h3><span class="tag tag-done">해소</span> Qual·Strategist 폴백 복원</h3>
+          <p><code>qual.py</code>는 <code>retrieve_news_with_fallback</code>/<code>retrieve_disclosures_with_fallback</code>로 retriever 실패를 try/except 처리하고, <code>strategist.py</code>는 일부 워커 결손을 허용(graceful degradation)합니다.</p>
+          <ul><li>해소 근거: #52(Qual fallback), #51(Strategist resilience)</li><li>남은 일: CI 제외 테스트 재활성화 점검</li></ul>
+        </article>
+        <article class="focus-card done">
+          <h3><span class="tag tag-done">해소</span> Guardrail 실게이팅</h3>
+          <p><code>passed=True</code> 하드코딩을 제거하고 7개 게이트(PII·욕설·보장표현·근거충분성 등) 기반 <code>passed = not blocked</code> + 재합성 rewrite 루프를 구현했습니다.</p>
+          <ul><li>해소 근거: #50(guardrail gating)</li><li>남은 일: 관측(langsmith/langfuse) span 실연결</li></ul>
+        </article>
+        <article class="focus-card done">
+          <h3><span class="tag tag-done">해소</span> Macro 파이프라인 연결</h3>
+          <p><code>run_macro</code>가 <code>run_phase1_analysis</code>에 포함되고, Strategist가 <code>_WEIGHTS_WITH_MACRO</code>(macro 0.15)로 결과를 실제 가중 소비합니다.</p>
+          <ul><li>해소 근거: #49(Macro 연결 + 가중치)</li><li>남은 일: Macro 실데이터 폭 확대</li></ul>
+        </article>
+        <article class="focus-card done">
+          <h3><span class="tag tag-done">해소</span> MCP 최소 실동작(#6)</h3>
+          <p>Competitor DB 미연결 폴백이 <code>mcp_bridge</code>의 FastMCP 서버(<code>sector_roster</code>·<code>market_metrics</code> Tool)를 in-process 호출해 pykrx 실시간 시세 peer 비교를 확보합니다.</p>
+          <ul><li>해소 근거: #56(Competitor MCP). 루브릭 #6 0→~1</li><li>남은 일: stdio 핸드셰이크 시연 캡처</li></ul>
+        </article>
+        <article class="focus-card high">
+          <h3><span class="tag tag-risk">P0 잔여</span> 오픈웨이트 sLLM 실호출</h3>
+          <p><code>config.py:34</code>의 OpenRouter 기본 모델이 여전히 <code>openai/gpt-4o-mini</code>라 항목 #3(a) sLLM 요구를 미충족합니다. 가중 ×2 최대 레버.</p>
+          <ul><li>300B 이하 오픈웨이트(qwen-2.5-7b 등)를 1개 이상 노드에 실연결</li><li>이미 구현된 Guardrail 게이팅·관측과 묶어 #3 회복</li><li>담당: 백형준 중심, 이동원 설정·평가 지원</li></ul>
+        </article>
+        <article class="focus-card high">
+          <h3><span class="tag tag-risk">P0 잔여</span> LangGraph StateGraph 전환</h3>
+          <p><code>pipeline.py</code>는 여전히 8단계 동기 순차 호출입니다(<code>StateGraph/add_node</code> 0건, langgraph 의존성 없음). Multi-Agent 차별성(#1)이 가장 크게 막힌 지점, 가중 ×2.</p>
+          <ul><li>worker fan-out(Send) + Strategist join + conditional 라우팅</li><li>전환 시 #10 비동기 병렬도 동반 개선</li><li>담당: 백형준, melinamuun 협업</li></ul>
+        </article>
+        <article class="focus-card">
+          <h3><span class="tag tag-owner">P1</span> Hybrid + Reranker 실연결</h3>
+          <p><code>retriever.py</code>는 아직 pgvector 단독(<code>&lt;=&gt;</code>)입니다. DB의 tsvector GIN 인덱스는 준비됐으나 미사용.</p>
+          <ul><li>plainto_tsquery 키워드 + 벡터 RRF 결합</li><li>bge-reranker + embed 단계 청킹 추가</li><li>담당: doyekeem</li></ul>
+        </article>
+        <article class="focus-card">
+          <h3><span class="tag tag-owner">P1</span> RAGAS 지표 확장 + 실데이터 재측정</h3>
+          <p>RAGAS는 공식 4점이지만 context precision/recall과 채워진 DB 재실행 증거가 부족합니다.</p>
+          <ul><li>context_precision·context_recall·relevancy 포함</li><li>Hybrid RAG 수정 후 누적 리포트 커밋</li><li>담당: 이동원, doyekeem 협업</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="unassigned">
+      <p class="section-label">Ownership Needed</p>
+      <h2 class="section-title">미배정 과제</h2>
+      <p class="section-desc">다음 회의에서 담당자를 정해야 실제 일정으로 전환됩니다. 작은 실동작 1개를 먼저 만드는 최소구현 경로를 제안합니다.</p>
+      <div class="unassigned-grid">
+        <article class="unassigned-card">
+          <h3><span class="badge badge-unassigned">미배정</span> #7 vLLM</h3>
+          <p>로컬 소형 모델 1개를 Guardrail 또는 검증 노드 한 경로에 연결합니다. #3 오픈웨이트 작업과 묶으면 효율적.</p>
+          <ul><li>예상 효과: 0→1~2</li><li>추천 파트: LLM·Graph 담당</li></ul>
+        </article>
+        <article class="unassigned-card">
+          <h3><span class="badge badge-unassigned">미배정</span> #10 스트리밍·비동기</h3>
+          <p><code>st.write_stream</code> 토큰 출력과 worker 병렬 실행을 LangGraph 전환에 함께 묶습니다.</p>
+          <ul><li>예상 효과: 1→3~4</li><li>추천 파트: UI·Graph 담당</li></ul>
+        </article>
+        <article class="unassigned-card">
+          <h3><span class="badge badge-strong">진행중</span> #6 MCP 확장</h3>
+          <p>Competitor in-process MCP는 동작 확정. 다음은 stdio 서버 분리 + 다른 에이전트의 Tool 소비로 확장.</p>
+          <ul><li>현재: 0→~1 확보</li><li>추천 파트: 데이터 Tool 담당(이동원)</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <p class="section-label">Execution Order</p>
+      <h2 class="section-title">P0~P3 실행 순서 (06-13 갱신)</h2>
+      <div class="timeline">
+        <div class="tl-item done">
+          <div class="tl-rail"><div class="tl-dot">✓</div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h3>파이프라인 안정성 복원 <span class="tag tag-done">완료</span></h3>
+            <p>Qual·Strategist 폴백(#51·#52), Guardrail 게이팅(#50), Macro 연결(#49), Competitor MCP(#56)가 main에 머지됨. 다음 강사 재검토 전까지 점수는 비공식.</p>
+          </div>
+        </div>
+        <div class="tl-item current">
+          <div class="tl-rail"><div class="tl-dot">P0</div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h3>가중 ×2 핵심 레버 <span class="tag tag-risk">최대 효과</span></h3>
+            <p>오픈웨이트 sLLM 실호출(#3)과 LangGraph fan-out(#1)을 완료합니다. 이 둘만 제대로 처리해도 가중점 +6~8로 C~B 진입이 현실적(강사 진단).</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-rail"><div class="tl-dot">P1</div><div class="tl-line"></div></div>
+          <div class="tl-body">
+            <h3>분석 품질·검색 고도화 <span class="tag tag-now">품질</span></h3>
+            <p>Hybrid/Reranker 실연결(#9), RAGAS 지표 확장·실데이터 재측정(#8), 관측(langsmith/langfuse) span 부착(#3c).</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-rail"><div class="tl-dot">P2</div></div>
+          <div class="tl-body">
+            <h3>미배정 항목 최소 실동작 <span class="tag tag-owner">PM 배정 필요</span></h3>
+            <p>vLLM(#7), 스트리밍·비동기(#10)에서 각각 재현 가능한 한 경로를 만들고 증거를 남깁니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sources">
+      <p class="section-label">Evidence</p>
+      <h2 class="section-title">근거와 해석 범위</h2>
+      <div class="card source-list">
+        <div class="source-row"><strong>공식 점수</strong><span><a href="../../feedback/2026-06-13_강사재검토리포트_93487d3.md">강사 재검토 리포트 93487d3</a> · 32/70(D), Full 동적 검증</span></div>
+        <div class="source-row"><strong>코드 기준</strong><span><code>main@4790f2d</code> · #49 Macro·#50 Guardrail·#51 Strategist·#52 Qual·#56 Competitor MCP 머지 포함</span></div>
+        <div class="source-row"><strong>이전 대시보드</strong><span><a href="../2026-06-12/progress_dashboard.html">2026-06-12 progress_dashboard.html</a> (강사 재검토 직후 스냅샷)</span></div>
+        <div class="source-row"><strong>담당자 기준</strong><span>GitHub 협업자 5명과 파일별 기여 이력 기반 추정. 최종 배정은 PM·팀 합의가 우선입니다.</span></div>
+      </div>
+    </section>
+
+    <footer>
+      stock-agent · 팀 작업 현황 대시보드 · 기준일 2026-06-13 EOD (KST)<br />
+      공식 점수(32/70)는 강사 재검토 확정값이며, 이후 머지분은 "코드상 해소·재검증 대기"로 분리 표기했습니다.
+    </footer>
+  </main>
+
+  <script>
+    const TEAM = [
+      {
+        name: "이동원", handle: "mygithub05253", percent: 88, tone: "strong", status: "강점 확장",
+        area: "Competitor · MCP 브리지 · RAGAS 평가 · Guardrail/Strategist 정비 · CI/Docker · PM 문서",
+        shipped: ["Competitor MCP tools/list 핸드셰이크(#59) + Peer 선정 복합 유사도 고도화(#62)", "RAGAS context_precision(#60) · CI 충돌마커 게이트(#63) · ERD 코드 정합(#64)", "Guardrail·Strategist 머지 정비(#50·#51·#55) · 발표 흐름도 · 팀 대시보드"],
+        focus: "context_recall reference 작성 후 재측정, 오픈웨이트 모델 설정 지원, 미배정 과제(#7·#10) 담당 확정"
+      },
+      {
+        name: "백형준", handle: "vividbaek", percent: 66, tone: "watch", status: "핵심 레버 보유",
+        area: "InvestorProfile · Curator · Classifier · Strategist · InvestmentAnalyst · Guardrail · Graph/UI",
+        shipped: ["사용자 접수·개인화 흐름", "Curator·Classifier GLM 경로", "Guardrail 실게이팅 구현(#50)", "Phase 1 파이프라인·Docker 앱 골격"],
+        focus: "LangGraph 전환(#1), 오픈웨이트 sLLM 실호출(#3) — 남은 ×2 레버 2개의 핵심 오너"
+      },
+      {
+        name: "윤수정", handle: "Yoonssu", percent: 72, tone: "watch", status: "실데이터 강화",
+        area: "DART/KRX 데이터 · Quant · Qual 공시 연결",
+        shipped: ["DART 스키마·수집·적재", "Quant Agent 로직·fallback·테스트(#53)", "Qual 공시 원문 연결"],
+        focus: "Quant retry·실데이터 경로 확대, 문서-실제 테이블명 정합(#4 ERD)"
+      },
+      {
+        name: "doyekeem", handle: "doyekeem", percent: 64, tone: "watch", status: "P0 해소·다음 RAG",
+        area: "News 수집 · pgvector RAG · Qual 검색 경로",
+        shipped: ["뉴스 수집·전처리·임베딩", "pgvector news retrieval", "Qual fallback try/except 복원(#52)"],
+        focus: "Hybrid/RRF/Reranker와 청킹(#9), RAGAS contexts 지표 협업"
+      },
+      {
+        name: "melinamuun", handle: "melinamuun", percent: 74, tone: "strong", status: "연결 완료",
+        area: "Macro 데이터 · Macro Tool · Macro Agent",
+        shipped: ["거시경제 데이터 수집·DB", "Macro Agent 로직·fallback·테스트", "파이프라인 연결 + Strategist 가중 소비(#49)"],
+        focus: "Macro 실데이터 폭 확대, LangGraph 전환 시 Macro 노드 fan-out 협업"
+      }
+    ];
+
+    const AGENTS = [
+      { name: "InvestorProfile", percent: 75, owner: "백형준", status: "strong", label: "실동작", evidence: "온보딩 응답을 UserProfile로 구조화하고 UI 접수 흐름에 연결됨.", focus: "프로필 DB 저장·재사용 증거를 추가." },
+      { name: "Curator", percent: 80, owner: "백형준 중심 · 이동원 보정", status: "strong", label: "실동작", evidence: "rule-based+GLM 경로와 corp_code 보정이 있으며 pipeline 첫 단계로 실행됨.", focus: "카탈로그 외 종목의 corp_code 해소 경로를 확정." },
+      { name: "RequestClassifier", percent: 75, owner: "백형준 중심", status: "strong", label: "실동작", evidence: "의도·범위·긴급도를 구조화하고 GLM 실패 시 기본 분류로 fallback.", focus: "분류 결과가 Graph 라우팅을 실제 변경하도록 연결(LangGraph 전환과 동반)." },
+      { name: "Quant", percent: 66, owner: "윤수정", status: "focus", label: "강화 필요", evidence: "DART/가격 도구와 fallback 결과가 있고 테스트 보강(#53)됨. 실데이터 증거는 보강 여지.", focus: "DART retry와 부분 실패 허용, mock 의존 축소." },
+      { name: "Qual", percent: 64, owner: "doyekeem · 윤수정", status: "focus", label: "P0 해소", evidence: "retrieve_*_with_fallback로 retriever 실패 try/except 처리 — 파이프라인 크래시 전파 제거(#52).", focus: "Hybrid/Reranker 연결과 RAGAS contexts 개선." },
+      { name: "Competitor", percent: 92, owner: "이동원", status: "strong", label: "강점", evidence: "MCP tools/list 핸드셰이크 실측(#59) + Peer 선정 복합 유사도 고도화(#62: 시총·영업이익률·완성도 가중). 3단계 폴백·캐시 완비.", focus: "Peer 비교 품질 회귀 평가 골든셋 추가, MCP stdio 외부 노출 확장." },
+      { name: "Macro", percent: 72, owner: "melinamuun", status: "strong", label: "연결됨", evidence: "run_phase1_analysis에서 run_macro 호출 + Strategist _WEIGHTS_WITH_MACRO(0.15) 실소비(#49).", focus: "실데이터 폭 확대, LangGraph 노드화." },
+      { name: "Strategist", percent: 60, owner: "백형준", status: "focus", label: "부분실패 허용", evidence: "Quant·Qual·Competitor·Macro 가중 합성 + 일부 결손 허용(graceful degradation, #51). 전 케이스 HOLD 변별력은 과제.", focus: "BUY/SELL 변별력 강화, 골든셋 다양화." },
+      { name: "InvestmentAnalyst", percent: 65, owner: "백형준", status: "focus", label: "sLLM 잔여", evidence: "GLM 분석과 fallback은 연결됐으나 OpenRouter 기본이 gpt-4o-mini라 오픈웨이트 sLLM 요구 미충족.", focus: "오픈웨이트 모델 실호출과 trace 증거 확보(#3 핵심)." },
+      { name: "Guardrail", percent: 62, owner: "백형준 · 이동원 정비", status: "strong", label: "게이팅 구현", evidence: "passed=True 제거, 7게이트 기반 passed=not blocked + PII/욕설 redaction + 재합성 rewrite 루프(#50).", focus: "langsmith/langfuse 관측 span 부착(#3c)." },
+      { name: "Graph Orchestration", percent: 28, owner: "백형준 · Graph 담당", status: "disconnected", label: "미구현", evidence: "여전히 8단계 순차 동기 호출. StateGraph·fan-out·conditional edge·langgraph 의존성 부재.", focus: "LangGraph 전환으로 #1과 #10을 함께 개선 — 남은 최대 레버." }
+    ];
+
+    // report=최초검토, now=공식재검토(06-13), code=코드현재(머지 반영, 비공식), target=다음목표
+    const RUBRIC = [
+      { no: 1, name: "Multi-Agent 구조", weight: 2, report: 2, now: 2, code: 2, target: 4, status: "watch", label: "정체", evidence: "역할 분리는 있으나 StateGraph·동적 라우팅·fan-out 부재. 코드 변화 없음 — 최대 레버." },
+      { no: 2, name: "에러핸들링 & 폴백", weight: 2, report: 3, now: 3, code: 4, target: 4, status: "progress", label: "코드 상승", evidence: "Qual try/except(#52)·Strategist 부분실패 허용(#51)으로 잔여 구멍 해소. 재검증 시 4 기대." },
+      { no: 3, name: "sLLM + 검증 + 관측", weight: 2, report: 2, now: 2, code: 3, target: 4, status: "watch", label: "부분 상승", evidence: "Guardrail 게이팅 구현(#50)으로 (b) 진전. 단 (a) 오픈웨이트 sLLM·(c) 관측 span은 여전히 미충족." },
+      { no: 4, name: "5대 설계문서", weight: 1, report: 3, now: 3, code: 3, target: 4, status: "watch", label: "캡 3", evidence: "ERD-실제 SQL 정합 완료(#64: financial_data→financial_statement 정정 + 구현 상태표·미구현 명시). 잔여 캡 사유는 유스케이스·인터페이스 정의서 부재 — 작성 시 4~5." },
+      { no: 5, name: "Dockerise", weight: 1, report: 2, now: 4, code: 4, target: 5, status: "strong", label: "공식 개선", evidence: "강사 Full 검증에서 build·DB healthy·app HTTP 200 확인. HEALTHCHECK·멀티스테이지로 5 도달 가능." },
+      { no: 6, name: "MCP / A2A", weight: 1, report: 0, now: 0, code: 2, target: 2, status: "progress", label: "코드 상승", evidence: "Competitor 폴백이 stdio FastMCP 서버 호출(#56). #59에서 tools/list 핸드셰이크 명시·데모 스크립트·자동 통합테스트 추가 — initialize→tools/list→call_tool round-trip 실측(sector_roster 7개)." },
+      { no: 7, name: "vLLM", weight: 1, report: 0, now: 0, code: 0, target: 1, status: "risk", label: "미배정", evidence: "로컬 모델 서빙 경로 없음. #3 오픈웨이트 작업과 묶으면 효율적." },
+      { no: 8, name: "RAGAS 정량평가", weight: 2, report: 0, now: 4, code: 4, target: 5, status: "strong", label: "게이트 해소", evidence: "evaluate() 실호출·수치 리포트 공식 인정. #60에서 context_precision(--with-contexts, reference 불필요) 코드 추가·context_recall 가이드 문서화. 키 보유 환경 재측정 시 5점." },
+      { no: 9, name: "RAG 고도화", weight: 1, report: 2, now: 2, code: 2, target: 3, status: "watch", label: "정체", evidence: "retriever 여전히 pgvector 단독(<=>). Hybrid·RRF·Reranker·청킹 미연결(DB 인덱스는 준비됨)." },
+      { no: 10, name: "스트리밍 & 비동기", weight: 1, report: 1, now: 1, code: 1, target: 2, status: "risk", label: "미배정", evidence: "streamlit 여전히 st.status 일괄 출력. st.write_stream·asyncio.gather 경로 없음 — LangGraph 전환과 동반." }
+    ];
+
+    const STATUS_CLASS = {
+      strong: "badge-strong",
+      progress: "badge-progress",
+      watch: "badge-watch",
+      focus: "badge-watch",
+      disconnected: "badge-risk",
+      risk: "badge-risk"
+    };
+
+    const MAX = 5;
+
+    function animateFills() {
+      const fills = document.querySelectorAll("[data-pct]");
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.style.width = entry.target.dataset.pct + "%";
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.15 });
+        fills.forEach(fill => observer.observe(fill));
+      } else {
+        fills.forEach(fill => { fill.style.width = fill.dataset.pct + "%"; });
+      }
+    }
+
+    function renderTeam() {
+      document.getElementById("teamGrid").innerHTML = TEAM.map(item => `
+        <article class="team-card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">${item.name} <span class="badge ${STATUS_CLASS[item.tone]}">${item.status}</span></div>
+              <div class="card-subtitle">@${item.handle} · ${item.area}</div>
+            </div>
+            <div class="percent">${item.percent}%</div>
+          </div>
+          <div class="progress-track"><div class="progress-fill ${item.tone}" data-pct="${item.percent}"></div></div>
+          <div class="detail-block">
+            <div class="detail-label">현재 구현 근거</div>
+            <ul>${item.shipped.map(value => `<li>${value}</li>`).join("")}</ul>
+          </div>
+          <div class="focus-line"><strong>집중 피드백:</strong> ${item.focus}</div>
+        </article>
+      `).join("");
+    }
+
+    function renderAgents() {
+      document.getElementById("agentGrid").innerHTML = AGENTS.map(item => `
+        <article class="agent-card" data-status="${item.status}">
+          <div class="card-head">
+            <div>
+              <div class="card-title">${item.name}</div>
+              <div class="card-subtitle">담당 추정: ${item.owner}</div>
+            </div>
+            <div class="percent">${item.percent}%</div>
+          </div>
+          <div class="agent-meta"><span class="badge ${STATUS_CLASS[item.status]}">${item.label}</span></div>
+          <div class="progress-track"><div class="progress-fill ${item.status === "strong" ? "strong" : item.status === "disconnected" ? "risk" : "watch"}" data-pct="${item.percent}"></div></div>
+          <p class="evidence"><strong>근거:</strong> ${item.evidence}</p>
+          <div class="focus-line"><strong>다음 DoD:</strong> ${item.focus}</div>
+        </article>
+      `).join("");
+    }
+
+    function barRow(label, cls, score) {
+      const pct = Math.round((score / MAX) * 100);
+      return `
+        <div class="bar-row">
+          <span class="bar-label">${label}</span>
+          <div class="bar-track"><div class="bar-fill ${cls}" data-pct="${pct}"></div></div>
+          <span class="bar-val">${score} / ${MAX}</span>
+        </div>`;
+    }
+
+    function renderRubric() {
+      document.getElementById("rubricGrid").innerHTML = RUBRIC.map(item => `
+        <article class="rubric-card">
+          <div class="rubric-head">
+            <div class="rubric-name"><span class="rubric-no">#${item.no}</span>${item.name}</div>
+            <div class="badges">
+              <span class="badge ${STATUS_CLASS[item.status]}">${item.label}</span>
+              <span class="badge badge-weight">가중 ×${item.weight}</span>
+            </div>
+          </div>
+          <div class="bars">
+            ${barRow("최초 검토", "report", item.report)}
+            ${barRow("공식 현재", "now", item.now)}
+            ${barRow("코드 현재", "code", item.code)}
+            ${barRow("다음 목표", "target", item.target)}
+          </div>
+          <div class="rubric-evidence"><strong>강사 피드백·코드:</strong> ${item.evidence}</div>
+        </article>
+      `).join("");
+    }
+
+    function bindFilters() {
+      const buttons = document.querySelectorAll(".filter-button");
+      const cards = document.querySelectorAll(".agent-card");
+      buttons.forEach(button => {
+        button.addEventListener("click", () => {
+          buttons.forEach(item => item.classList.remove("active"));
+          button.classList.add("active");
+          const filter = button.dataset.filter;
+          cards.forEach(card => {
+            const status = card.dataset.status;
+            card.hidden = !(filter === "all" || status === filter || (filter === "focus" && ["focus", "watch"].includes(status)));
+          });
+        });
+      });
+    }
+
+    renderTeam();
+    renderAgents();
+    renderRubric();
+    bindFilters();
+    animateFills();
+  </script>
+</body>
+</html>

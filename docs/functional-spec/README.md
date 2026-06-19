@@ -20,7 +20,7 @@ docs/functional-spec/
 └── advanced/
     ├── A1_valuation_5y_spec_v0.7.md
     ├── A2_industry_qualitative_spec_v0.8.md
-    ├── A3_peer_comparison_spec_v0.9.md
+    ├── A3_peer_comparison_spec_v1.0.md
     ├── A4_action_recommendation_spec_v1.0.md
     └── A5_stock_recommendation_spec_v1.1.md
 ```
@@ -72,7 +72,7 @@ B1_signup_login_spec_v0.3.md
 B2_holdings_manage_spec_v0.4.md
 A1_valuation_5y_spec_v0.7.md
 A2_industry_qualitative_spec_v0.8.md
-A3_peer_comparison_spec_v0.9.md
+A3_peer_comparison_spec_v1.0.md
 A4_action_recommendation_spec_v1.0.md
 A5_stock_recommendation_spec_v1.1.md
 D1_backtesting_validation_spec_v0.1.md
@@ -89,7 +89,7 @@ D1_backtesting_validation_spec_v0.1.md
 | 기본 | B5 | 포트폴리오 일괄 안내 | `basic/B5_portfolio_bulk_advice_spec_v0.2.md` |
 | 고급 | A1 | 5개년 밸류에이션 | `advanced/A1_valuation_5y_spec_v0.7.md` |
 | 고급 | A2 | 산업·정성 분석 | `advanced/A2_industry_qualitative_spec_v0.8.md` |
-| 고급 | A3 | 동종업계 횡비교 | `advanced/A3_peer_comparison_spec_v0.9.md` |
+| 고급 | A3 | 동종업계 횡비교 | `advanced/A3_peer_comparison_spec_v1.0.md` |
 | 고급 | A4 | BUY/HOLD/SELL 권유 | `advanced/A4_action_recommendation_spec_v1.0.md` |
 | 고급 | A5 | 종목 추천 | `advanced/A5_stock_recommendation_spec_v1.1.md` |
 | 고급 | A6 | PB 리포트 다운로드 | 예정 |

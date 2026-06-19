@@ -7,14 +7,23 @@ from stock_agent.schemas.analysis import AgentState, CuratorResult, Portfolio, U
 from stock_agent.tools.peer_tool import PeerComparison, PeerMetricRow
 
 
+def _stub_settings(**overrides):
+    base = dict(
+        openrouter_api_key=None,
+        competitor_mcp_fallback_enabled=False,
+        competitor_mcp_timeout_seconds=20.0,
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
 @pytest.fixture(autouse=True)
 def no_openrouter_key(monkeypatch):
-    """로컬 .env에 OpenRouter 키가 있어도 테스트가 실제 LLM을 호출(과금)하지 않도록 차단한다."""
-    monkeypatch.setattr(
-        competitor_module,
-        "get_settings",
-        lambda: SimpleNamespace(openrouter_api_key=None),
-    )
+    """로컬 .env에 OpenRouter 키가 있어도 테스트가 실제 LLM을 호출(과금)하지 않도록 차단한다.
+
+    기본값으로 MCP 폴백을 끈다(실서버·네트워크 미사용). MCP 경로 테스트는 개별적으로 켠다.
+    """
+    monkeypatch.setattr(competitor_module, "get_settings", _stub_settings)
 
 
 def _state_with_curator() -> AgentState:
@@ -156,6 +165,102 @@ def test_run_competitor_uses_explicit_mock_fallback_when_db_fails(monkeypatch) -
     assert state.competitor.peer_selection_summary is not None
     assert "fallback" in state.competitor.peer_selection_summary.lower()
     assert any("fallback" in flag.lower() for flag in state.competitor.data_quality_flags)
+
+
+def _mcp_records() -> list[dict]:
+    return [
+        {
+            "stock_code": "AAA001",
+            "corp_name": "Target Co",
+            "base_date": "20260612",
+            "close_price": 70000,
+            "market_cap": 1_000_000,
+            "per": 18.0,
+            "pbr": 1.3,
+            "roe": 0.11,
+        },
+        {
+            "stock_code": "BBB001",
+            "corp_name": "Peer B",
+            "base_date": "20260612",
+            "close_price": 60000,
+            "market_cap": 1_100_000,
+            "per": 12.0,
+            "pbr": 1.0,
+            "roe": 0.14,
+        },
+        {
+            "stock_code": "CCC001",
+            "corp_name": "Peer C",
+            "base_date": "20260612",
+            "close_price": 50000,
+            "market_cap": 900_000,
+            "per": 20.0,
+            "pbr": 1.5,
+            "roe": 0.09,
+        },
+    ]
+
+
+def test_run_competitor_uses_mcp_live_data_when_db_fails(monkeypatch) -> None:
+    """DB 실패 시 MCP 실시간 시세 경로가 mock보다 우선 사용되고, mock으로 오판되지 않는다."""
+    from stock_agent.mcp_bridge import peer_data_client
+
+    def failing_get_connection():
+        raise ConnectionError("database is unavailable")
+
+    monkeypatch.setattr(competitor_module, "get_connection", failing_get_connection)
+    monkeypatch.setattr(competitor_module, "get_settings", lambda: _stub_settings(competitor_mcp_fallback_enabled=True))
+
+    def fake_fetch(stock_code, sector=None, timeout=20.0):
+        assert stock_code == "AAA001"
+        return peer_data_client.McpPeerData(
+            target_stock_code="AAA001",
+            sector=sector,
+            base_date="20260612",
+            records=_mcp_records(),
+        )
+
+    monkeypatch.setattr(peer_data_client, "fetch_mcp_peer_data", fake_fetch)
+
+    state = _state_with_curator()
+    competitor_module.run_competitor(state)
+
+    assert state.competitor is not None
+    # 실데이터 경로: MCP 출처 플래그가 있고, mock 폴백 마커는 없어야 한다(guardrail 오판 방지).
+    assert "mcp_live_market_data" in state.competitor.data_quality_flags
+    assert not any("mock_data_fallback" in flag for flag in state.competitor.data_quality_flags)
+    forbidden = ("mock", "데모용")
+    assert not any(
+        any(word in flag.lower() for word in forbidden) for flag in state.competitor.data_quality_flags
+    )
+    assert not any(
+        any(word in w.lower() for word in ("mock", "fallback", "데모용")) for w in state.competitor.warnings
+    )
+    assert [p["stock_code"] for p in state.competitor.peers] == ["BBB001", "CCC001"]
+    assert state.competitor.score > 0
+
+
+def test_run_competitor_falls_back_to_mock_when_mcp_unavailable(monkeypatch) -> None:
+    """MCP 경로가 실패하면 최후 보루인 하드코딩 mock으로 폴백한다."""
+    from stock_agent.mcp_bridge import peer_data_client
+
+    def failing_get_connection():
+        raise ConnectionError("database is unavailable")
+
+    monkeypatch.setattr(competitor_module, "get_connection", failing_get_connection)
+    monkeypatch.setattr(competitor_module, "get_settings", lambda: _stub_settings(competitor_mcp_fallback_enabled=True))
+
+    def failing_fetch(stock_code, sector=None, timeout=20.0):
+        raise peer_data_client.McpUnavailableError("MCP 서버 기동 실패")
+
+    monkeypatch.setattr(peer_data_client, "fetch_mcp_peer_data", failing_fetch)
+
+    state = _state_with_curator()
+    competitor_module.run_competitor(state)
+
+    assert state.competitor is not None
+    assert any("mock_data_fallback" in flag for flag in state.competitor.data_quality_flags)
 
 
 def test_run_competitor_reraises_unexpected_internal_error(monkeypatch) -> None:

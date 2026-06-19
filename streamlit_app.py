@@ -1,6 +1,9 @@
+from html import escape
+from typing import Any
+
 import streamlit as st
 
-from stock_agent.graph import run_phase1_analysis
+from stock_agent.graph import stream_phase1_analysis_events
 from stock_agent.intake import (
     STOCK_CATALOG,
     build_holding_from_selection,
@@ -28,6 +31,38 @@ _DEFAULT_AVG_PRICE_RATIO_BY_CORP = {
     "한미반도체": 0.9,
     "KB금융": 0.94,
     "신한지주": 0.96,
+}
+
+
+_AGENT_PROGRESS_ORDER = [
+    "curator",
+    "classifier",
+    "quant",
+    "qual",
+    "competitor",
+    "macro",
+    "strategist",
+    "investment_analyst",
+    "guardrail",
+]
+
+_AGENT_LABELS = {
+    "curator": "Curator",
+    "classifier": "RequestClassifier",
+    "quant": "Quant",
+    "qual": "Qual",
+    "competitor": "Competitor",
+    "macro": "Macro",
+    "strategist": "Strategist",
+    "investment_analyst": "InvestmentAnalyst",
+    "guardrail": "Guardrail",
+}
+
+_STATUS_LABELS = {
+    "pending": "대기",
+    "done": "완료",
+    "skipped": "스킵",
+    "error": "오류",
 }
 
 
@@ -59,6 +94,7 @@ def _reset_intake() -> None:
         "cash_amount",
         "intake_portfolio",
         "analysis_output",
+        "agent_events",
         "intake_messages",
     ]:
         st.session_state.pop(key, None)
@@ -280,22 +316,150 @@ def _build_initial_query(portfolio: Portfolio) -> str:
     return "현재 포트폴리오를 투자성향 기준으로 먼저 점검해줘"
 
 
+def _clean_progress_text(value: Any, limit: int = 110) -> str:
+    text = str(value or "").replace("\n", " ").replace("|", "/").strip()
+    if len(text) > limit:
+        return text[: limit - 1] + "..."
+    return text
+
+
+def _initial_agent_progress() -> dict[str, dict[str, str]]:
+    return {
+        name: {
+            "label": _AGENT_LABELS[name],
+            "status": "pending",
+            "detail": "",
+        }
+        for name in _AGENT_PROGRESS_ORDER
+    }
+
+
+def _render_agent_progress(
+    placeholder: Any,
+    progress: dict[str, dict[str, str]],
+    *,
+    title: str = "에이전트 실행 로그",
+) -> None:
+    active = next(
+        (item["label"] for item in progress.values() if item["status"] == "pending"),
+        "완료",
+    )
+    cards = []
+    for item in progress.values():
+        status = item["status"]
+        cards.append(
+            "<div class='agent-card agent-card-{status}'>"
+            "<div class='agent-card-top'>"
+            "<span class='agent-name'>{label}</span>"
+            "<span class='agent-status'>{status_label}</span>"
+            "</div>"
+            "<div class='agent-detail'>{detail}</div>"
+            "</div>".format(
+                status=escape(status),
+                label=escape(_clean_progress_text(item["label"], 36)),
+                status_label=escape(_STATUS_LABELS.get(status, status)),
+                detail=escape(_clean_progress_text(item.get("detail"), 86)) or "&nbsp;",
+            )
+        )
+
+    html = """
+    <div class="agent-progress-panel">
+      <div class="agent-progress-head">
+        <div>
+          <div class="agent-progress-title">{title}</div>
+          <div class="agent-progress-sub">현재 작업: {active}</div>
+        </div>
+        <div class="robot-worker" aria-label="agent worker">
+          <div class="robot-antenna"></div>
+          <div class="robot-head">
+            <span class="robot-eye"></span>
+            <span class="robot-eye"></span>
+          </div>
+          <div class="robot-body">
+            <span class="robot-panel"></span>
+          </div>
+          <div class="robot-arm robot-arm-left"></div>
+          <div class="robot-arm robot-arm-right"></div>
+          <div class="robot-shadow"></div>
+        </div>
+      </div>
+      <div class="agent-card-grid">{cards}</div>
+    </div>
+    """.format(
+        title=escape(title),
+        active=escape(_clean_progress_text(active, 60)),
+        cards="".join(cards),
+    )
+    placeholder.markdown(html, unsafe_allow_html=True)
+
+
+def _progress_from_events(events: list[dict[str, Any]]) -> dict[str, dict[str, str]]:
+    progress = _initial_agent_progress()
+    for event in events:
+        node = event.get("node")
+        if node not in progress:
+            continue
+        progress[node] = {
+            "label": event.get("label") or _AGENT_LABELS[node],
+            "status": event.get("status") or "done",
+            "detail": event.get("detail") or "",
+        }
+    return progress
+
+
+def _run_analysis_with_progress(
+    query: str,
+    *,
+    user_profile: UserProfile,
+    portfolio: Portfolio,
+) -> Any:
+    progress = _initial_agent_progress()
+    events: list[dict[str, Any]] = []
+    output = None
+    with st.status("LangGraph 에이전트 실행 중", expanded=True) as status:
+        progress_placeholder = st.empty()
+        _render_agent_progress(progress_placeholder, progress)
+        for event in stream_phase1_analysis_events(
+            query,
+            user_profile=user_profile,
+            portfolio=portfolio,
+        ):
+            if event["type"] == "complete":
+                output = event["output"]
+                continue
+            node = event["node"]
+            if node in progress:
+                progress[node] = {
+                    "label": event["label"],
+                    "status": event["status"],
+                    "detail": event["detail"],
+                }
+                events.append(
+                    {
+                        "node": node,
+                        "label": event["label"],
+                        "status": event["status"],
+                        "detail": event["detail"],
+                    }
+                )
+                _render_agent_progress(progress_placeholder, progress)
+                status.update(label=f"{event['label']} 완료", state="running", expanded=True)
+        if output is None:
+            status.update(label="LangGraph 실패", state="error", expanded=True)
+            raise RuntimeError("analysis pipeline did not produce output")
+        status.update(label="LangGraph 에이전트 실행 완료", state="complete", expanded=False)
+    st.session_state["agent_events"] = events
+    return output
+
+
 def _ensure_initial_analysis_output(user_profile: UserProfile, portfolio: Portfolio) -> None:
     if st.session_state.get("analysis_output") is not None:
         return
-    with st.status("에이전트 파이프라인 실행 중", expanded=True) as status:
-        st.write("InvestorProfile Agent: 투자성향 context 준비")
-        st.write("Curator Agent: 분석 대상 종목/후보 탐색")
-        st.write("RequestClassifier Agent: 질문 intent/scope/urgency 분류")
-        st.write("Quant, Qual, Competitor Worker: 기초 분석 생성")
-        st.write("InvestmentAnalyst Agent: GLM 기반 투자 분석 보정")
-        st.write("Strategist, Guardrail: 최종 결과와 안전 문구 생성")
-        output = run_phase1_analysis(
-            _build_initial_query(portfolio),
-            user_profile=user_profile,
-            portfolio=portfolio,
-        )
-        status.update(label="에이전트 파이프라인 완료", state="complete", expanded=False)
+    output = _run_analysis_with_progress(
+        _build_initial_query(portfolio),
+        user_profile=user_profile,
+        portfolio=portfolio,
+    )
     st.session_state["analysis_output"] = output
 
 
@@ -307,7 +471,6 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
     st.subheader("3. 저장된 포트폴리오")
     _render_portfolio_summary(portfolio)
 
-    _ensure_initial_analysis_output(user_profile, portfolio)
     _render_output()
 
     st.subheader("4. 대화형 질문")
@@ -326,8 +489,11 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
     with col_run:
         if st.button("분석 실행", type="primary"):
             st.session_state["intake_messages"].append({"role": "user", "content": query})
-            with st.spinner("에이전트 파이프라인 실행 중..."):
-                output = run_phase1_analysis(query, user_profile=user_profile, portfolio=portfolio)
+            output = _run_analysis_with_progress(
+                query,
+                user_profile=user_profile,
+                portfolio=portfolio,
+            )
             st.session_state["analysis_output"] = output
             if output.state.user_request:
                 st.session_state["intake_messages"].append(
@@ -366,11 +532,52 @@ def _render_output() -> None:
         st.write("질문 분류")
         st.json(output.state.user_request.model_dump(mode="json"), expanded=False)
 
-    tabs = st.tabs(["정량", "정성", "Peer", "적합도", "리스크"])
-    for tab, key in zip(tabs, ["정량 근거", "정성 근거", "Peer 비교", "포트폴리오 적합도", "리스크"], strict=True):
+    if output.state.strategist:
+        st.write("Graph 상태")
+        route = output.state.graph_route
+        col_route, col_agents, col_model = st.columns(3)
+        col_route.metric("graph route", route.get("analysis_scope") or "unknown")
+        col_agents.metric(
+            "contributing agents",
+            ", ".join(output.state.strategist.contributing_agents) or "none",
+        )
+        col_model.metric(
+            "model",
+            f"{output.state.strategist.model_provider}/{output.state.strategist.model}",
+        )
+        st.caption(
+            f"degraded={output.state.strategist.degraded} | "
+            f"fallback_used={output.state.strategist.fallback_used} | "
+            f"requested_depth={route.get('requested_depth')}"
+        )
+        if output.state.worker_errors:
+            st.warning(" / ".join(output.state.worker_errors))
+
+    events = st.session_state.get("agent_events") or []
+    if events:
+        progress_placeholder = st.empty()
+        _render_agent_progress(
+            progress_placeholder,
+            _progress_from_events(events),
+            title="마지막 에이전트 실행 로그",
+        )
+
+    tabs = st.tabs(["정량", "정성", "Peer", "거시", "적합도", "리스크"])
+    for tab, key in zip(
+        tabs,
+        ["정량 근거", "정성 근거", "Peer 비교", "거시경제", "포트폴리오 적합도", "리스크"],
+        strict=True,
+    ):
         with tab:
             for item in output.tier2.get(key, []):
-                st.write(f"- {item}")
+                if key == "거시경제":
+                    # [논문출처] 태그 제거 후 본문만 표시, 데이터 출처는 고정 caption으로
+                    bracket_idx = item.rfind("[")
+                    main_text = item[:bracket_idx].strip() if "[" in item else item
+                    st.write(f"- {main_text}")
+                    st.caption("  📎 데이터 출처: 한국은행 ECOS API")
+                else:
+                    st.write(f"- {item}")
 
     with st.expander("상세 상태 보기"):
         st.json(output.model_dump(mode="json"), expanded=False)
@@ -386,6 +593,11 @@ def main() -> None:
     st.markdown(
         """
         <style>
+        section.main > div.block-container {
+            max-width: 1500px;
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
         .stApp {
             background: #f8fafc;
             color: #0f172a;
@@ -401,6 +613,231 @@ def main() -> None:
         div[data-testid="stMultiSelect"] label p {
             font-size: 0.85rem;
             font-weight: 600;
+        }
+        .agent-progress-panel {
+            width: 100%;
+            margin: 0.25rem 0 0.5rem;
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 0.9rem;
+        }
+        .agent-progress-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .agent-progress-title {
+            font-size: 0.98rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .agent-progress-sub {
+            margin-top: 0.15rem;
+            font-size: 0.82rem;
+            color: #64748b;
+        }
+        .agent-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+            gap: 0.55rem;
+            width: 100%;
+        }
+        .agent-card {
+            min-height: 84px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 0.65rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .agent-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.45rem;
+            margin-bottom: 0.45rem;
+        }
+        .agent-name {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .agent-status {
+            flex: 0 0 auto;
+            border-radius: 999px;
+            padding: 0.13rem 0.45rem;
+            font-size: 0.7rem;
+            font-weight: 800;
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .agent-detail {
+            color: #64748b;
+            font-size: 0.74rem;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+        .agent-card-done {
+            border-color: #99f6e4;
+            background: #f0fdfa;
+        }
+        .agent-card-done .agent-status {
+            background: #0f766e;
+            color: #ffffff;
+        }
+        .agent-card-skipped {
+            border-color: #fed7aa;
+            background: #fff7ed;
+        }
+        .agent-card-skipped .agent-status {
+            background: #c2410c;
+            color: #ffffff;
+        }
+        .agent-card-error {
+            border-color: #fecaca;
+            background: #fef2f2;
+        }
+        .agent-card-error .agent-status {
+            background: #b91c1c;
+            color: #ffffff;
+        }
+        .robot-worker {
+            position: relative;
+            width: 58px;
+            height: 70px;
+            flex: 0 0 58px;
+            animation: robot-float 1.6s ease-in-out infinite;
+        }
+        .robot-antenna {
+            position: absolute;
+            left: 27px;
+            top: 0;
+            width: 3px;
+            height: 11px;
+            background: #475569;
+            border-radius: 999px;
+        }
+        .robot-antenna::after {
+            content: "";
+            position: absolute;
+            left: -4px;
+            top: -5px;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+        }
+        .robot-head {
+            position: absolute;
+            left: 10px;
+            top: 12px;
+            width: 38px;
+            height: 28px;
+            border: 2px solid #334155;
+            border-radius: 8px;
+            background: #e0f2fe;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .robot-eye {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #0f172a;
+            animation: robot-blink 2.4s ease-in-out infinite;
+        }
+        .robot-body {
+            position: absolute;
+            left: 15px;
+            top: 42px;
+            width: 28px;
+            height: 20px;
+            border: 2px solid #334155;
+            border-radius: 6px;
+            background: #ffffff;
+        }
+        .robot-panel {
+            position: absolute;
+            left: 8px;
+            top: 6px;
+            width: 12px;
+            height: 5px;
+            border-radius: 999px;
+            background: #14b8a6;
+            animation: robot-panel 1s ease-in-out infinite;
+        }
+        .robot-arm {
+            position: absolute;
+            top: 45px;
+            width: 14px;
+            height: 4px;
+            border-radius: 999px;
+            background: #334155;
+            transform-origin: center;
+        }
+        .robot-arm-left {
+            left: 4px;
+            animation: robot-arm-left 0.9s ease-in-out infinite;
+        }
+        .robot-arm-right {
+            right: 4px;
+            animation: robot-arm-right 0.9s ease-in-out infinite;
+        }
+        .robot-shadow {
+            position: absolute;
+            left: 11px;
+            bottom: 0;
+            width: 36px;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.13);
+            animation: robot-shadow 1.6s ease-in-out infinite;
+        }
+        @keyframes robot-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        @keyframes robot-blink {
+            0%, 92%, 100% { transform: scaleY(1); }
+            95% { transform: scaleY(0.15); }
+        }
+        @keyframes robot-panel {
+            0%, 100% { opacity: 0.45; }
+            50% { opacity: 1; }
+        }
+        @keyframes robot-arm-left {
+            0%, 100% { transform: rotate(-18deg); }
+            50% { transform: rotate(18deg); }
+        }
+        @keyframes robot-arm-right {
+            0%, 100% { transform: rotate(18deg); }
+            50% { transform: rotate(-18deg); }
+        }
+        @keyframes robot-shadow {
+            0%, 100% { transform: scaleX(1); opacity: 0.13; }
+            50% { transform: scaleX(0.8); opacity: 0.08; }
+        }
+        @media (max-width: 760px) {
+            section.main > div.block-container {
+                padding-left: 0.9rem;
+                padding-right: 0.9rem;
+            }
+            .agent-card-grid {
+                grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+            }
+            .agent-progress-head {
+                align-items: flex-start;
+            }
         }
         </style>
         """,

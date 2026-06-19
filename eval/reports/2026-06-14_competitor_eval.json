@@ -1,0 +1,144 @@
+{
+  "run_date": "2026-06-14",
+  "suite": "competitor_peer_quality_regression",
+  "passed": 6,
+  "total": 6,
+  "cases": [
+    {
+      "case_id": "C1_normal_comparison",
+      "description": "정상 비교 — 시총·지표가 가까운 peer 3개, 충분한 데이터 품질",
+      "passed": true,
+      "selected": [
+        "DDD001",
+        "CCC001",
+        "BBB001"
+      ],
+      "score": 54,
+      "data_quality_flags": [],
+      "peer_outlier_flags": [],
+      "relative_position": {
+        "valuation_percentile": 0.6667,
+        "roe_percentile": 0.3333,
+        "growth_percentile": 0.3333,
+        "operating_margin_percentile": 0.6667,
+        "balance_sheet_percentile": 0.6667,
+        "data_quality_score": 95
+      },
+      "failures": []
+    },
+    {
+      "case_id": "C2_market_cap_band_filter",
+      "description": "시총 band 거름 — 4배 초과 대형 peer는 비교군에서 제외되어 peer 부족 경고 발생",
+      "passed": true,
+      "selected": [
+        "CCC002",
+        "BBB002"
+      ],
+      "score": 61,
+      "data_quality_flags": [
+        "peer_count_below_minimum"
+      ],
+      "peer_outlier_flags": [],
+      "relative_position": {
+        "valuation_percentile": 1.0,
+        "roe_percentile": 0.5,
+        "growth_percentile": 0.5,
+        "operating_margin_percentile": 0.5,
+        "balance_sheet_percentile": 1.0,
+        "data_quality_score": 90
+      },
+      "failures": []
+    },
+    {
+      "case_id": "C3_outlier_metric_flag",
+      "description": "이상치 표기 — peer 중앙값 10배 초과 PER 후보에 outlier_per 플래그 부여",
+      "passed": true,
+      "selected": [
+        "OUTL03",
+        "CCC003",
+        "BBB003"
+      ],
+      "score": 64,
+      "data_quality_flags": [],
+      "peer_outlier_flags": [
+        "outlier_per"
+      ],
+      "relative_position": {
+        "valuation_percentile": 0.8333,
+        "roe_percentile": 0.3333,
+        "growth_percentile": 0.6667,
+        "operating_margin_percentile": 0.6667,
+        "balance_sheet_percentile": 0.6667,
+        "data_quality_score": 92
+      },
+      "failures": []
+    },
+    {
+      "case_id": "C4_no_comparable_peers",
+      "description": "비교군 없음 — peer 후보가 전혀 없어 score 0, no_comparable_peers",
+      "passed": true,
+      "selected": [],
+      "score": 0,
+      "data_quality_flags": [
+        "no_comparable_peers",
+        "peer_count_below_minimum"
+      ],
+      "peer_outlier_flags": [],
+      "relative_position": {
+        "valuation_percentile": null,
+        "roe_percentile": null,
+        "growth_percentile": null,
+        "operating_margin_percentile": null,
+        "balance_sheet_percentile": null,
+        "data_quality_score": 90
+      },
+      "failures": []
+    },
+    {
+      "case_id": "C5_low_quality_target_cap",
+      "description": "저품질 타깃 캡 — 타깃 데이터 완성도 60 미만이면 score 55로 상한",
+      "passed": true,
+      "selected": [
+        "DDD005",
+        "CCC005",
+        "BBB005"
+      ],
+      "score": 49,
+      "data_quality_flags": [
+        "target_data_quality_low"
+      ],
+      "peer_outlier_flags": [],
+      "relative_position": {
+        "valuation_percentile": 0.5,
+        "roe_percentile": 0.5,
+        "growth_percentile": 0.5,
+        "operating_margin_percentile": 0.5,
+        "balance_sheet_percentile": 0.5,
+        "data_quality_score": 40
+      },
+      "failures": []
+    },
+    {
+      "case_id": "C6_similarity_ordering",
+      "description": "복합 유사도 정렬(#62) — 시총·사업경제성이 동일한 peer가 데이터완성도만 높은 peer보다 우선",
+      "passed": true,
+      "selected": [
+        "SIZEMATCH",
+        "MIDPEER",
+        "QUALONLY"
+      ],
+      "score": 61,
+      "data_quality_flags": [],
+      "peer_outlier_flags": [],
+      "relative_position": {
+        "valuation_percentile": 0.6667,
+        "roe_percentile": 0.6667,
+        "growth_percentile": 0.6667,
+        "operating_margin_percentile": 0.3333,
+        "balance_sheet_percentile": 0.3333,
+        "data_quality_score": 90
+      },
+      "failures": []
+    }
+  ]
+}

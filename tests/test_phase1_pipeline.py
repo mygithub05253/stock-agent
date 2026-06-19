@@ -1,5 +1,16 @@
+import os
+
+import pytest
+
 from stock_agent.agents import run_curator, run_investor_profile_agent, run_request_classifier
-from stock_agent.graph import build_demo_profile, run_phase1_analysis
+from stock_agent.agents.investment_analyst import run_investment_analyst
+from stock_agent.config import get_settings
+from stock_agent.graph import (
+    build_analysis_graph,
+    build_demo_profile,
+    run_phase1_analysis,
+    stream_phase1_analysis_events,
+)
 from stock_agent.intake import (
     ONBOARDING_CARDS,
     build_holding_from_selection,
@@ -11,6 +22,13 @@ from stock_agent.intake import (
 )
 from stock_agent.llm.glm_client import _api_key_for_header, _strip_json_fence
 from stock_agent.schemas import AgentState, Holding, Portfolio, UserProfile, UserRequest
+
+
+@pytest.fixture(autouse=True)
+def clear_settings_cache() -> None:
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def test_phase1_analysis_returns_guarded_tier1() -> None:
@@ -25,6 +43,37 @@ def test_phase1_analysis_returns_guarded_tier1() -> None:
     assert output.state.guardrail is not None
     assert output.tier1.signal in {"BUY", "HOLD", "SELL"}
     assert "투자 권유" in output.tier1.disclaimer
+    assert output.state.graph_route["analysis_scope"] in {"single_stock", "portfolio", "sector"}
+    assert {"curator", "classifier", "worker_fanout", "strategist", "investment_analyst", "guardrail"}.issubset(
+        set(output.state.trace_spans)
+    )
+
+
+def test_build_analysis_graph_returns_langgraph_contract() -> None:
+    graph = build_analysis_graph()
+
+    assert graph.__class__.__name__ == "CompiledStateGraph"
+
+
+def test_stream_phase1_analysis_events_reports_agent_progress() -> None:
+    events = list(stream_phase1_analysis_events("삼성전자 분석해줄래"))
+    node_events = [event for event in events if event["type"] == "node"]
+    complete = events[-1]
+
+    assert [event["node"] for event in node_events[:2]] == ["curator", "classifier"]
+    assert {event["node"] for event in node_events} >= {
+        "quant",
+        "qual",
+        "competitor",
+        "macro",
+        "strategist",
+        "investment_analyst",
+        "guardrail",
+    }
+    assert any(event["node"] == "macro" and event["status"] == "skipped" for event in node_events)
+    assert all(event["status"] in {"done", "skipped", "error"} for event in node_events)
+    assert complete["type"] == "complete"
+    assert complete["output"].state.strategist is not None
 
 
 def test_phase1_analysis_uses_candidates_when_stock_is_missing() -> None:
@@ -231,6 +280,118 @@ def test_request_classifier_classifies_news_urgency() -> None:
     assert output.state.user_request is not None
     assert output.state.user_request.intent == "holding_review"
     assert output.state.user_request.urgency_reason == "news"
+
+
+def test_langgraph_route_reflects_sector_scope_and_depth() -> None:
+    output = run_phase1_analysis("반도체 섹터를 상세하게 점검해줘")
+
+    assert output.state.user_request is not None
+    assert output.state.user_request.analysis_scope == "sector"
+    assert output.state.user_request.requested_depth == "deep"
+    assert output.state.graph_route["analysis_scope"] == "sector"
+    assert output.state.graph_route["urgency_reason"] == "general"
+    assert "macro" in output.state.graph_route["worker_plan"]
+    assert output.state.macro is not None
+    assert output.state.strategist is not None
+    assert "macro" in output.state.strategist.contributing_agents
+
+
+def test_summary_depth_keeps_workers_but_limits_ui_evidence() -> None:
+    output = run_phase1_analysis("삼성전자 요약해서 핵심만 알려줘")
+
+    assert output.state.user_request is not None
+    assert output.state.user_request.requested_depth == "summary"
+    assert output.state.qual is not None
+    assert output.state.competitor is not None
+    assert len(output.state.qual.evidence) > 1
+    assert len(output.state.competitor.evidence) > 1
+    assert len(output.tier2["정성 근거"]) == 1
+    assert len(output.tier2["Peer 비교"]) == 1
+
+
+def test_worker_failure_degrades_strategy(monkeypatch: pytest.MonkeyPatch) -> None:
+    from stock_agent.graph import pipeline
+
+    def fail_qual(state: AgentState) -> AgentState:
+        raise RuntimeError("qual unavailable")
+
+    monkeypatch.setattr(pipeline, "run_qual", fail_qual)
+
+    output = run_phase1_analysis("삼성전자 상세하게 점검해줘")
+
+    assert output.state.qual is None
+    assert output.state.worker_errors
+    assert output.state.strategist is not None
+    assert output.state.strategist.degraded is True
+    assert "qual" not in output.state.strategist.contributing_agents
+    assert output.tier1.signal in {"BUY", "HOLD", "SELL"}
+
+
+def test_investment_analyst_falls_back_without_openrouter_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    get_settings.cache_clear()
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("GLM_API_KEY", raising=False)
+    output = run_phase1_analysis("삼성전자 상세하게 점검해줘")
+
+    assert output.state.strategist is not None
+    assert output.state.strategist.model_provider == "strategist"
+    assert output.state.strategist.model == "local-rule"
+    assert output.state.strategist.fallback_used is True
+
+
+def test_investment_analyst_uses_mock_openrouter_qwen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("GLM_API_KEY", raising=False)
+
+    profile, portfolio = build_demo_profile()
+    state = run_phase1_analysis(
+        "삼성전자 상세하게 점검해줘",
+        user_profile=profile,
+        portfolio=portfolio,
+    ).state
+
+    get_settings.cache_clear()
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+
+    def fake_openrouter_chat_json(*args, **kwargs):
+        return {
+            "signal": "HOLD",
+            "confidence": 66,
+            "suitability": 61,
+            "headline": "Qwen mock 분석 결과입니다.",
+            "key_reasons": ["Qwen mock 근거"],
+            "risks": ["Qwen mock 리스크"],
+            "next_actions": ["Qwen mock 액션"],
+        }
+
+    monkeypatch.setattr(
+        "stock_agent.agents.investment_analyst.openrouter_chat_json",
+        fake_openrouter_chat_json,
+    )
+    state = run_investment_analyst(state)
+
+    assert state.strategist is not None
+    assert state.strategist.model_provider == "openrouter"
+    assert state.strategist.model == "qwen/qwen-2.5-7b-instruct"
+    assert state.strategist.fallback_used is False
+    assert state.strategist.headline == "Qwen mock 분석 결과입니다."
+
+
+@pytest.mark.openrouter_smoke
+def test_openrouter_qwen_smoke_when_key_is_configured() -> None:
+    if not os.getenv("OPENROUTER_API_KEY"):
+        pytest.skip("OPENROUTER_API_KEY is not configured")
+    get_settings.cache_clear()
+
+    output = run_phase1_analysis("삼성전자 요약해서 알려줘")
+
+    assert output.state.strategist is not None
+    assert output.state.strategist.model_provider == "openrouter"
+    assert output.state.strategist.model == "qwen/qwen-2.5-7b-instruct"
 
 
 def test_curator_does_not_classify_user_request_before_classifier() -> None:

@@ -1,14 +1,60 @@
 import os
-import psycopg2
-from psycopg2 import OperationalError
+import time
 from dotenv import load_dotenv
+import psycopg2
 
+from psycopg2 import OperationalError  
+from stock_agent.agents.fallback import ensure_database_available
+from stock_agent.config import get_settings
 from stock_agent.schemas.analysis import AgentState, QuantResult
-from stock_agent.tools.price_tool import get_price_metrics
 from stock_agent.tools.financial_tool import get_financial_metrics
+from stock_agent.tools.price_tool import get_price_metrics
 
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL") or get_settings().resolved_database_url
+
+_RETRYABLE_DB_CONNECT_ATTEMPTS = 3
+_DB_CONNECT_BACKOFF_SECONDS = (0.5, 1.0)
+
+_DEFAULT_PRICE_METRICS = {
+    "per": 18.0,
+    "pbr": 1.3,
+    "close_price": 0,
+}
+_DEFAULT_FIN_METRICS = {
+    "roe": 8.0,
+    "revenue_growth_yoy": 4.0,
+    "operating_margin": 12.0,
+    "debt_ratio": 90.0,
+}
+
+def _connect_with_retry() -> tuple[object | None, list[str]]:
+    settings = get_settings()
+    reasons: list[str] = []
+
+    for attempt in range(1, _RETRYABLE_DB_CONNECT_ATTEMPTS + 1):
+        try:
+            return psycopg2.connect(settings.resolved_database_url), reasons
+        except Exception as exc:
+            reasons.append(
+                f"DB 연결 시도 {attempt} 실패: {exc.__class__.__name__}: {exc}"
+            )
+            if attempt < _RETRYABLE_DB_CONNECT_ATTEMPTS:
+                time.sleep(
+                    _DB_CONNECT_BACKOFF_SECONDS[
+                        min(attempt - 1, len(_DB_CONNECT_BACKOFF_SECONDS) - 1)
+                    ]
+                )
+
+    return None, reasons
+
+
+def _normalize_metrics(raw: dict[str, float | int], fallback: dict[str, float | int]) -> dict[str, float | int]:
+    return {
+        key: float(raw.get(key)) if raw.get(key) is not None else fallback[key]
+        for key in fallback
+    }
+
 
 def run_quant(state: AgentState) -> AgentState:
     """
@@ -19,38 +65,51 @@ def run_quant(state: AgentState) -> AgentState:
 
     stock_code = state.curator.stock_code
     corp_code = state.curator.corp_code
-    
-    # 파이프라인에서 as_of_date를 주입하지 않았다면 오늘 날짜를 기본값으로 사용
+
     as_of_date = getattr(state, "as_of_date", None)
     if not as_of_date:
         from datetime import datetime
         as_of_date = datetime.now().strftime("%Y-%m-%d")
 
-    # DB 커넥션 오픈 및 Tool 호출
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-    except (OperationalError, Exception) as exc:
-        price_metrics = {
-            "per": 18.0,
-            "pbr": 1.3,
-            "close_price": 0,
-        }
-        fin_metrics = {
-            "roe": 8.0,
-            "revenue_growth_yoy": 4.0,
-            "operating_margin": 12.0,
-            "debt_ratio": 90.0,
-        }
-        fallback_reason = f"{exc.__class__.__name__}: {exc}"
+    price_metrics: dict[str, float | int] = _DEFAULT_PRICE_METRICS.copy()
+    fin_metrics: dict[str, float | int] = _DEFAULT_FIN_METRICS.copy()
+    price_source = "fallback"
+    fin_source = "fallback"
+    fallback_reasons: list[str] = []
+
+    # #53 retry 헬퍼로 DB 연결을 시도하고, 실패하면 기본값으로 graceful degradation.
+    # (머지 leftover였던 중복 직접연결 블록을 제거해 import·테스트 정합성 복구)
+    conn, connect_reasons = _connect_with_retry()
+    if conn is None:
+        fallback_reasons.extend(connect_reasons)
     else:
         try:
-            price_metrics = get_price_metrics(conn, stock_code, as_of_date)
-            fin_metrics = get_financial_metrics(conn, corp_code, as_of_date)
-        finally:
-            conn.close()
-        fallback_reason = None
+            try:
+                price_metrics = get_price_metrics(conn, stock_code, as_of_date)
+                price_source = "db"
+            except Exception as exc:
+                fallback_reasons.append(
+                    f"시세 도구 오류: {exc.__class__.__name__}: {exc}"
+                )
+                price_metrics = _DEFAULT_PRICE_METRICS.copy()
 
-    # Tool 결과를 통합하여 metrics 생성
+            try:
+                fin_metrics = get_financial_metrics(conn, corp_code, as_of_date)
+                fin_source = "db"
+            except Exception as exc:
+                fallback_reasons.append(
+                    f"DART 재무 도구 오류: {exc.__class__.__name__}: {exc}"
+                )
+                fin_metrics = _DEFAULT_FIN_METRICS.copy()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    price_metrics = _normalize_metrics(price_metrics, _DEFAULT_PRICE_METRICS)
+    fin_metrics = _normalize_metrics(fin_metrics, _DEFAULT_FIN_METRICS)
+
     metrics = {
         "per": price_metrics.get("per"),
         "pbr": price_metrics.get("pbr"),
@@ -58,31 +117,63 @@ def run_quant(state: AgentState) -> AgentState:
         "revenue_growth_yoy": fin_metrics.get("revenue_growth_yoy"),
         "operating_margin": fin_metrics.get("operating_margin"),
         "debt_ratio": fin_metrics.get("debt_ratio"),
-        "close_price": price_metrics.get("close_price")
+        "close_price": price_metrics.get("close_price"),
     }
 
-    # 💡 [Calculation outside LLM] MVP 룰 기반 점수 및 시그널 산출
-    # 향후 이 부분은 LLM/GLM API에 metrics 딕셔너리를 던져 텍스트를 받아오는 로직으로 교체 가능
     score = 50
-    reasons = []
-    risks = []
-    
+    reasons: list[str] = []
+    risks: list[str] = []
+
     roe = metrics["roe"] or 0
     growth = metrics["revenue_growth_yoy"] or 0
     debt = metrics["debt_ratio"] or 0
 
     if roe > 10 and growth > 5:
         score += 30
-        reasons.append(f"ROE({roe}%)와 매출 성장률({growth}%)이 견조하여 본업 경쟁력이 우수합니다.")
+        reasons.append(
+            f"ROE({roe}%)와 매출 성장률({growth}%)이 견조하여 본업 경쟁력이 우수합니다."
+        )
     elif roe <= 0:
         score -= 20
-        risks.append("수익성(ROE) 악화로 인해 기초 펀더멘털 리스크가 존재합니다.")
-        
+        risks.append(
+            "수익성(ROE) 악화로 인해 기초 펀더멘털 리스크가 존재합니다."
+        )
+
     if debt > 150:
         score -= 10
-        risks.append(f"부채비율이 {debt}%로 다소 높아 재무 건전성 점검이 필요합니다.")
+        risks.append(
+            f"부채비율이 {debt}%로 다소 높아 재무 건전성 점검이 필요합니다."
+        )
     else:
         reasons.append("부채비율이 안정적인 수준에서 관리되고 있습니다.")
+
+    if price_source == "db":
+        reasons.append(
+            f"{as_of_date} 기준 {stock_code}의 시세와 밸류에이션 지표를 DB에서 조회했습니다."
+        )
+    else:
+        reasons.append(
+            "시세 데이터 조회가 불완전하여 데모용 fallback 값이 사용되었습니다."
+        )
+
+    if fin_source == "db":
+        reasons.append(
+            f"{as_of_date} 기준 {corp_code}의 DART 재무 지표를 DB에서 조회했습니다."
+        )
+    else:
+        reasons.append(
+            "재무 지표 조회가 불완전하여 데모용 fallback 값이 사용되었습니다."
+        )
+
+    if fallback_reasons:
+        reasons.append(
+            "일부 정량 지표는 데모 또는 기본값으로 대체되어 있습니다. 실제 투자 판단 전 DB/툴 연결 결과를 재확인하세요."
+        )
+        risks.append(
+            "현재 정량 결과에는 일부 mock/기본값이 포함되어 있으므로 검증이 필요합니다."
+        )
+        for fallback_reason in fallback_reasons:
+            reasons.append(fallback_reason)
 
     if score >= 70:
         valuation_signal = "BUY"
@@ -91,11 +182,6 @@ def run_quant(state: AgentState) -> AgentState:
     else:
         valuation_signal = "SELL"
 
-    if fallback_reason:
-        reasons.append(f"DB 연결 실패로 데모용 정량 추정치를 사용했습니다. ({fallback_reason})")
-        risks.append("현재 정량 결과는 데모용 fallback 값이므로 실제 투자 판단 전 DB 연결 후 재확인이 필요합니다.")
-
-    # AgentState 갱신
     state.quant = QuantResult(
         score=score,
         valuation_signal=valuation_signal,

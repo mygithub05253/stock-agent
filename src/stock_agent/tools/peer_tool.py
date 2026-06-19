@@ -523,12 +523,66 @@ def _mark_outliers(rows: list[PeerMetricRow], target_stock_code: str) -> list[Pe
     return result
 
 
+# peer 복합 유사도 가중치. 합이 1이 되도록 유지한다.
+# - size: 시가총액 근접(규모 유사)  - business: 영업이익률 근접(사업 경제성 유사)
+# - quality: 데이터 완성도(보조 요인 — 단독으로 선정을 지배하지 않게 낮게 둔다)
+# 일부 지표가 결측이면 가용 항목으로 가중치를 재정규화한다.
+_SIM_WEIGHT_SIZE = 0.45
+_SIM_WEIGHT_BUSINESS = 0.30
+_SIM_WEIGHT_QUALITY = 0.25
+
+
+def _proximity(target_value: float | None, peer_value: float | None) -> float | None:
+    """두 값의 근접도를 0~1로 반환(1=동일). 비교 불가하면 None.
+
+    상대 격차 기반이라 절대 규모가 큰 시가총액·비율 지표 모두에 쓸 수 있다.
+    """
+    if target_value is None or peer_value is None:
+        return None
+    scale = max(abs(target_value), 1e-9)
+    gap = abs(peer_value - target_value) / scale
+    return 1.0 / (1.0 + gap)
+
+
+def peer_similarity(target: PeerMetricRow, row: PeerMetricRow) -> float:
+    """target 대비 peer 후보의 복합 유사도(0~1, 높을수록 좋은 비교군).
+
+    시총 근접(규모)·영업이익률 근접(사업 경제성)·데이터 완성도를 가중 합산한다.
+    company 테이블에 별도 사업구성 컬럼이 없어, 보유 재무지표(영업이익률)로
+    "사업 경제성 유사도"를 근사한다(정직한 프록시).
+    """
+    components: list[tuple[float, float]] = []  # (weight, score)
+
+    size_sim = _proximity(
+        float(target.market_cap) if target.market_cap is not None else None,
+        float(row.market_cap) if row.market_cap is not None else None,
+    )
+    if size_sim is not None:
+        components.append((_SIM_WEIGHT_SIZE, size_sim))
+
+    business_sim = _proximity(target.operating_margin, row.operating_margin)
+    if business_sim is not None:
+        components.append((_SIM_WEIGHT_BUSINESS, business_sim))
+
+    # 데이터 완성도는 항상 존재(0~100) → 보조 요인으로 포함
+    components.append((_SIM_WEIGHT_QUALITY, row.data_quality_score / 100.0))
+
+    total_weight = sum(weight for weight, _ in components)
+    if total_weight <= 0:
+        return 0.0
+    return sum(weight * score for weight, score in components) / total_weight
+
+
 def select_peer_rows(
     target: PeerMetricRow,
     rows: list[PeerMetricRow],
     max_peer_count: int,
 ) -> list[PeerMetricRow]:
+    """시총 band로 1차 거른 뒤 복합 유사도(시총·사업경제성·데이터완성도)로 선정한다.
 
+    데이터 완성도만 1순위로 보던 기존 방식은 규모·사업이 훨씬 비슷한 peer를
+    한 지표 결측만으로 밀어내는 한계가 있었다. 복합 점수로 전체 비교가능성을 본다.
+    """
     candidates = [row for row in rows if row.stock_code != target.stock_code]
 
     if target.market_cap is not None:
@@ -541,12 +595,9 @@ def select_peer_rows(
         if len(within_band) >= 2:
             candidates = within_band
 
-    def sort_key(row: PeerMetricRow) -> tuple[int, float]:
-        if target.market_cap and row.market_cap:
-            gap = abs(row.market_cap - target.market_cap) / target.market_cap
-        else:
-            gap = 9_999.0
-        return (-row.data_quality_score, gap)
+    # 유사도 내림차순. 동점 시 데이터 완성도 높은 쪽을 안정적으로 우선한다.
+    def sort_key(row: PeerMetricRow) -> tuple[float, int]:
+        return (-peer_similarity(target, row), -row.data_quality_score)
 
     return sorted(candidates, key=sort_key)[:max_peer_count]
 
@@ -682,7 +733,8 @@ def build_peer_comparison(
     if target_company.sector:
         peer_selection_summary = (
             f"{target_company.sector} 섹터에서 후보 {len(peer_candidates)}개를 불러와 "
-            f"데이터 완성도와 시가총액 근접도 기준으로 {len(selected_peers)}개를 선택했습니다."
+            f"시가총액·사업 경제성(영업이익률)·데이터 완성도를 가중한 복합 유사도 기준으로 "
+            f"{len(selected_peers)}개를 선택했습니다."
         )
     else:
         peer_selection_summary = "섹터 정보가 없어 같은 섹터 peer 후보를 선택하지 못했습니다."
@@ -690,6 +742,131 @@ def build_peer_comparison(
     evidence = [
         *position.evidence,
         f"비교군은 최종 {len(selected_peers)}개 peer로 구성했습니다.",
+    ]
+
+    return PeerComparison(
+        target=target_row,
+        peers=selected_peers,
+        score=position.score,
+        peer_selection_summary=peer_selection_summary,
+        peer_summary=build_peer_summary(target_row, len(selected_peers), data_quality_flags),
+        metric_definitions=metric_definitions(),
+        relative_position=position.relative_position,
+        evidence=evidence,
+        data_quality_flags=data_quality_flags,
+        a1_peer_multiple_payload=position.a1_peer_multiple_payload,
+        warnings=warnings,
+    )
+
+
+# 실시간 시세 출처를 가리키는 데이터 품질 마커. guardrail.mock_data_audit가 mock으로
+# 오판하지 않도록 "mock"/"fallback"/"데모용" 문자열을 의도적으로 배제한다(실데이터이므로).
+MCP_LIVE_SOURCE_FLAG = "mcp_live_market_data"
+MCP_DB_UNAVAILABLE_FLAG = "db_unavailable_used_mcp"
+
+
+def _metric_row_from_market_record(record: dict[str, Any]) -> PeerMetricRow:
+    """MCP 실시간 지표 레코드(per/pbr/roe/market_cap 등)를 PeerMetricRow로 변환한다.
+
+    DART 재무가 없는 폴백 경로이므로 매출성장률·영업이익률·부채비율은 결측으로 두고
+    그에 맞는 metric_flags를 부여한다(정직한 데이터 품질 신호).
+    """
+    per = record.get("per")
+    pbr = record.get("pbr")
+    roe = record.get("roe")
+    market_cap = _as_int(record.get("market_cap"))
+    close_price = _as_int(record.get("close_price"))
+
+    flags: list[str] = []
+    if per is None:
+        flags.append("per_not_applicable")
+    if pbr is None:
+        flags.append("pbr_not_applicable")
+    if roe is None:
+        flags.append("roe_missing")
+    # 폴백 경로에서 항상 결측인 재무 파생 지표
+    flags.extend(["revenue_growth_missing", "operating_margin_missing", "debt_ratio_missing"])
+
+    quality = _quality_score([market_cap, close_price, per, pbr, roe])
+
+    return PeerMetricRow(
+        corp_code=str(record.get("corp_code") or ""),
+        stock_code=str(record["stock_code"]),
+        corp_name=str(record.get("corp_name") or record["stock_code"]),
+        sector=record.get("sector"),
+        base_date=str(record["base_date"]) if record.get("base_date") else None,
+        market_cap=market_cap,
+        close_price=close_price,
+        per=rounded(per, 4) if per is not None else None,
+        pbr=rounded(pbr, 4) if pbr is not None else None,
+        roe=rounded(roe, 4) if roe is not None else None,
+        revenue_growth=None,
+        operating_margin=None,
+        debt_ratio=None,
+        data_quality_score=quality,
+        metric_flags=flags,
+    )
+
+
+def build_comparison_from_market_rows(
+    target_stock_code: str,
+    records: list[dict[str, Any]],
+    sector: str | None = None,
+    base_date: str | None = None,
+    min_peer_count: int = 3,
+    max_peer_count: int = 8,
+) -> PeerComparison:
+    """MCP 실시간 시세 레코드로부터 PeerComparison을 만든다(DB 없이, 순수 함수).
+
+    `build_peer_comparison`의 DB 로더 대신 외부 시세 레코드를 입력으로 받아 동일한 점수·상대위치
+    엔진(select_peer_rows·calculate_relative_position)을 재사용한다. DB 미연결 폴백 전용 경로다.
+    """
+    warnings: list[str] = [MCP_DB_UNAVAILABLE_FLAG]
+
+    target_records = [r for r in records if str(r.get("stock_code")) == target_stock_code]
+    if not target_records:
+        message = f"{target_stock_code} 종목의 실시간 시세를 MCP 경로에서 확보하지 못했습니다."
+        return PeerComparison(
+            target=_missing_target_row(target_stock_code),
+            peers=[],
+            score=0,
+            peer_selection_summary=message,
+            peer_summary=message,
+            metric_definitions=metric_definitions(),
+            relative_position={},
+            evidence=[message],
+            data_quality_flags=_dedupe(["target_not_found", MCP_DB_UNAVAILABLE_FLAG]),
+            warnings=_dedupe(["target_not_found", *warnings]),
+        )
+
+    metric_rows = [_metric_row_from_market_record(r) for r in records]
+    # 대상이 항상 첫 행이 되도록 정렬
+    metric_rows.sort(key=lambda row: 0 if row.stock_code == target_stock_code else 1)
+
+    metric_rows = _mark_outliers(metric_rows, target_stock_code)
+    target_row = next(row for row in metric_rows if row.stock_code == target_stock_code)
+    selected_peers = select_peer_rows(target_row, metric_rows, max_peer_count=max_peer_count)
+
+    if not selected_peers:
+        warnings.append("no_comparable_peers")
+    if len(selected_peers) < min_peer_count:
+        warnings.append("peer_count_below_minimum")
+
+    position = calculate_relative_position([target_row, *selected_peers], target_row.stock_code)
+    warnings = _dedupe(warnings)
+    data_quality_flags = _dedupe([MCP_LIVE_SOURCE_FLAG, *position.data_quality_flags, *warnings])
+
+    base_label = base_date or target_row.base_date or "최근 영업일"
+    peer_selection_summary = (
+        f"DB 미연결로 MCP 실시간 시세 경로를 사용했습니다. {sector or '대상'} 비교군 후보 "
+        f"{len(records) - 1}개 중 시가총액 근접도 기준으로 {len(selected_peers)}개를 선택했습니다."
+    )
+
+    evidence = [
+        f"MCP 실시간 시세({base_label}) 기준으로 peer 비교를 수행했습니다.",
+        *position.evidence,
+        f"비교군은 최종 {len(selected_peers)}개 peer로 구성했습니다.",
+        "DART 재무 기반 매출성장률·영업이익률·부채비율은 이 경로에서 제공되지 않아 결측 처리했습니다.",
     ]
 
     return PeerComparison(
