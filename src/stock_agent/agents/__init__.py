@@ -8,6 +8,7 @@ from stock_agent.agents.quant import run_quant
 from stock_agent.agents.request_classifier import run_request_classifier
 from stock_agent.agents.macro import run_macro
 from stock_agent.agents.strategist import run_strategist
+from stock_agent.agents.result_renderer import run_result_renderer
 
 __all__ = [
     "run_competitor",
@@ -20,4 +21,5 @@ __all__ = [
     "run_macro",
     "run_request_classifier",
     "run_strategist",
+    "run_result_renderer",
 ]

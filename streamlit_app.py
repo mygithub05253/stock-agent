@@ -553,6 +553,31 @@ def _render_output() -> None:
         if output.state.worker_errors:
             st.warning(" / ".join(output.state.worker_errors))
 
+    # Rendered report (Tier cards)
+    if output.state.rendered_report:
+        rr = output.state.rendered_report
+        st.subheader("요약 카드")
+        col_main, col_meta = st.columns([3, 1])
+        with col_main:
+            st.markdown(f"### {rr.summary}")
+            st.write(rr.recommendation)
+        with col_meta:
+            st.metric("투자 판단", rr.recommendation)
+            st.metric("신뢰도", f"{tier1.confidence}%")
+
+        st.subheader("투자 근거 (Tier2)")
+        for reason in rr.strengths:
+            st.write(f"✅ {reason}")
+
+        st.subheader("리스크 (Tier3)")
+        for risk in rr.risks:
+            st.write(f"⚠️ {risk}")
+
+        st.subheader("권장 행동")
+        if rr.actions:
+            for act in rr.actions:
+                st.info(act)
+
     events = st.session_state.get("agent_events") or []
     if events:
         progress_placeholder = st.empty()
