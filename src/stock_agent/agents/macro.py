@@ -217,10 +217,15 @@ def run_macro(state: AgentState) -> AgentState:
     - 변화율(RoC) 추세 보정 (데이터 부족 또는 주기 불일치 시 생략)
     - DB 실패 시 mock fallback으로 파이프라인 유지
 
-    논문 근거:
-        Miyazaki et al. (2026). arXiv:2602.23330
-        Yang et al. (2018). Applied Economics 50(7)
-        PLOS ONE (2024). 한국 섹터별 거시경제 영향
+    임계값 근거:
+        기준금리 2.5% / 3.5% : Yang et al. (2018) Applied Economics 50(7)
+        CPI 2.0%             : 한국은행 물가안정목표 (2019~현재)
+        CPI 4.0%             : Mishkin (2007) Monetary Policy Strategy
+        GDP 2.0%             : IMF World Economic Outlook (2024) 한국 잠재성장률
+        GDP 0%               : Miyazaki et al. (2026) arXiv:2602.23330
+        NSI 90/110           : 한국은행 뉴스심리지수 기술문서 (2021)
+        환율 1350원           : PLOS ONE (2024) 한국 섹터별 거시경제 영향 연구
+        환율 1200원 기준선    : 한국은행 환율 역사적 평균 (2000~2024)
 
     TODO Phase 2:
         1. Z-Score 기반 점수 계산 (절대값 threshold 대신)
@@ -232,6 +237,21 @@ def run_macro(state: AgentState) -> AgentState:
         raise ValueError("Curator result is required before macro analysis")
 
     sector = state.curator.sector
+
+    # intake.py의 sector명 → macro_tool SECTOR_INDICATORS 키 정규화
+    _SECTOR_MAP = {
+        "반도체": "반도체IT",
+        "IT":     "반도체IT",
+        "은행":   "금융",
+        "보험":   "금융",
+        "증권":   "금융",
+        "화학":   "에너지화학",
+        "에너지": "에너지화학",
+        "자동차": "자동차제조",
+        "건설":   "건설부동산",
+        "부동산": "건설부동산",
+    }
+    sector = _SECTOR_MAP.get(sector, sector)
 
     as_of_date = state.as_of_date
     if not as_of_date:
@@ -267,55 +287,72 @@ def run_macro(state: AgentState) -> AgentState:
         return _get_value(indicators_raw, name)
 
     # ── 4. 점수 계산 ─────────────────────────────────────────
-    # 출처: Miyazaki et al. (2026) 4영역 0~100점 구조
+    # 출처: Miyazaki et al. (2026) arXiv:2602.23330 — 4영역 0~100점 구조
     # TODO Phase 2: 절대값 threshold → Z-Score 기반으로 개선
     score   = 50
     reasons: list[str] = []
     risks:   list[str] = []
 
     # [영역 1] 금리 평가
+    # 임계값: Yang et al. (2018) Applied Economics 50(7)
+    # 2.5% 이하 = 완화적 통화정책 구간 / 3.5% 이상 = 긴축 구간
     rate = val(_K_RATE)
     if rate is not None:
         if rate <= 2.5:
             score += 15
-            reasons.append(f"기준금리({rate}%)가 낮아 기업 투자 및 소비 환경이 우호적입니다.")
+            reasons.append(f"기준금리({rate}%)가 완화 구간(≤2.5%) 이하로 기업 투자 및 소비 환경이 우호적입니다. [Yang et al., 2018]")
         elif rate >= 3.5:
             score -= 15
-            risks.append(f"기준금리({rate}%)가 높아 기업 자금 조달 비용이 상승 압력을 받고 있습니다.")
+            risks.append(f"기준금리({rate}%)가 긴축 구간(≥3.5%)으로 기업 자금 조달 비용이 상승 압력을 받고 있습니다. [Yang et al., 2018]")
+        else:
+            reasons.append(f"기준금리({rate}%)가 중립 범위(2.5~3.5%)로 통화정책 방향성이 유지되고 있습니다. [Yang et al., 2018]")
 
     # [영역 2] 인플레이션 평가
+    # 임계값: 한국은행 물가안정목표 2.0% (2019~현재)
+    #         Mishkin (2007) — CPI 4% 초과 시 긴축 압력 임계값
     cpi = val(_K_CPI)
     if cpi is not None:
         if cpi <= 2.0:
             score += 10
-            reasons.append(f"CPI({cpi})가 안정적 수준으로 통화정책 완화 여지가 있습니다.")
+            reasons.append(f"CPI({cpi}%)가 한국은행 물가안정목표(2%) 이하로 통화정책 완화 여지가 있습니다. [한국은행, 2019]")
         elif cpi >= 4.0:
             score -= 15
-            risks.append(f"CPI({cpi})가 높아 긴축 통화정책 지속 가능성이 있습니다.")
+            risks.append(f"CPI({cpi}%)가 긴축 임계값(≥4%)을 초과해 긴축 통화정책 지속 가능성이 있습니다. [Mishkin, 2007]")
+        else:
+            reasons.append(f"CPI({cpi}%)가 물가안정목표(2%) 근방으로 안정적 범위(2~4%)에 있습니다. [한국은행, 2019]")
 
     # [영역 3] 경제성장 평가
+    # 임계값: IMF World Economic Outlook (2024) — 한국 잠재성장률 2.0%
+    #         Miyazaki et al. (2026) arXiv:2602.23330 — GDP 0% 이하: 침체 리스크
     # GDP 지표는 이미 전년동기비 값이므로 RoC 계산 생략
     gdp = val(_K_GDP)
     if gdp is not None:
         if gdp >= 2.0:
             score += 10
-            reasons.append(f"GDP 성장률({gdp}%)이 양호해 기업 실적 개선 기대가 높습니다.")
+            reasons.append(f"GDP 성장률({gdp}%)이 잠재성장률(2%) 이상으로 기업 실적 개선 기대가 높습니다. [IMF WEO, 2024]")
         elif gdp <= 0:
             score -= 20
-            risks.append(f"GDP 성장률({gdp}%)이 0% 이하로 경기 침체 리스크가 존재합니다.")
+            risks.append(f"GDP 성장률({gdp}%)이 0% 이하로 경기 침체 리스크가 존재합니다. [Miyazaki et al., 2026]")
+        else:
+            reasons.append(f"GDP 성장률({gdp}%)로 잠재성장률(2%) 하회하나 완만한 성장세를 유지하고 있습니다. [IMF WEO, 2024]")
 
     # [영역 4] 시장 심리 평가
+    # 임계값: 한국은행 뉴스심리지수 기술문서 (2021)
+    # 100 기준선 / 110 이상: 낙관 구간 / 90 이하: 비관 구간
     nsi = val(_K_NSI)
     if nsi is not None:
         if nsi >= 110:
             score += 5
-            reasons.append(f"뉴스심리지수({nsi})가 높아 시장 투자심리가 긍정적입니다.")
+            reasons.append(f"뉴스심리지수({nsi})가 낙관 구간(≥110)으로 시장 투자심리가 긍정적입니다. [한국은행, 2021]")
         elif nsi <= 90:
             score -= 5
-            risks.append(f"뉴스심리지수({nsi})가 낮아 시장 투자심리가 위축되어 있습니다.")
+            risks.append(f"뉴스심리지수({nsi})가 비관 구간(≤90)으로 시장 투자심리가 위축되어 있습니다. [한국은행, 2021]")
+        else:
+            reasons.append(f"뉴스심리지수({nsi})가 중립 범위(90~110)로 시장 심리가 안정적입니다. [한국은행, 2021]")
 
     # [섹터 가중치] 환율 보정 — 비대칭 구조 개선
-    # 출처: PLOS ONE (2024) — 섹터별 환율 민감도 차별화
+    # 임계값: PLOS ONE (2024) 한국 섹터별 거시경제 영향 연구
+    # 1350원 이상: 원화 약세 구간 / 1200원 이하: 원화 강세 구간 (역사적 평균)
     # TODO Phase 2: fx_bonus * (현재환율 - 기준환율) 선형 보정으로 개선
     fx = val(_K_FX)
     fx_bonus = _SECTOR_FX_BONUS.get(sector, 0)
@@ -324,27 +361,31 @@ def run_macro(state: AgentState) -> AgentState:
             # 원화 약세 구간 → 수출업종 유리, 내수업종 불리
             score += fx_bonus
             if fx_bonus > 0:
-                reasons.append(f"원화 약세(환율 {fx}원)가 {sector} 수출에 유리하게 작용합니다.")
+                reasons.append(f"원화 약세(환율 {fx}원, ≥1350원 구간)가 {sector} 수출에 유리하게 작용합니다. [PLOS ONE, 2024]")
             else:
-                risks.append(f"원화 약세(환율 {fx}원)가 {sector} 업종에 비용 부담으로 작용합니다.")
+                risks.append(f"원화 약세(환율 {fx}원, ≥1350원 구간)가 {sector} 업종 수입 비용 부담으로 작용합니다. [PLOS ONE, 2024]")
         elif fx <= _FX_BASE:
             # 원화 강세 구간 → 방향 반전 적용 (비대칭 개선)
             score -= fx_bonus
             if fx_bonus > 0:
-                risks.append(f"원화 강세(환율 {fx}원)가 {sector} 수출 경쟁력에 부담으로 작용합니다.")
+                risks.append(f"원화 강세(환율 {fx}원, ≤1200원 구간)가 {sector} 수출 경쟁력에 부담으로 작용합니다. [PLOS ONE, 2024]")
             else:
-                reasons.append(f"원화 강세(환율 {fx}원)가 {sector} 업종 수입비용 절감에 유리합니다.")
+                reasons.append(f"원화 강세(환율 {fx}원, ≤1200원 구간)가 {sector} 업종 수입비용 절감에 유리합니다. [PLOS ONE, 2024]")
+        else:
+            reasons.append(f"환율({fx}원)이 중립 범위(1200~1350원)로 {sector} 업종에 큰 환율 영향은 없습니다. [PLOS ONE, 2024]")
 
     # [섹터 가중치] 금리 보정
+    # 출처: PLOS ONE (2024) 한국 섹터별 거시경제 영향 연구
     rate_bonus = _SECTOR_RATE_BONUS.get(sector, 0)
     if rate is not None and rate_bonus != 0:
         score += rate_bonus
         if rate_bonus > 0:
-            reasons.append(f"현 금리 환경({rate}%)이 {sector} 업종에 유리하게 작용합니다.")
+            reasons.append(f"현 금리 환경({rate}%)이 {sector} 업종에 유리하게 작용합니다. [PLOS ONE, 2024]")
         else:
-            risks.append(f"현 금리 환경({rate}%)이 {sector} 업종 수익성에 부담을 줍니다.")
+            risks.append(f"현 금리 환경({rate}%)이 {sector} 업종 수익성에 부담을 줍니다. [PLOS ONE, 2024]")
 
     # [RoC 보정] 변화율 추세 반영
+    # 출처: Miyazaki et al. (2026) arXiv:2602.23330
     rate_of_change: dict[str, float | None] = {}
     if prev_context and prev_context.get("indicators"):
         prev_indicators = prev_context["indicators"]
@@ -364,10 +405,10 @@ def run_macro(state: AgentState) -> AgentState:
 
         if roc_rate is not None and roc_rate < 0:
             score += 5
-            reasons.append(f"기준금리가 하락 추세({roc_rate:+.1f}%)로 통화정책 완화 방향입니다.")
+            reasons.append(f"기준금리가 하락 추세({roc_rate:+.1f}%)로 통화정책 완화 방향입니다. [Miyazaki et al., 2026]")
         if roc_cpi is not None and roc_cpi > 0:
             score -= 3
-            risks.append(f"CPI가 상승 추세({roc_cpi:+.1f}%)로 인플레이션 재가속 가능성이 있습니다.")
+            risks.append(f"CPI가 상승 추세({roc_cpi:+.1f}%)로 인플레이션 재가속 가능성이 있습니다. [Miyazaki et al., 2026]")
 
     # 점수 범위 클리핑
     score = max(0, min(100, score))

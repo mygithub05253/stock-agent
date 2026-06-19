@@ -570,7 +570,14 @@ def _render_output() -> None:
     ):
         with tab:
             for item in output.tier2.get(key, []):
-                st.write(f"- {item}")
+                if key == "거시경제":
+                    # [논문출처] 태그 제거 후 본문만 표시, 데이터 출처는 고정 caption으로
+                    bracket_idx = item.rfind("[")
+                    main_text = item[:bracket_idx].strip() if "[" in item else item
+                    st.write(f"- {main_text}")
+                    st.caption("  📎 데이터 출처: 한국은행 ECOS API")
+                else:
+                    st.write(f"- {item}")
 
     with st.expander("상세 상태 보기"):
         st.json(output.model_dump(mode="json"), expanded=False)

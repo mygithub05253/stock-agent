@@ -155,6 +155,8 @@ def _worker_plan(state: AgentState) -> list[str]:
     """
     scope = state.user_request.analysis_scope if state.user_request else None
     workers = ["quant", "qual", "competitor"]
+    # single_stock도 업종이 확인되면 macro 분석 포함
+    # 근거: 개별 종목도 업종 거시경제 환경에 직접 영향받음
     has_sector = bool(state.curator and state.curator.sector)
     if scope in {"portfolio", "sector"} or (scope == "single_stock" and has_sector):
         workers.append("macro")
