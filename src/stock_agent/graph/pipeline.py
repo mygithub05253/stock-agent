@@ -16,6 +16,7 @@ from stock_agent.agents import (
     run_quant,
     run_request_classifier,
     run_strategist,
+    run_result_renderer,
 )
 from stock_agent.schemas.analysis import (
     AgentState,
@@ -48,6 +49,8 @@ class AnalysisGraphState(TypedDict, total=False):
     macro: MacroResult | None
     strategist: StrategistResult | None
     guardrail: GuardrailResult | None
+    investment_report: dict[str, str] | None
+    rendered_report: dict[str, str | int | list[str]] | None
     graph_route: dict[str, Any]
     trace_spans: Annotated[list[str], operator.add]
     worker_errors: Annotated[list[str], operator.add]
@@ -292,7 +295,7 @@ def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
     guardrail = state.get("guardrail")
     if strategist is None or guardrail is None:
         return _node_span("guardrail_apply")
-
+    # 기본 보정: PII/부적절 표현은 마스킹/보수적으로 수정
     if not guardrail.passed:
         if any("PII" in warning or "Inappropriate language" in warning for warning in guardrail.warnings):
             strategist = strategist.model_copy(
@@ -309,7 +312,52 @@ def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
             strategist = strategist.model_copy(
                 update={"headline": guardrail.revised_headline, "degraded": True}
             )
+
+    # If guardrail requests revision, perform a recomposition loop:
+    # recomposer -> strategist -> investment_analyst -> guardrail (max 2 retries)
+    needs_revision = bool(guardrail.needs_revision)
+    if needs_revision:
+        try:
+            from stock_agent.agents.recomposer import run_recomposer
+
+            max_retries = 2
+            attempt = 0
+            last_guardrail = guardrail
+            last_strategist = strategist
+            while attempt < max_retries and (last_guardrail.needs_revision or not last_guardrail.passed):
+                attempt += 1
+                # 1) recomposer patches worker outputs to address revisable issues
+                patched = run_recomposer(_agent_state({**state, **{"strategist": last_strategist, "guardrail": last_guardrail}}))
+
+                # 2) rerun strategist with patched state
+                patched = run_strategist(patched)
+                last_strategist = patched.strategist
+
+                # 3) run investment_analyst to refresh long-form report if available (non-fatal)
+                try:
+                    patched = run_investment_analyst(patched)
+                except Exception:
+                    pass
+
+                # 4) re-evaluate guardrail
+                patched = run_guardrail(patched)
+                last_guardrail = patched.guardrail
+
+            strategist = last_strategist
+            guardrail = last_guardrail
+        except Exception as exc:  # defensive: ensure pipeline doesn't crash
+            err = f"recomposition_loop_failed: {exc.__class__.__name__}: {exc}"
+            return {"worker_errors": [err], **_node_span("guardrail_apply")}
+
     return {"strategist": strategist, "guardrail": guardrail, **_node_span("guardrail_apply")}
+
+
+def _renderer_node(state: AnalysisGraphState) -> dict[str, Any]:
+    try:
+        next_state = run_result_renderer(_agent_state(state))
+        return {**_patch_from_agent(next_state, "rendered_report"), **_node_span("renderer")}
+    except Exception as exc:
+        return {"worker_errors": [f"renderer: {exc.__class__.__name__}: {exc}"], **_node_span("renderer")}
 
 
 def build_analysis_graph():
@@ -338,6 +386,7 @@ def build_analysis_graph():
     graph.add_node("investment_analyst", _investment_analyst_node)
     graph.add_node("guardrail", _guardrail_node)
     graph.add_node("guardrail_apply", _apply_guardrail_node)
+    graph.add_node("renderer", _renderer_node)
 
     # 엣지 연결
     graph.add_edge(START, "curator")
@@ -357,7 +406,8 @@ def build_analysis_graph():
     graph.add_edge("strategist", "investment_analyst")
     graph.add_edge("investment_analyst", "guardrail")
     graph.add_edge("guardrail", "guardrail_apply")
-    graph.add_edge("guardrail_apply", END)
+    graph.add_edge("guardrail_apply", "renderer")
+    graph.add_edge("renderer", END)
 
     return graph.compile()
 
