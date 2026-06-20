@@ -1,12 +1,15 @@
+import os
+from functools import lru_cache
 from typing import Any
 
 from pgvector.psycopg import register_vector
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import CrossEncoder, SentenceTransformer
 
 from stock_agent.db import get_connection
 
 
 EMBEDDING_MODEL = "BAAI/bge-m3"
+RERANKER_MODEL = os.getenv("RAG_RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
 RRF_K = 60
 
 
@@ -14,8 +17,41 @@ def get_embedding_model() -> SentenceTransformer:
     return SentenceTransformer(EMBEDDING_MODEL)
 
 
+@lru_cache(maxsize=1)
+def get_reranker_model() -> CrossEncoder:
+    return CrossEncoder(RERANKER_MODEL)
+
+
+def is_reranker_enabled() -> bool:
+    return os.getenv("RAG_RERANKER_ENABLED", "").lower() in {"1", "true", "yes", "on"}
+
+
 def _rows_to_dicts(columns: list[str], rows: list[tuple[Any, ...]]) -> list[dict[str, Any]]:
     return [dict(zip(columns, row)) for row in rows]
+
+
+def rerank_documents(query: str, docs: list[dict[str, Any]], k: int) -> list[dict[str, Any]]:
+    if not docs:
+        return []
+    if not is_reranker_enabled():
+        return docs[:k]
+
+    try:
+        reranker = get_reranker_model()
+        pairs = [(query, doc.get("body") or doc.get("title") or "") for doc in docs]
+        scores = reranker.predict(pairs)
+    except Exception:
+        return docs[:k]
+
+    scored_docs = []
+    for doc, score in zip(docs, scores, strict=True):
+        updated_doc = dict(doc)
+        updated_doc["reranker_model"] = RERANKER_MODEL
+        updated_doc["reranker_score"] = float(score)
+        updated_doc["retrieval_method"] = "hybrid_rrf_reranked"
+        scored_docs.append(updated_doc)
+
+    return sorted(scored_docs, key=lambda item: item["reranker_score"], reverse=True)[:k]
 
 
 def _hybrid_search(
@@ -134,7 +170,7 @@ def _hybrid_search(
                         candidate_limit,
                         RRF_K,
                         RRF_K,
-                        k,
+                        candidate_limit,
                     ),
                 )
 
@@ -145,7 +181,7 @@ def _hybrid_search(
         # Return empty evidence set and let callers handle absence gracefully.
         return []
 
-    return _rows_to_dicts(columns, rows)
+    return rerank_documents(query, _rows_to_dicts(columns, rows), k)
 
 
 def retrieve_news(ticker: str | None, query: str, k: int = 5) -> list[dict[str, Any]]:

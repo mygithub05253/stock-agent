@@ -4,6 +4,7 @@ from typing import Any
 
 from stock_agent.config import get_settings
 from stock_agent.db import get_connection
+from stock_agent.rag.retriever import retrieve_news
 
 
 def _format_vector(values: list[float]) -> str:
@@ -21,6 +22,11 @@ def search_similar_chunks(
     stock_code: str | None = None,
     limit: int = 5,
 ) -> list[dict[str, Any]]:
+    """Low-level vector diagnostic helper.
+
+    Qual Agent uses ``retriever.retrieve_news()`` for Hybrid/RRF and optional reranking.
+    Keep this function only for embedding/vector smoke tests that already have a vector.
+    """
     vector = _format_vector(query_embedding)
     stock_filter = "AND d.stock_code = %(stock_code)s" if stock_code else ""
 
@@ -51,3 +57,13 @@ def search_similar_chunks(
             cur.execute(sql, params)
             columns = [desc.name for desc in cur.description]
             return [dict(zip(columns, row, strict=True)) for row in cur.fetchall()]
+
+
+def search_hybrid_chunks(
+    query: str,
+    *,
+    stock_code: str | None = None,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Primary news retrieval helper backed by Hybrid/RRF and optional reranking."""
+    return retrieve_news(ticker=stock_code, query=query, k=limit)
