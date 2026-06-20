@@ -3,11 +3,15 @@
 | 항목 | 값 |
 |------|-----|
 | 작성 목적 | 개발팀 논의와 구현 기준 정리 |
-| 기준 문서 | `docs/prd/PRD_v0.6.md`, `docs/architecture/system_flow.md`, `docs/decisions/ADR-003-six-agent-structure.md` |
+| 기준 코드(SSOT) | [`docs/architecture/pipeline_11node_groundtruth.md`](pipeline_11node_groundtruth.md) · 다이어그램 정본 [`canonical_diagrams.md`](canonical_diagrams.md) |
+| 기준 문서 | `docs/prd/PRD_v0.6.md`, `docs/architecture/system_flow.md`, `docs/decisions/ADR-005-eleven-node-langgraph.md`(ADR-003 supersede) |
 | 관련 HTML | `docs/architecture/multi_agent_architecture_review.html` |
-| 현재 구현 기준 | Phase 1 mock pipeline |
-| 목표 구현 기준 | LangGraph 기반 supervisor graph + 병렬 fan-out |
-| 최종 갱신 | 2026-05-25 |
+| 현재 구현 기준 | **11노드 LangGraph StateGraph 실동작** (Send fan-out·revision loop) |
+| 최종 갱신 | 2026-06-20 (11노드 정합) |
+
+---
+
+> **⚠️ 2026-06-20 11노드 정합 안내**: 본 문서는 초안(2026-05-25) 당시 "6 에이전트(목표)" 기준으로 작성됐으나, 현재 코드는 **11노드 LangGraph가 실동작** 중입니다(`graph/pipeline.py:404-435`). 노드·흐름의 단일 기준은 [`pipeline_11node_groundtruth.md`](pipeline_11node_groundtruth.md)이며, §2 흐름도는 정본 [`canonical_diagrams.md`](canonical_diagrams.md) §1로 갱신했습니다. §4 이하의 에이전트 책임·프롬프트·Tool 설계 원칙은 현재도 유효합니다.
 
 ---
 
@@ -15,14 +19,16 @@
 
 우리 프로젝트의 멀티 에이전트는 자유롭게 대화하는 AI 집단이 아니라, **개인 투자자의 포트폴리오 맥락에서 정량·정성·Peer·리스크를 분리 분석한 뒤, 근거 기반 분석 신호를 생성하는 금융 의사결정 보조 파이프라인**이다.
 
-MVP에서는 완전 분산형 A2A 구조보다 다음 형태가 가장 안전하다.
+완전 분산형 A2A 구조보다 다음 11노드 형태가 가장 안전하며, 현재 이대로 동작한다.
 
 ```text
 Curator
-→ Quant / Qual / Competitor 병렬 분석
-→ Strategist 종합
-→ Guardrail 검증
-→ Tier 1/2/3 출력
+→ RequestClassifier (worker_plan 결정)
+→ Quant / Qual / Competitor (+Macro 조건부) 병렬 fan-out (Send API)
+→ Strategist 종합(join)
+→ InvestmentAnalyst (sLLM 보정)
+→ Guardrail 검증 → Guardrail Apply (PII 차단 + revision loop ≤2)
+→ ResultRenderer → Tier 1/2/3 출력
 ```
 
 핵심 원칙은 다음과 같다.
@@ -82,46 +88,38 @@ Agent별 사용자 context 반영 수준은 다음처럼 나눈다.
 
 ---
 
-## 2. 현재 구현과 목표 구현
+## 2. 현행 구현 (11노드 LangGraph)
 
-### 2.1 현재 구현
-
-현재 `src/stock_agent/graph/pipeline.py`는 다음 순서로 mock agent를 실행한다.
-
-```text
-run_curator
-→ run_quant
-→ run_qual
-→ run_competitor
-→ run_strategist
-→ run_guardrail
-```
-
-현재 구현의 의미는 “최종 구조의 입출력 계약을 검증하는 Phase 1 skeleton”이다. 실제 LangGraph 병렬 실행, 실제 DB 조회, 실제 LLM 호출, 실제 RAG 검색은 아직 연결되지 않았다.
-
-### 2.2 목표 구현
-
-목표 구조는 LangGraph `StateGraph` 기반이다.
+`src/stock_agent/graph/pipeline.py`의 `build_analysis_graph()`는 **11개 노드 `StateGraph`**를 컴파일한다(`:404-435`). classifier가 `worker_plan`을 정하고 `_fanout_workers`(Send API)로 워커를 동적 병렬 실행하며, strategist에서 join한다. 흐름도는 정본([`canonical_diagrams.md`](canonical_diagrams.md) §1)과 동일하다.
 
 ```mermaid
 flowchart TD
-    START([User Query + Profile + Portfolio]) --> INPUT_GUARD[Input Guardrail]
-    INPUT_GUARD --> CURATOR[Curator Agent]
-    CURATOR --> ROUTE{종목 확정?}
-    ROUTE -->|No| RECOMMEND[Candidate Recommendation]
-    ROUTE -->|Yes| FANOUT{Parallel Fan-out}
-    FANOUT --> QUANT[Quant Agent]
-    FANOUT --> QUAL[Qual Agent]
-    FANOUT --> COMP[Competitor Agent]
-    QUANT --> JOIN[Merge]
-    QUAL --> JOIN
-    COMP --> JOIN
-    JOIN --> STRAT[Strategist Agent]
-    RECOMMEND --> STRAT
-    STRAT --> GUARD[Guardrail & Evaluator]
-    GUARD -->|Pass| OUTPUT[Tier 1 / Tier 2 / Tier 3]
-    GUARD -->|Needs revision| STRAT
+    START([START]) --> CUR["① Curator"]
+    CUR --> CLS["② RequestClassifier<br/>worker_plan 결정"]
+    CLS -. "_fanout_workers · Send API" .-> FAN{{"동적 fan-out"}}
+    FAN --> QNT["③ Quant"]
+    FAN --> QAL["④ Qual"]
+    FAN --> CMP["⑤ Competitor"]
+    FAN -. "조건부" .-> MAC["⑥ Macro"]
+    QNT --> STR
+    QAL --> STR
+    CMP --> STR
+    MAC --> STR
+    STR["⑦ Strategist (join)"] --> INV["⑧ InvestmentAnalyst (sLLM)"]
+    INV --> GRD["⑨ Guardrail"]
+    GRD --> GAP["⑩ Guardrail Apply<br/>PII 차단 + revision loop ≤2"]
+    GAP --> RND["⑪ ResultRenderer"]
+    RND --> ENDN([END])
+
+    classDef core fill:#eff6ff,color:#1e3a8a,stroke:#2563eb;
+    classDef worker fill:#ecfdf5,color:#065f46,stroke:#059669;
+    classDef guard fill:#fffbeb,color:#92400e,stroke:#d97706;
+    class CUR,CLS,STR,INV,RND core;
+    class QNT,QAL,CMP,MAC worker;
+    class GRD,GAP guard;
 ```
+
+> 6에이전트 초안 대비 추가/명시된 노드: **RequestClassifier**(라우팅), **Macro**(조건부 워커), **InvestmentAnalyst**(sLLM 보정), **Guardrail Apply**(PII·재생성 루프), **ResultRenderer**(Tier 렌더). 상세 입출력 계약은 [`interface_spec.md`](../interface/interface_spec.md) §3.
 
 ---
 
@@ -549,4 +547,5 @@ src/stock_agent/prompts/
 
 | 날짜 | 변경 |
 |------|------|
+| 2026-06-20 | **11노드 정합** — 헤더/§1/§2를 현행 11노드 LangGraph(Send fan-out·revision loop)로 갱신, 정본 다이어그램 연결, ADR-005 참조. §4 이하 설계 원칙 유지 |
 | 2026-05-25 | 멀티 에이전트 아키텍처, agent 책임, DB 매핑, prompt/tool/guardrail/evaluation 기준 정리 |

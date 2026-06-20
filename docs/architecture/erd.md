@@ -6,7 +6,7 @@
 | 작성일 | 2026-05-10 |
 | 버전 | v0.2 |
 | **원본 출처** | 데이터팀 노션 페이지 (변경 없이 그대로 옮김) |
-| 코드 정합 | 2026-06-13 — 실제 `db/init/` SQL과 대조해 `financial_data`→`financial_statement` 정정, 미구현 테이블(`financial_ratio`·`users`·`holdings`·`analysis_history`) 명시 (강사 #4 코드 우선 피드백 반영) |
+| 코드 정합 | 2026-06-13 — `financial_data`→`financial_statement` 정정, 미구현 테이블 명시. **2026-06-20 — `disclosure_report`·`disclosure_content` DDL 부재(❌ 미구현) 정정, `stock_price` 6투자지표 컬럼 DDL 부재(설계안) 정정, 실제 7테이블 확정** (강사 06-20 코드 우선 피드백 반영) |
 
 ---
 
@@ -25,15 +25,17 @@
 | 테이블 | db/init DDL | 정의 위치 | 비고 |
 |--------|:-----------:|-----------|------|
 | `company` | ✅ 존재 | `001_create_raw_tables.sql` | 종목 마스터 |
-| `stock_price` | ✅ 존재 | `001_...sql` | 일별 시세·시총 |
+| `stock_price` | ⚠️ 부분 | `001_...sql` | DDL은 **close_price·market_cap·volume**만. per·pbr·dividend_yield·외국인/기관순매수·short_ratio **6컬럼은 DDL 부재(설계안)** — §3.2 참고 |
 | `financial_statement` | ✅ 존재 | `001_...sql` | DART 재무(구 표기 `financial_data` 아님) |
-| `disclosure_report` | ✅ 존재 | `001_...sql` | 공시 메타 |
-| `disclosure_content` | ✅ 존재 | `001_...sql` | 공시 원문 |
+| `disclosure_report` | ❌ **미구현** | (DDL 없음) | 강사 06-20 지적 반영 — `db/init/*.sql`에 CREATE 없음. 수집/런타임 경로만 |
+| `disclosure_content` | ❌ **미구현** | (DDL 없음) | 동일 — DDL 부재. §3.6은 설계안 |
 | `rag_documents` | ✅ 존재 | `002_*.sql` | RAG 문서 |
 | `rag_chunks` | ✅ 존재 | `002_*.sql` | RAG 청크 `vector(1024)` |
 | `raw_news` / `raw_macro` | ✅ 존재 | `001_...sql` | 수집 원천 |
 | `financial_ratio` | ❌ 미구현 | (DDL 없음) | 3.4는 **설계안** — 현재 비율은 `financial_statement`에서 파생 계산 |
 | `users` / `holdings` / `analysis_history` | ❌ 미구현 | (DDL 없음) | 런타임 Pydantic 객체만 존재(2.1 제안 테이블) |
+
+> **실제 `db/init/` CREATE TABLE 7종(코드 확정)**: `raw_news`·`raw_macro`·`company`·`stock_price`·`financial_statement`(001) / `rag_documents`·`rag_chunks`(002). 그 외는 모두 설계안(미구현).
 
 ---
 
@@ -66,8 +68,8 @@
 
 ```mermaid
     erDiagram
-    %% 코드 기준 주의: users·holdings·analysis_history·financial_ratio는 db/init DDL 미작성(설계안).
-    %% 실제 존재 테이블은 위 "0.1 구현 상태" 표 참고. 상충 시 SQL 우선.
+    %% 코드 기준 주의(2026-06-20): users·holdings·analysis_history·financial_ratio·disclosure_report·disclosure_content는 db/init DDL 미작성(설계안).
+    %% stock_price 6투자지표(per/pbr/dividend_yield/외국인·기관순매수/short_ratio)도 DDL 부재. 실제 7테이블은 "0.1 구현 상태" 참고. 상충 시 SQL 우선.
 
     users ||--o{ holdings : "보유종목(미구현)"
     users ||--o{ analysis_history : "분석이력(미구현)"
@@ -157,13 +159,13 @@
         int close_price
         bigint market_cap
         bigint volume
-        decimal per
-        decimal pbr
-        decimal dividend_yield
-        bigint foreign_net_buy
-        bigint institutional_net_buy
-        decimal short_ratio
         timestamp created_at
+        decimal per "설계안(DDL부재)"
+        decimal pbr "설계안(DDL부재)"
+        decimal dividend_yield "설계안(DDL부재)"
+        bigint foreign_net_buy "설계안(DDL부재)"
+        bigint institutional_net_buy "설계안(DDL부재)"
+        decimal short_ratio "설계안(DDL부재)"
     }
 
     analysis_history {
@@ -241,6 +243,8 @@ CREATE TABLE company (
 ## 3.2 stock_price
 
 일별 시세 및 투자/수급 지표
+
+> ⚠️ **코드 우선 정합(2026-06-20)**: 실제 `db/init/001_create_raw_tables.sql:44-54`의 `stock_price`는 **`close_price`·`market_cap`·`volume`** 3개 fact 컬럼만 있습니다. 아래 표의 `per`·`pbr`·`dividend_yield`·`foreign_net_buy`·`institutional_net_buy`·`short_ratio` **6개는 DDL에 없는 설계안**입니다(강사 06-20 지적). 현재 PER/PBR은 MCP `market_metrics` 또는 파생 계산으로 충당.
 
 | 컬럼명 | 타입 | 설명 |
 |---------|---------|---------|
@@ -355,7 +359,9 @@ CREATE TABLE financial_ratio (
 
 ---
 
-## 3.5 disclosure_report
+## 3.5 disclosure_report ⚠️ 설계안 (DDL 미작성)
+
+> **코드 우선 정합(2026-06-20)**: `disclosure_report`는 `db/init/`에 **CREATE TABLE이 없습니다**(강사 06-20 지적). 아래는 도입 시 설계안이며, 현재 공시 데이터는 수집 경로·`rag_documents`(source_type=disclosure)로 흐릅니다.
 
 공시 메타데이터
 
@@ -382,7 +388,9 @@ CREATE TABLE disclosure_report (
 
 ---
 
-## 3.6 disclosure_content
+## 3.6 disclosure_content ⚠️ 설계안 (DDL 미작성)
+
+> **코드 우선 정합(2026-06-20)**: `disclosure_content`도 `db/init/`에 CREATE TABLE이 없습니다. 아래는 설계안.
 
 공시 원문 및 AI 요약
 
@@ -529,6 +537,8 @@ ON disclosure_report (corp_code, rcept_dt DESC);
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-20 | v0.3 | **코드 우선 정합** — `disclosure_report`/`disclosure_content` DDL 부재 정정(❌ 미구현), `stock_price` 6투자지표 컬럼 설계안 표기, §0.1 정합표·§2.1 Mermaid·§3.2/3.5/3.6 동기화 (강사 06-20 지적) |
+| 2026-06-13 | v0.2 | `financial_data`→`financial_statement` 정정, 미구현 테이블 명시 |
 | 2026-05-10 | v0.1 | 초안 — 데이터팀 4 테이블 그대로 + PM 추가 제안 3 테이블 + 에이전트 사용 케이스 + ERD Mermaid |
 
 ---

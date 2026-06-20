@@ -29,23 +29,25 @@
 
 ---
 
-## 0.1 현재 구현 상태와 목표 상태
+## 0.1 현행 구현 상태 (11노드 LangGraph)
 
-현재 코드는 Phase 1 검증용 mock pipeline이다. `src/stock_agent/graph/pipeline.py`에서 다음 순서로 함수가 실행된다.
+> 기준 코드(SSOT): [`pipeline_11node_groundtruth.md`](pipeline_11node_groundtruth.md) · 다이어그램 정본 [`canonical_diagrams.md`](canonical_diagrams.md). 본 문서 초안(2026-05-10)의 "mock 순차/목표" 기술은 아래로 갱신됨.
+
+현재 코드는 **11노드 LangGraph `StateGraph`**가 실동작한다(`graph/pipeline.py:404-435`). classifier가 `worker_plan`을 정하고 Send API로 워커를 동적 병렬 실행, strategist에서 join한다.
 
 ```text
-Curator → Quant → Qual → Competitor → Strategist → Guardrail
+Curator → RequestClassifier → [Quant·Qual·Competitor (+Macro 조건부) 병렬]
+→ Strategist(join) → InvestmentAnalyst → Guardrail → Guardrail Apply → ResultRenderer
 ```
 
-목표 구조는 LangGraph `StateGraph` 기반이며, Curator 이후 `Quant`, `Qual`, `Competitor`를 병렬 fan-out으로 실행하고 `Strategist`에서 병합한다.
-
-| 영역 | 현재 | 목표 |
-|------|------|------|
-| Graph | 순차 함수 호출 | LangGraph `StateGraph` |
-| 전문 Agent | mock 결과 반환 | DB/Tool/LLM/RAG 연결 |
-| 병렬화 | 없음 | Quant/Qual/Competitor 병렬 실행 |
-| RAG | `pgvector_store.py` 검색 함수 준비 | Qual Agent 실제 연결 |
-| Guardrail | 금지 표현 일부 치환 | Input/Tool/Output 3계층 guardrail |
+| 영역 | 현행 |
+|------|------|
+| Graph | LangGraph `StateGraph` 11노드 컴파일 |
+| 병렬화 | `_fanout_workers`(Send API) 동적 병렬, macro는 조건부 |
+| 전문 Agent | DB/Tool/LLM/RAG 연결(워커별 try/except 격리) |
+| RAG | Qual이 Hybrid RRF retriever 실호출 |
+| sLLM | InvestmentAnalyst qwen-2.5-7b 보정 |
+| Guardrail | 7게이트 + PII 차단 + recomposer revision loop(≤2) |
 
 ---
 
@@ -74,10 +76,11 @@ sequenceDiagram
     Note over Q,LG: 백엔드에서 멀티에이전트 실행
 
     Q->>LG: AgentState 초기화
-    LG->>LG: 1) Curator (의도 파싱)
-    LG->>LG: 2) Quant + Qual + Competitor (병렬)
-    LG->>LG: 3) Strategist (종합 + 결정)
-    LG->>LG: 4) Guardrail (검증 + 채점)
+    LG->>LG: 1) Curator → RequestClassifier (worker_plan)
+    LG->>LG: 2) Quant + Qual + Competitor (+Macro 조건부) 병렬
+    LG->>LG: 3) Strategist join → InvestmentAnalyst (sLLM)
+    LG->>LG: 4) Guardrail → Guardrail Apply (PII·재생성 ≤2)
+    LG->>LG: 5) ResultRenderer (Tier 1/2/3)
     LG-->>Q: Tier 1/2/3 결과
 
     Q-->>U: 진행 상태 실시간 표시 (st.spinner + st.empty 갱신)
@@ -97,47 +100,44 @@ sequenceDiagram
 
 ## 2. LangGraph 노드 흐름 (Flowchart)
 
-> AI 에이전트들이 어떤 순서로 협업하는지. 6 에이전트 + Send API 병렬 fan-out.
+> AI 에이전트들이 어떤 순서로 협업하는지. **11노드** + Send API 동적 병렬 fan-out. (정본: [`canonical_diagrams.md`](canonical_diagrams.md) §1)
 
 ```mermaid
 flowchart TD
-    START([사용자 분석 요청]) --> CURATOR[🎯 Curator Agent<br/>의도 파싱<br/>종목 확정]
+    START([사용자 분석 요청]) --> CUR[🎯 Curator<br/>의도·종목 확정]
+    CUR --> CLS[🧭 RequestClassifier<br/>worker_plan 결정]
+    CLS -. "Send API" .-> FAN{동적 fan-out}
 
-    CURATOR -->|종목 미지정| RECOMMEND[종목 추천<br/>5~10 후보 카드]
-    RECOMMEND --> CURATOR
-    CURATOR -->|종목 확정| FANOUT{Send API<br/>병렬 분기}
+    FAN --> QNT[📊 Quant]
+    FAN --> QAL[📰 Qual ★<br/>Hybrid RRF RAG]
+    FAN --> CMP[🏢 Competitor<br/>DB→MCP→mock]
+    FAN -. "조건부" .-> MAC[🌍 Macro]
 
-    FANOUT --> QUANT[📊 Quant Worker<br/>5y 밸류에이션<br/>DCF + Multiple]
-    FANOUT --> QUAL[📰 Qual Worker ★<br/>RAG 뉴스/공시<br/>호재·악재 분석]
-    FANOUT --> COMP[🏢 Competitor Agent<br/>동종업계 횡비교<br/>Peer Heatmap]
+    QNT --> STR((join))
+    QAL --> STR
+    CMP --> STR
+    MAC --> STR
 
-    QUANT --> JOIN((merge))
-    QUAL --> JOIN
-    COMP --> JOIN
+    STR --> SYN[🎲 Strategist<br/>가중 합성·자체검토]
+    SYN --> INV[🤖 InvestmentAnalyst<br/>sLLM qwen-2.5-7b 보정]
+    INV --> GRD[🛡 Guardrail<br/>7게이트·PII·RAGAS]
+    GRD --> GAP[🔁 Guardrail Apply<br/>PII 차단 + revision loop ≤2]
+    GAP --> RND[Tier 1/2/3 렌더링]
+    RND --> ENDX([Streamlit 표시 + 다운로드])
 
-    JOIN --> STRAT[🎲 Strategist & Synthesizer<br/>4 입력 종합<br/>BUY/HOLD/SELL 결정<br/>+ 자체 검증]
-
-    STRAT --> GUARD[🛡 Guardrail & Evaluator<br/>PII/욕설/투자권유 차단<br/>RAGAS 자동 채점]
-
-    GUARD -->|통과| RENDER[Tier 1/2/3 렌더링]
-    GUARD -->|차단| RETRY[해당 부분만<br/>재합성 / 마스킹]
-    RETRY --> STRAT
-
-    RENDER --> END([Streamlit 화면 표시<br/>+ 다운로드 가능])
-
-    style QUAL fill:#10b981,color:#fff
-    style STRAT fill:#ef4444,color:#fff
-    style GUARD fill:#6b7280,color:#fff
-    style CURATOR fill:#f59e0b,color:#fff
-    style QUANT fill:#3b82f6,color:#fff
-    style COMP fill:#8b5cf6,color:#fff
+    style QAL fill:#10b981,color:#fff
+    style SYN fill:#ef4444,color:#fff
+    style GRD fill:#6b7280,color:#fff
+    style CUR fill:#f59e0b,color:#fff
+    style QNT fill:#3b82f6,color:#fff
+    style CMP fill:#8b5cf6,color:#fff
 ```
 
 **핵심 설명:**
-- 🎯 Curator → 입력 처리 (사용자에게 가까운 위치)
-- 📊 Quant + 📰 Qual + 🏢 Competitor → **병렬 실행** (LangGraph Send API). 셋이 동시 진행 → 응답 시간 단축
-- 🎲 Strategist → 셋의 결과를 종합해 최종 결정 + 자체 Critic 검증 (Critic을 분리하지 않은 이유는 `docs/decisions/ADR-002-critic-separation.md` 참고)
-- 🛡 Guardrail → 출력 직전 마지막 안전 검사 + 자동 채점 (백그라운드에서 RAGAS 측정)
+- 🎯 Curator → 🧭 RequestClassifier가 scope·depth로 `worker_plan`을 결정 (macro 포함 여부)
+- 📊 Quant + 📰 Qual + 🏢 Competitor (+🌍 Macro 조건부) → **Send API 동적 병렬**. 실행된 워커만 join
+- 🎲 Strategist → 가중 합성 + 자체 검토 → 🤖 InvestmentAnalyst가 sLLM으로 최종 보정 (Critic 분리 안 한 이유는 `ADR-002`)
+- 🛡 Guardrail → 🔁 Guardrail Apply에서 PII 차단·recomposer 재생성 루프(≤2). 백그라운드 RAGAS 채점
 
 ---
 
@@ -351,6 +351,7 @@ flowchart LR
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-20 | v0.3 | **11노드 정합** — §0.1 현행 상태, §1 시퀀스 단계, §2 노드 흐름도를 11노드 LangGraph(classifier·macro·investment_analyst·guardrail_apply·renderer 포함)로 갱신. 정본 다이어그램 연결 |
 | 2026-05-23 | v0.2 | 5월 22일 타깃 예측일 기반 백테스팅 시연 검증 흐름 추가 |
 | 2026-05-10 | v0.1 | 초안 — 4종 Mermaid (Sequence·Flowchart·Architecture·Gantt) + 보너스 Tier 다이어그램 |
 

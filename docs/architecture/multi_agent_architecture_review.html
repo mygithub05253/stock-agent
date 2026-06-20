@@ -209,32 +209,40 @@
     <section id="graph" class="section bg-white">
       <div class="mx-auto max-w-7xl px-5 py-10">
         <div class="mb-6 max-w-3xl">
-          <p class="text-sm font-semibold text-teal-700">LangGraph Target Design</p>
-          <h2 class="mt-1 text-2xl font-black text-slate-950">메인 그래프 구조</h2>
+          <p class="text-sm font-semibold text-teal-700">LangGraph 11-Node (현행 · 2026-06-20)</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-950">메인 그래프 구조 (11노드)</h2>
           <p class="mt-3 text-sm leading-6 text-slate-700">
-            MVP에서는 하나의 supervisor graph 안에서 agent를 관리합니다. A2A 같은 외부 agent protocol은
-            v2에서 외부 report agent, notification agent, backtest agent가 분리될 때 검토하는 것이 안전합니다.
+            하나의 supervisor graph 안에서 11노드를 관리합니다. classifier가 worker_plan을 정하고 Send API로 워커를 동적 병렬 실행,
+            strategist에서 join합니다. macro는 조건부, guardrail_apply에 PII 차단·재생성 루프(≤2)가 있습니다.
+            기준: <code>docs/architecture/pipeline_11node_groundtruth.md</code> · 정본 <code>canonical_diagrams.md</code> §1.
           </p>
         </div>
         <div class="mermaid">
 flowchart TD
-    START["User Query + User Profile + Portfolio"] --> INPUT_GUARD["Input Guardrail"]
-    INPUT_GUARD --> CURATOR["Curator Agent<br/>의도 파악 / 종목 확정 / 후보 추천"]
-    CURATOR --> ROUTE{"종목이 확정됐는가?"}
-    ROUTE -->|"No"| RECOMMEND["Candidate Recommendation<br/>5~10개 후보 생성"]
-    RECOMMEND --> STRATEGIST
-    ROUTE -->|"Yes"| FANOUT{"Parallel Fan-out"}
-    FANOUT --> QUANT["Quant Agent<br/>재무 / 시세 / 밸류에이션"]
-    FANOUT --> QUAL["Qual Agent<br/>뉴스 / 공시 RAG"]
-    FANOUT --> COMP["Competitor Agent<br/>Peer 비교"]
-    QUANT --> JOIN["Merge Analysis Results"]
-    QUAL --> JOIN
-    COMP --> JOIN
-    JOIN --> STRATEGIST["Strategist Agent<br/>종합 / 신호 생성 / 자체 검토"]
-    STRATEGIST --> OUTPUT_GUARD["Guardrail & Evaluator<br/>금융 표현 / 근거 부족 / 출처 검증"]
-    OUTPUT_GUARD -->|"Pass"| RENDER["Tier 1 / Tier 2 / Tier 3 Output"]
-    OUTPUT_GUARD -->|"Needs Revision"| STRATEGIST
-    RENDER --> END["Streamlit UI / Report"]
+    START(["START · User Query + Profile + Portfolio"]) --> CUR["① Curator<br/>의도 파악 / 종목 확정 / 후보 추천"]
+    CUR --> CLS["② RequestClassifier<br/>intent / scope / depth · worker_plan 결정"]
+    CLS -. "_fanout_workers · Send API" .-> FAN{"동적 fan-out"}
+    FAN --> QNT["③ Quant<br/>재무 / 시세 / 밸류에이션"]
+    FAN --> QAL["④ Qual<br/>뉴스 / 공시 Hybrid RRF RAG"]
+    FAN --> CMP["⑤ Competitor<br/>Peer 비교 · DB→MCP→mock"]
+    FAN -. "scope∈{portfolio,sector} 또는 single_stock+섹터" .-> MAC["⑥ Macro<br/>거시경제 · 조건부"]
+    QNT --> STR["⑦ Strategist<br/>join / 가중 합성 / 자체 검토"]
+    QAL --> STR
+    CMP --> STR
+    MAC --> STR
+    STR --> INV["⑧ InvestmentAnalyst<br/>sLLM qwen-2.5-7b 보정"]
+    INV --> GRD["⑨ Guardrail<br/>7게이트 / 근거 / 출처 / PII"]
+    GRD --> GAP["⑩ Guardrail Apply<br/>PII 차단 + revision loop ≤2"]
+    GAP --> RND["⑪ ResultRenderer<br/>Tier 1 / 2 / 3"]
+    RND --> ENDX(["END · Streamlit UI / Report"])
+    GAP -. "needs_revision / !passed" .-> STR
+
+    classDef core fill:#eff6ff,color:#1e3a8a,stroke:#2563eb;
+    classDef worker fill:#ecfdf5,color:#065f46,stroke:#059669;
+    classDef guard fill:#fffbeb,color:#92400e,stroke:#d97706;
+    class CUR,CLS,STR,INV,RND core;
+    class QNT,QAL,CMP,MAC worker;
+    class GRD,GAP guard;
         </div>
       </div>
     </section>

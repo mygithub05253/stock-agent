@@ -71,14 +71,14 @@
       </p>
       <div class="meta-row">
         <dl class="stat"><dt>전체 문서</dt><dd>22종</dd></dl>
-        <dl class="stat"><dt>완료</dt><dd id="cntDone">6</dd></dl>
+        <dl class="stat"><dt>완료</dt><dd id="cntDone">12</dd></dl>
         <dl class="stat"><dt>진행중</dt><dd id="cntProg">0</dd></dl>
-        <dl class="stat"><dt>대기</dt><dd id="cntWait">17</dd></dl>
-        <dl class="stat"><dt>강사 항목4</dt><dd>캡 해제 ✅ (P1로)</dd></dl>
+        <dl class="stat"><dt>대기</dt><dd id="cntWait">11</dd></dl>
+        <dl class="stat"><dt>강사 항목4</dt><dd>캡 해제 ✅ · 드리프트 정합 ✅</dd></dl>
       </div>
       <div class="overall">
-        <div class="overall-track"><div class="overall-fill" style="width:30%"></div></div>
-        <p class="phase-sub" style="margin-top:6px;">전체 진척 ≈ 30% · <strong>Phase 0 완료 — 유스케이스·인터페이스 부재 2종 해소 → 강사 항목4 캡 3 해제</strong>. 다음 Phase 1 드리프트 정합</p>
+        <div class="overall-track"><div class="overall-fill" style="width:52%"></div></div>
+        <p class="phase-sub" style="margin-top:6px;">전체 진척 ≈ 52% · <strong>Phase 0(캡 해제) + Phase 1(드리프트 정합) 완료</strong> — 아키텍처·시퀀스·에이전트설계·ADR-005·ERD·리뷰HTML 11노드/실DDL 정합. 다음 Phase 2 AI 문서</p>
       </div>
     </div>
   </header>
@@ -123,11 +123,12 @@
         <thead><tr><th style="width:24%">문서</th><th style="width:9%">상태</th><th style="width:13%">형식</th><th style="width:27%">기준 코드 / DoD</th><th>비고</th></tr></thead>
         <tbody>
           <tr><td><div class="doc-name">11노드 그라운드 트루스 (SSOT)</div><div class="doc-path">docs/architecture/pipeline_11node_groundtruth.md</div></td><td><span class="tag t-done">완료</span></td><td>md</td><td>pipeline.py:404-435 직접 추출</td><td>모든 정합의 기준점</td></tr>
-          <tr><td><div class="doc-name">멀티에이전트 아키텍처</div><div class="doc-path">docs/architecture/multi_agent_architecture.md</div></td><td><span class="tag t-wait">대기</span></td><td>md + mermaid</td><td>6→11노드 컴포넌트도 교정</td><td>드리프트 핵심</td></tr>
-          <tr><td><div class="doc-name">시스템 시퀀스 흐름</div><div class="doc-path">docs/architecture/system_flow.md</div></td><td><span class="tag t-wait">대기</span></td><td>md + mermaid</td><td>fan-out·join·revision loop 반영</td><td>—</td></tr>
-          <tr><td><div class="doc-name">에이전트 상세 설계</div><div class="doc-path">docs/architecture/agent_design.md</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>노드별 상세 11개</td><td>—</td></tr>
-          <tr><td><div class="doc-name">ADR-005 (11노드 전환)</div><div class="doc-path">docs/decisions/ADR-005-*.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>ADR-003 supersede 표기</td><td>—</td></tr>
-          <tr><td><div class="doc-name">ERD 정정</div><div class="doc-path">docs/architecture/erd.md</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>disclosure DDL·stock_price 6컬럼 정합 (db/init/*.sql 기준)</td><td>강사 신규 지적</td></tr>
+          <tr><td><div class="doc-name">멀티에이전트 아키텍처</div><div class="doc-path">docs/architecture/multi_agent_architecture.md</div></td><td><span class="tag t-done">완료</span></td><td>md + mermaid</td><td>헤더·§1·§2 11노드 정합 + 정본 흐름도</td><td>드리프트 핵심</td></tr>
+          <tr><td><div class="doc-name">시스템 시퀀스 흐름</div><div class="doc-path">docs/architecture/system_flow.md</div></td><td><span class="tag t-done">완료</span></td><td>md + mermaid</td><td>§0.1·§1·§2 fan-out·join·revision loop 반영</td><td>—</td></tr>
+          <tr><td><div class="doc-name">에이전트 상세 설계</div><div class="doc-path">docs/architecture/agent_design.md</div></td><td><span class="tag t-done">완료</span></td><td>md</td><td>11노드 요약표 + 신설 5노드 명시</td><td>—</td></tr>
+          <tr><td><div class="doc-name">ADR-005 (11노드 전환)</div><div class="doc-path">docs/decisions/ADR-005-eleven-node-langgraph.md</div></td><td><span class="tag t-done">완료</span></td><td>md</td><td>11노드 전환 결정 + ADR-003 supersede</td><td>—</td></tr>
+          <tr><td><div class="doc-name">ERD 정정</div><div class="doc-path">docs/architecture/erd.md</div></td><td><span class="tag t-done">완료</span></td><td>md</td><td>disclosure DDL 부재·stock_price 6컬럼 설계안 정정 (실 7테이블 확정)</td><td>강사 신규 지적</td></tr>
+          <tr><td><div class="doc-name">아키텍처 리뷰 HTML 정합</div><div class="doc-path">docs/architecture/multi_agent_architecture_review.html</div></td><td><span class="tag t-done">완료</span></td><td>html</td><td>Mermaid 11노드 교체(macro+4노드 보강)</td><td>시각자료 1종</td></tr>
         </tbody>
       </table>
     </section>
