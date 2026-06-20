@@ -126,3 +126,55 @@ flowchart LR
 | `docs/ai/orchestration.md` (Phase 2) | §1, §2 |
 
 > 교체 시 각 문서 상단에 `> 다이어그램 정본: docs/architecture/canonical_diagrams.md` 를 남긴다.
+
+---
+
+## 5. 유스케이스 다이어그램
+
+> 상세: [`docs/usecase/usecase_spec.md`](../usecase/usecase_spec.md). 액터·유스케이스·외부 시스템 관계.
+
+```mermaid
+flowchart LR
+    investor(("👤 개인 투자자"))
+    evaluator(("🛠 평가 관리자"))
+
+    subgraph SYS["stock-agent"]
+      S1["UC-S1 투자성향 온보딩·프로필"]
+      S2["UC-S2 포트폴리오 입력"]
+      A1["UC-A1 보유 종목 검토"]
+      A2["UC-A2 신규/추가 종목 추천"]
+      A3["UC-A3 리스크 점검"]
+      A4["UC-A4 매도 판단"]
+      A5["UC-A5 포트폴리오 전반 점검"]
+      O1["UC-O1 산출물 다운로드"]
+      M1["UC-M1 골든셋 평가"]
+    end
+
+    investor --> S1 --> S2
+    investor --> A1
+    investor --> A2
+    investor --> A3
+    investor --> A4
+    investor --> A5
+    investor --> O1
+    evaluator --> M1
+
+    A1 -. include .-> S2
+    A5 -. include .-> S2
+    O1 -. extend .-> A1
+
+    DART[("DART")]; KRX[("pykrx/KRX")]; NEWS[("뉴스")]; ECOS[("ECOS")]; MCP[("MCP peer")]; LLM[("LLM")]
+    A1 --- DART
+    A1 --- KRX
+    A1 --- NEWS
+    A2 --- MCP
+    A5 --- ECOS
+    A1 --- LLM
+
+    classDef uc fill:#eff6ff,color:#1e3a8a,stroke:#2563eb;
+    classDef ext fill:#f1f5f9,color:#334155,stroke:#94a3b8;
+    class S1,S2,A1,A2,A3,A4,A5,O1,M1 uc;
+    class DART,KRX,NEWS,ECOS,MCP,LLM ext;
+```
+
+> `include`(점선): 분석 유스케이스는 포트폴리오 입력을 전제로 한다. `extend`: 다운로드는 분석 결과가 있을 때 확장된다.
