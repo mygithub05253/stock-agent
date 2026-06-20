@@ -130,9 +130,14 @@ def _node_span(name: str) -> dict[str, list[str]]:
 
 
 def _curator_node(state: AnalysisGraphState) -> dict[str, Any]:
-    next_state = run_curator(_agent_state(state))
-    return {**_patch_from_agent(next_state, "curator"), **_node_span("curator")}
-
+    try:
+        next_state = run_curator(_agent_state(state))
+        return {**_patch_from_agent(next_state, "curator"), **_node_span("curator")}
+    except Exception as exc:
+        return {
+            "worker_errors": [f"curator: {exc.__class__.__name__}: {exc}"],
+            **_node_span("curator"),
+        }
 
 def _classifier_node(state: AnalysisGraphState) -> dict[str, Any]:
     next_state = run_request_classifier(_agent_state(state))
