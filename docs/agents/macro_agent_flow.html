@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Macro Agent 설명</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --ink: #111827;
+    --muted: #64748b;
+    --line: #d9e2ef;
+    --panel: #ffffff;
+    --cyan: #0891b2;
+    --green: #16a34a;
+    --orange: #ea580c;
+    --red: #dc2626;
+    --violet: #7c3aed;
+    --blue: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 24px 48px;
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  main { max-width: 1080px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
+  h2 { margin: 0 0 12px; font-size: 18px; }
+  h3 { margin: 0 0 8px; font-size: 15px; }
+  p { margin: 0; color: var(--muted); line-height: 1.65; font-size: 14px; }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    background: #eef2f7;
+    border: 1px solid #d8e2ef;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 12px;
+    color: #25324a;
+  }
+  header { margin-bottom: 24px; }
+  .subtitle { color: var(--muted); font-size: 14px; }
+  .dashboard {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+  }
+  .compact { margin: 0; }
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .step {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: #fbfdff;
+    min-height: 142px;
+    position: relative;
+  }
+  .step::after {
+    content: ">";
+    position: absolute;
+    top: 50%;
+    right: -9px;
+    transform: translateY(-50%);
+    width: 16px;
+    text-align: center;
+    color: #94a3b8;
+    background: var(--bg);
+    font-weight: 700;
+  }
+  .step:last-child::after { display: none; }
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #fff;
+  }
+  .cyan   { background: var(--cyan); }
+  .green  { background: var(--green); }
+  .orange { background: var(--orange); }
+  .red    { background: var(--red); }
+  .violet { background: var(--violet); }
+  .blue   { background: var(--blue); }
+  .slate  { background: #475569; }
+  .step p { font-size: 12px; line-height: 1.55; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .metric {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+    background: #fbfdff;
+  }
+  .metric .label { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+  .metric .value { font-size: 15px; font-weight: 700; line-height: 1.35; }
+  .metric .sub   { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.65; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; color: #334155; font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+  .callout {
+    border-left: 4px solid var(--blue);
+    background: #eff6ff;
+    color: #1e3a8a;
+    padding: 12px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tag {
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 2px 1px;
+  }
+  .tag-blue  { background: #dbeafe; color: #1d4ed8; }
+  .tag-cyan  { background: #cffafe; color: #0e7490; }
+  .tag-green { background: #dcfce7; color: #16a34a; }
+  .tag-muted { background: #f1f5f9; color: #64748b; }
+  .dimmed { opacity: 0.4; }
+  @media (max-width: 960px) {
+    .dashboard, .flow, .grid-3, .grid-4, .split { grid-template-columns: 1fr; }
+    .step::after { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <header>
+    <h1>Macro Agent 거시경제 분석 흐름</h1>
+    <p class="subtitle">범위: ECOS API 데이터 수집, DB 적재, 업종별 거시경제 점수 산출, LangGraph Send API 동적 라우팅</p>
+  </header>
+
+  <section class="dashboard">
+    <div class="section compact">
+      <h2>Agent 목적</h2>
+      <p>
+        Macro Agent는 한국은행 ECOS API에서 수집한 거시경제 지표를 기반으로
+        종목이 속한 업종의 투자 환경을 평가합니다.
+        금리·인플레이션·경제성장·시장심리 4개 영역을 0~100점으로 점수화하고
+        업종별 환율·금리 민감도를 가중치로 보정해 <code>MacroResult</code>를 Strategist에 전달합니다.
+      </p>
+    </div>
+    <div class="section compact">
+      <h2>핵심 개선점</h2>
+      <p>
+        기존에는 단일 종목 질문에서 Macro가 무조건 스킵됐습니다.
+        업종이 확인된 종목이라면 거시경제 환경이 주가에 직접 영향을 미치므로
+        <code>_worker_plan</code> 조건을 수정해 <strong>single_stock도 Macro 분석에 포함</strong>되도록 했습니다.
+        또한 LangGraph <code>Send API</code>를 적용해 Macro 노드를 진짜 동적 병렬 실행 구조로 전환했습니다.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>1. 처리 흐름</h2>
+    <div class="flow">
+      <div class="step">
+        <span class="badge cyan">Input</span>
+        <h3>Curator 결과 수신</h3>
+        <p><code>sector</code>(업종명)를 AgentState에서 읽습니다. 업종이 없으면 공통 지표로 분석합니다.</p>
+      </div>
+      <div class="step">
+        <span class="badge green">Map</span>
+        <h3>업종명 정규화</h3>
+        <p>"반도체" → <code>반도체IT</code>, "은행" → <code>금융</code> 등 intake.py 업종명을 macro_tool 키로 변환합니다.</p>
+      </div>
+      <div class="step">
+        <span class="badge blue">Fetch</span>
+        <h3>DB 조회</h3>
+        <p><code>raw_macro</code>에서 업종 관련 지표 최신값과 이전 시점값을 조회합니다. 실패 시 mock fallback으로 대체합니다.</p>
+      </div>
+      <div class="step">
+        <span class="badge orange">Score</span>
+        <h3>4영역 점수화</h3>
+        <p>금리·CPI·GDP·NSI를 논문 기반 임계값과 비교해 점수를 가감합니다. 업종별 환율·금리 보정치를 추가 적용합니다.</p>
+      </div>
+      <div class="step">
+        <span class="badge violet">RoC</span>
+        <h3>변화율 보정</h3>
+        <p>금리·CPI 전기 대비 변화율(RoC)을 계산해 추세 방향을 점수에 반영합니다. 주기 불일치 시 생략합니다.</p>
+      </div>
+      <div class="step">
+        <span class="badge slate">Output</span>
+        <h3>MacroResult</h3>
+        <p>score, signal(BUY/HOLD/SELL), indicators, reasons, risks, sector를 Strategist로 전달합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>2. 데이터 수집 구조 (collector.py)</h2>
+    <table>
+      <thead>
+        <tr><th>단계</th><th>파일</th><th>설명</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>API 요청</td>
+          <td><code>datas/macro/collector.py</code></td>
+          <td>한국은행 ECOS API에서 최근 6개월치 데이터를 수집합니다. 지표별 주기(일/월/분기/연)를 자동 변환합니다.</td>
+        </tr>
+        <tr>
+          <td>지표 수집</td>
+          <td><code>INDICATORS</code> 딕셔너리</td>
+          <td>기준금리·환율·코스피·CPI·GDP·뉴스심리지수 등 15개 지표를 업종별 매핑과 함께 정의합니다.</td>
+        </tr>
+        <tr>
+          <td>DB 저장</td>
+          <td><code>raw_macro</code> 테이블</td>
+          <td><code>ON CONFLICT DO NOTHING</code>으로 중복 방지. source=ECOS, indicator_code, observed_at, payload(JSON) 구조입니다.</td>
+        </tr>
+        <tr>
+          <td>DB 조회</td>
+          <td><code>src/stock_agent/tools/macro_tool.py</code></td>
+          <td>업종별 <code>SECTOR_INDICATORS</code> 목록으로 관련 지표만 최신값 조회합니다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="section">
+    <h2>3. 업종별 지표 (현재 구현: 반도체IT · 금융)</h2>
+    <table>
+      <thead>
+        <tr><th>업종</th><th>핵심 지표</th><th>보정 계수</th><th>비고</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>반도체IT</strong> <span class="tag tag-cyan">구현</span></td>
+          <td>
+            <span class="tag tag-blue">환율</span>
+            <span class="tag tag-blue">수출금액지수</span>
+            <span class="tag tag-blue">경상수지</span>
+            <span class="tag tag-blue">뉴스심리지수</span>
+          </td>
+          <td>환율 <span class="tag tag-green">+10</span> / 금리 <span class="tag" style="background:#fee2e2;color:#dc2626;">-10</span></td>
+          <td style="color:var(--muted);font-size:12px;">원화 약세 시 수출 유리. PLOS ONE (2024)</td>
+        </tr>
+        <tr>
+          <td><strong>금융</strong> <span class="tag tag-cyan">구현</span></td>
+          <td>
+            <span class="tag tag-blue">기준금리</span>
+            <span class="tag tag-blue">국고채3년</span>
+            <span class="tag tag-blue">예금금리</span>
+            <span class="tag tag-blue">M2통화</span>
+          </td>
+          <td>환율 <span class="tag" style="background:#fee2e2;color:#dc2626;">-5</span> / 금리 <span class="tag tag-green">+15</span></td>
+          <td style="color:var(--muted);font-size:12px;">고금리 환경이 순이자마진에 유리. PLOS ONE (2024)</td>
+        </tr>
+        <tr class="dimmed">
+          <td><strong>자동차제조</strong> <span class="tag tag-muted">확장 가능</span></td>
+          <td><span class="tag tag-muted">환율</span> <span class="tag tag-muted">산업생산지수</span></td>
+          <td>환율 +8 / 금리 -8</td>
+          <td style="color:var(--muted);font-size:12px;">수출 비중 높아 환율 민감도 2위</td>
+        </tr>
+        <tr class="dimmed">
+          <td><strong>건설부동산</strong> <span class="tag tag-muted">확장 가능</span></td>
+          <td><span class="tag tag-muted">GDP성장률</span> <span class="tag tag-muted">국고채3년</span></td>
+          <td>금리 -20</td>
+          <td style="color:var(--muted);font-size:12px;">고금리 시 분양·대출 부담 직결</td>
+        </tr>
+        <tr class="dimmed">
+          <td><strong>에너지화학</strong> <span class="tag tag-muted">확장 가능</span></td>
+          <td><span class="tag tag-muted">국제유가</span> <span class="tag tag-muted">생산자물가</span></td>
+          <td>환율 +5 / 금리 -8</td>
+          <td style="color:var(--muted);font-size:12px;">원자재 가격과 직결</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:10px;font-size:12px;color:var(--muted);">📎 데이터 출처: 한국은행 ECOS API · 보정 계수 근거: PLOS ONE (2024) 한국 섹터별 거시경제 영향 연구 · 흐린 행은 확장 예정 업종</p>
+  </section>
+
+  <section class="section">
+    <h2>4. 점수 계산 (4영역 + 섹터 보정)</h2>
+    <div class="grid-4">
+      <div class="metric">
+        <div class="label">영역 1 — 금리</div>
+        <div class="value">±15pt</div>
+        <div class="sub">≤2.5% → +15 / ≥3.5% → -15<br><span style="font-size:10px;">Yang et al. (2018) Applied Economics</span></div>
+      </div>
+      <div class="metric">
+        <div class="label">영역 2 — 인플레이션</div>
+        <div class="value">±15pt</div>
+        <div class="sub">CPI ≤2% → +10 / ≥4% → -15<br><span style="font-size:10px;">한국은행 물가안정목표 (2019) / Mishkin (2007)</span></div>
+      </div>
+      <div class="metric">
+        <div class="label">영역 3 — 경제성장</div>
+        <div class="value">±20pt</div>
+        <div class="sub">GDP ≥2% → +10 / ≤0% → -20<br><span style="font-size:10px;">IMF WEO (2024) / Miyazaki et al. (2026)</span></div>
+      </div>
+      <div class="metric">
+        <div class="label">영역 4 — 시장심리</div>
+        <div class="value">±5pt</div>
+        <div class="sub">NSI ≥110 → +5 / ≤90 → -5<br><span style="font-size:10px;">한국은행 뉴스심리지수 기술문서 (2021)</span></div>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <table>
+        <thead>
+          <tr><th>Signal</th><th>점수 범위</th><th>의미</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong style="color:var(--green)">BUY</strong></td><td>70점 이상</td><td>거시경제 환경이 투자에 우호적</td></tr>
+          <tr><td><strong style="color:var(--orange)">HOLD</strong></td><td>40~69점</td><td>중립적 환경, 현재 포지션 유지</td></tr>
+          <tr><td><strong style="color:var(--red)">SELL</strong></td><td>39점 이하</td><td>거시경제 리스크 높음, 비중 축소 고려</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section split">
+    <div>
+      <h2>5. Fallback 설계</h2>
+      <ul>
+        <li>DB 연결 실패·timeout 시 mock 데이터(기준금리 3.5%, 환율 1380원 등)로 분석을 계속합니다.</li>
+        <li>fallback 사용 시 reasons에 "DB 연결 실패로 데모용 추정치 사용" 경고를 포함합니다.</li>
+        <li>Guardrail이 fallback 문구를 감지해 최종 출력 신뢰도 경고에 반영합니다.</li>
+        <li>실패를 숨기지 않고 "분석은 계속하되 신뢰도는 낮춘다"는 구조입니다.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>6. LangGraph Send API 적용</h2>
+      <ul>
+        <li>기존: <code>_route_workers</code>가 항상 4개 노드 고정 라우팅 → Macro 내부에서 스킵 처리.</li>
+        <li>변경: <code>_fanout_workers</code>가 <code>worker_plan</code> 기반으로 <code>Send</code>를 동적 발송.</li>
+        <li>Macro가 <code>worker_plan</code>에 없으면 노드 실행 자체가 안 됨 → 불필요한 실행 제거.</li>
+        <li>single_stock도 업종이 확인되면 <code>worker_plan</code>에 macro 포함 → 거시 분석 적용.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>7. 발표 때 말할 핵심</h2>
+    <p class="callout">
+      Macro Agent는 한국은행 ECOS API 데이터를 업종별 거시경제 투자 신호로 변환하는 Agent입니다.
+      이번 작업으로 단일 종목 질문에서도 업종이 확인되면 Macro 분석이 포함되고,
+      LangGraph Send API를 통해 Quant·Qual·Competitor와 진짜 병렬로 실행됩니다.
+      DB 연결 실패 시에도 fallback mock 데이터로 파이프라인이 멈추지 않으며,
+      fallback 사용 여부는 reasons에 명시되어 Guardrail까지 신뢰도 정보가 전달됩니다.
+    </p>
+  </section>
+
+  <section class="section">
+    <h2>8. 담당 범위 파일</h2>
+    <table>
+      <thead>
+        <tr><th>파일</th><th>역할</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>datas/macro/collector.py</code></td>
+          <td>ECOS API 15개 지표 수집 및 raw_macro 테이블 적재 (759건)</td>
+        </tr>
+        <tr>
+          <td><code>src/stock_agent/tools/macro_tool.py</code></td>
+          <td>업종별 지표 목록 정의 및 DB 조회 Tool</td>
+        </tr>
+        <tr>
+          <td><code>src/stock_agent/agents/macro.py</code></td>
+          <td>4영역 점수화·섹터 보정·RoC 계산·fallback 처리·MacroResult 생성</td>
+        </tr>
+        <tr>
+          <td><code>src/stock_agent/graph/pipeline.py</code></td>
+          <td>_worker_plan 조건 수정 (single_stock macro 포함) / Send API fan-out 적용</td>
+        </tr>
+        <tr>
+          <td><code>src/stock_agent/schemas/analysis.py</code></td>
+          <td>MacroResult 클래스 및 AgentState.macro 필드 정의</td>
+        </tr>
+        <tr>
+          <td><code>tests/agents/macro_README.md</code></td>
+          <td>Macro Agent 5/5 테스트 통과 기록</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+</main>
+</body>
+</html>
