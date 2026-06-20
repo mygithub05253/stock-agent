@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 시각자료(HTML) 인덱스 + 수정 포인트 맵</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --card: #fff; --border: #e2e8f0; --text: #0f172a; --muted: #64748b;
+      --blue: #2563eb; --blue-soft: #eff6ff; --emerald: #059669; --emerald-soft: #ecfdf5;
+      --amber: #d97706; --amber-soft: #fffbeb; --red: #dc2626; --red-soft: #fef2f2;
+      --violet: #7c3aed; --violet-soft: #f5f3ff; --slate-soft: #f1f5f9; --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Pretendard, "Noto Sans KR", system-ui, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px; }
+    code { border-radius: 5px; background: var(--slate-soft); padding: 1px 5px; color: #334155; font-size: 0.88em; word-break: break-all; }
+    header { border-bottom: 1px solid var(--border); background: #fff; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 16px; }
+    .eyebrow { color: var(--blue); font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    h1 { font-size: 23px; font-weight: 800; margin-top: 4px; }
+    .lede { color: var(--muted); margin-top: 8px; max-width: 900px; font-size: 14px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 22px 16px 64px; }
+    .howto { border: 1px solid #bfdbfe; background: var(--blue-soft); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 26px; }
+    .howto h2 { font-size: 15px; color: #1e3a8a; }
+    .howto p { font-size: 13.5px; color: #1e3a8a; margin-top: 6px; }
+    .howto pre { margin-top: 10px; background: #fff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 12px;
+      font-size: 12.5px; color: #1e293b; white-space: pre-wrap; font-family: Consolas, monospace; }
+    .group { margin-top: 26px; }
+    .group-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .gbadge { border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 800; }
+    .g-fix { background: var(--red-soft); color: var(--red); }
+    .g-empty { background: var(--amber-soft); color: var(--amber); }
+    .g-domain { background: var(--blue-soft); color: var(--blue); }
+    .g-ok { background: var(--emerald-soft); color: var(--emerald); }
+    .g-hist { background: var(--slate-soft); color: var(--muted); }
+    .group-title { font-size: 17px; font-weight: 800; }
+    .group-sub { color: var(--muted); font-size: 13px; }
+    .cards { display: grid; gap: 12px; margin-top: 12px; }
+    .vcard { border: 1px solid var(--border); border-radius: var(--radius); background: #fff; padding: 14px 16px; }
+    .vcard.fix { border-left: 4px solid var(--red); }
+    .vcard.empty { border-left: 4px solid var(--amber); }
+    .vcard.domain { border-left: 4px solid var(--blue); }
+    .vcard.ok { border-left: 4px solid var(--emerald); }
+    .vcard.hist { border-left: 4px solid #cbd5e1; }
+    .vtop { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+    .vname { font-weight: 800; font-size: 15px; }
+    .vpath { display: block; margin-top: 2px; }
+    .vwhat { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .fixbox { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 9px; }
+    .fixlabel { font-size: 11px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; color: var(--red); }
+    .vcard.empty .fixlabel { color: var(--amber); }
+    .vcard.domain .fixlabel { color: var(--blue); }
+    .vcard.ok .fixlabel, .vcard.hist .fixlabel { color: var(--muted); }
+    .fixbox ul { margin: 6px 0 0 17px; font-size: 13px; }
+    .fixbox li { margin-top: 4px; }
+    .pin { display: inline-block; background: var(--slate-soft); border-radius: 5px; padding: 0 5px; font-family: Consolas, monospace; font-size: 12px; color: #334155; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">PM 문서화 트랙 · 시각자료 허브 · 2026-06-20</p>
+      <h1>시각자료(HTML) 인덱스 + 수정 포인트 맵</h1>
+      <p class="lede">
+        프로젝트의 모든 시각화 HTML을 한곳에 모으고, 11노드 기준에서 <strong>어디를 어떻게 고쳐야 하는지</strong>를 파일·라인 단위로 명시했습니다.
+        Codex에게 카드의 "수정 지시"를 그대로 복사해 전달하면 됩니다. 다이어그램 정본은
+        <code>docs/architecture/canonical_diagrams.md</code>, 노드 기준점은 <code>docs/architecture/pipeline_11node_groundtruth.md</code>.
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <section class="howto">
+      <h2>🧭 Codex에게 지시하는 법</h2>
+      <p>아래 카드의 <strong>경로 + 라인 + 수정 지시</strong>를 그대로 붙여넣고, 정본 다이어그램은 canonical_diagrams.md 섹션 번호로 참조시키세요. 예시 프롬프트:</p>
+      <pre>docs/architecture/multi_agent_architecture_review.html 의 222~233행 Mermaid 그래프를
+docs/architecture/canonical_diagrams.md §1 "마스터 파이프라인 플로우차트(11노드)" 코드로 전면 교체해줘.
+- 현재 fan-out에 Macro 노드가 빠져 있고, Strategist 다음의 InvestmentAnalyst·Guardrail·Guardrail Apply·ResultRenderer 4개가 누락돼 있어.
+- 노드 라벨과 점선(조건부) 표기, classDef 색상까지 정본 그대로 유지해줘.
+- 파일 상단 설명 문구의 "6 에이전트"류 표현도 "11노드"로 같이 고쳐줘.</pre>
+    </section>
+
+    <!-- 🔴 11노드 갱신 필요 -->
+    <section class="group">
+      <div class="group-head"><span class="gbadge g-fix">🔴 11노드 갱신 필요</span><span class="group-title">드리프트 — 구 6/9 에이전트 도식</span><span class="group-sub">canonical §1/§2로 교체</span></div>
+      <div class="cards">
+
+        <article class="vcard fix">
+          <div class="vtop"><span class="vname">멀티에이전트 아키텍처 리뷰</span></div>
+          <code class="vpath">docs/architecture/multi_agent_architecture_review.html</code>
+          <p class="vwhat">LangGraph 흐름·AgentState·에이전트 책임을 담은 핵심 아키텍처 리뷰 페이지. Mermaid 그래프 포함.</p>
+          <div class="fixbox">
+            <span class="fixlabel">Codex 수정 지시</span>
+            <ul>
+              <li><span class="pin">222–233행</span> Mermaid 그래프를 <strong>canonical §1</strong>로 전면 교체. 현재 fan-out에 <strong>Macro 누락</strong>, Strategist 이후 <strong>InvestmentAnalyst·Guardrail·Guardrail Apply·ResultRenderer 4노드 누락</strong>.</li>
+              <li>본문 "6 에이전트/agent" 서술을 11노드로 보완, revision loop·조건부 macro 한 줄씩 추가.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="vcard fix">
+          <div class="vtop"><span class="vname">시스템 아키텍처 대시보드</span></div>
+          <code class="vpath">docs/architecture/system_architecture_dashboard.html</code>
+          <p class="vwhat">발표·온보딩용 인터랙티브 시스템 구성도. nav·헤드라인에 "6 에이전트" 표기.</p>
+          <div class="fixbox">
+            <span class="fixlabel">Codex 수정 지시</span>
+            <ul>
+              <li><span class="pin">46행</span> nav "6 에이전트" → "11 노드"(앵커 <code>#agents</code> 유지).</li>
+              <li><span class="pin">60행</span> "6 에이전트 분석 시스템" → "11노드 LangGraph 분석 시스템".</li>
+              <li><code>#agents</code> 섹션 카드에 <strong>Macro·InvestmentAnalyst·Guardrail Apply·ResultRenderer</strong> 추가(총 11). 내부 Mermaid가 있으면 canonical §1로 교체.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="vcard fix">
+          <div class="vtop"><span class="vname">멀티에이전트 PM 리뷰</span></div>
+          <code class="vpath">docs/architecture/multi_agent_pm_review.html</code>
+          <p class="vwhat">PM 관점 아키텍처 리뷰(구 6에이전트 시기 산출물 가능성).</p>
+          <div class="fixbox">
+            <span class="fixlabel">Codex 수정 지시</span>
+            <ul>
+              <li>노드/에이전트 목록을 11노드 기준으로 정합 검토. 도식 있으면 canonical §1로 교체. (먼저 파일 정독 후 드리프트 여부 확정)</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="vcard fix">
+          <div class="vtop"><span class="vname">에이전트 흐름 대시보드</span></div>
+          <code class="vpath">docs/architecture/agent_flow_dashboard.html</code>
+          <p class="vwhat">발표·온보딩용 — 노드 클릭 시 입출력·데이터소스·폴백 상세. README가 "9 에이전트"로 소개.</p>
+          <div class="fixbox">
+            <span class="fixlabel">Codex 수정 지시</span>
+            <ul>
+              <li>9개 구성을 <strong>11노드</strong>로 정합: <strong>Guardrail Apply·ResultRenderer</strong>를 별도 노드로 추가, classifier의 worker_plan 분기·조건부 macro 반영. "현재 vs 목표(LangGraph)" 비교가 이미 충족됐으므로 "목표 달성"으로 갱신.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="vcard fix">
+          <div class="vtop"><span class="vname">중간발표 자료</span></div>
+          <code class="vpath">docs/presentation/midterm_presentation.html</code>
+          <p class="vwhat">중간 발표 슬라이드. ADR-003 6-에이전트 채택 근거 인용.</p>
+          <div class="fixbox">
+            <span class="fixlabel">Codex 수정 지시</span>
+            <ul>
+              <li><span class="pin">1028행</span> "ADR-003: 6-에이전트 구조 채택" 옆에 <strong>"→ ADR-005에서 11노드로 전환(superseded)"</strong> 각주 추가. (과거 발표 이력이므로 본문 통째 교체보다 각주 보완 권장)</li>
+            </ul>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+    <!-- 🟡 빈/리다이렉트 -->
+    <section class="group">
+      <div class="group-head"><span class="gbadge g-empty">🟡 빈/리다이렉트</span><span class="group-title">Phase 0 인터페이스 명세로 교체</span><span class="group-sub">강사 지적: 실내용 없음</span></div>
+      <div class="cards">
+        <article class="vcard empty">
+          <div class="vtop"><span class="vname">API/인터페이스 페이지 (2종)</span></div>
+          <code class="vpath">docs/api.html · docs/architecture/api.html</code>
+          <p class="vwhat">현재 refresh 리다이렉트만 존재. 강사 항목4가 "인터페이스 정의서 부재"로 캡 3 부여한 직접 원인.</p>
+          <div class="fixbox">
+            <span class="fixlabel">처리(Phase 0-2)</span>
+            <ul>
+              <li>리다이렉트를 걷어내고 <strong>11노드 입출력 계약 + MCP Tool 스키마</strong> 실내용으로 교체. 작성 소스는 <code>docs/interface/interface_spec.md</code>(예정). 두 경로 중 하나는 정본, 하나는 정본으로 리다이렉트 통일.</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 🔵 도메인별 (정합 검토) -->
+    <section class="group">
+      <div class="group-head"><span class="gbadge g-domain">🔵 도메인별</span><span class="group-title">개별 영역 — 경미 검토</span><span class="group-sub">11노드 전체 도식 아님, 부분 정합만 확인</span></div>
+      <div class="cards">
+        <article class="vcard domain">
+          <div class="vtop"><span class="vname">ERD 대시보드</span></div>
+          <code class="vpath">docs/architecture/erd_dashboard.html</code>
+          <p class="vwhat">ERD 인터랙티브 시각화(구현 상태 정합표·관계).</p>
+          <div class="fixbox"><span class="fixlabel">Phase 1 ERD와 동기</span><ul><li><code>disclosure_report/content</code> DDL 부재 표기 정정, <code>stock_price</code> 6컬럼 정합. <code>erd.md</code> 수정과 함께 갱신.</li></ul></div>
+        </article>
+        <article class="vcard domain">
+          <div class="vtop"><span class="vname">Competitor 아키텍처 / 흐름 (3종)</span></div>
+          <code class="vpath">docs/architecture/competitor_architecture.html · docs/agents/competitor_agent_flow.html · competitor_agent_mvp.html</code>
+          <p class="vwhat">Competitor 3단 폴백·복합 유사도·MCP 노출. (100% 마감 영역, 대체로 정합)</p>
+          <div class="fixbox"><span class="fixlabel">경미</span><ul><li>상위 파이프라인 표기가 있으면 11노드 라벨만 확인. 도메인 내용은 유지.</li></ul></div>
+        </article>
+        <article class="vcard domain">
+          <div class="vtop"><span class="vname">기능명세 대시보드</span></div>
+          <code class="vpath">docs/functional-spec/functional_spec_dashboard.html</code>
+          <p class="vwhat">기능(B1~B5·A1~A6·D1) 클릭형 상세. 11노드와 별개 축(사용자 기능).</p>
+          <div class="fixbox"><span class="fixlabel">정합 OK</span><ul><li>구조 변경 불필요. 기능↔노드 매핑 각주만 선택 추가.</li></ul></div>
+        </article>
+        <article class="vcard domain">
+          <div class="vtop"><span class="vname">Streamlit 사용 가이드</span></div>
+          <code class="vpath">docs/guides/2026-06-13/streamlit_usage_guide.html</code>
+          <p class="vwhat">실행·테스트 가이드(스크린샷 포함). 흐름 문자열에 에이전트 순서 언급.</p>
+          <div class="fixbox"><span class="fixlabel">경미</span><ul><li>실행 흐름 문장의 에이전트 나열을 11노드 순서로 맞춤(기능 설명은 유지).</li></ul></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 🟢 현행 정합 -->
+    <section class="group">
+      <div class="group-head"><span class="gbadge g-ok">🟢 현행 정합</span><span class="group-title">수정 불필요</span></div>
+      <div class="cards">
+        <article class="vcard ok">
+          <div class="vtop"><span class="vname">Qual / News RAG 흐름 (2종)</span></div>
+          <code class="vpath">docs/agents/qual_agent_flow.html · news_rag_pipeline.html</code>
+          <p class="vwhat">Hybrid RRF·fallback 반영된 최신 도메인 흐름. 11노드와 상충 없음.</p>
+          <div class="fixbox"><span class="fixlabel">유지</span><ul><li>그대로 사용. Reranker 연결(#9) 진행 시에만 후단 보강.</li></ul></div>
+        </article>
+        <article class="vcard ok">
+          <div class="vtop"><span class="vname">현행 진행 대시보드 (2종)</span></div>
+          <code class="vpath">docs/roadmap/2026-06-20/progress_dashboard.html · docs/roadmap/문서화_진행_대시보드.html</code>
+          <p class="vwhat">11노드 기준 최신 팀/문서 진행 현황.</p>
+          <div class="fixbox"><span class="fixlabel">유지·상시 갱신</span><ul><li>문서화 대시보드는 작업 진행에 따라 PM 트랙에서 갱신.</li></ul></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ⚪ 이력 스냅샷 -->
+    <section class="group">
+      <div class="group-head"><span class="gbadge g-hist">⚪ 이력 스냅샷</span><span class="group-title">수정 대상 아님 (시점 보존)</span></div>
+      <div class="cards">
+        <article class="vcard hist">
+          <div class="vtop"><span class="vname">과거 진행 대시보드 (3종)</span></div>
+          <code class="vpath">docs/roadmap/2026-06-12 · 2026-06-13 · 2026-06-14/progress_dashboard.html</code>
+          <p class="vwhat">각 시점의 강사 재검토 스냅샷. "6대 피드백" 등 당시 용어는 그 시점 기록이므로 보존.</p>
+          <div class="fixbox"><span class="fixlabel">보존</span><ul><li>소급 수정 금지. 최신 상태는 항상 2026-06-20 대시보드 참조.</li></ul></div>
+        </article>
+        <article class="vcard hist">
+          <div class="vtop"><span class="vname">백테스팅 시연 / 로드맵 (기타)</span></div>
+          <code class="vpath">docs/architecture/backtesting_demo_dashboard.html · docs/roadmap/2026-05-23/roadmap_dashboard.html</code>
+          <p class="vwhat">특정 시점·데모 목적 산출물.</p>
+          <div class="fixbox"><span class="fixlabel">보존</span><ul><li>재사용(발표 등) 시에만 11노드 라벨 확인.</li></ul></div>
+        </article>
+      </div>
+    </section>
+
+    <footer>
+      stock-agent · PM 문서화 트랙 · 2026-06-20 (KST) · 다이어그램 정본 canonical_diagrams.md · 노드 기준 pipeline_11node_groundtruth.md
+    </footer>
+  </main>
+</body>
+</html>
