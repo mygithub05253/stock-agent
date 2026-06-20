@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 설계문서 100% 진행 대시보드 (Living)</title>
+  <style>
+    :root {
+      --bg: #f8fafc; --card: #fff; --border: #e2e8f0; --text: #0f172a; --muted: #64748b;
+      --blue: #2563eb; --blue-soft: #eff6ff; --emerald: #059669; --emerald-soft: #ecfdf5;
+      --amber: #d97706; --amber-soft: #fffbeb; --red: #dc2626; --red-soft: #fef2f2;
+      --violet: #7c3aed; --violet-soft: #f5f3ff; --slate-soft: #f1f5f9; --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Pretendard, "Noto Sans KR", system-ui, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.6; font-size: 15px; }
+    code { border-radius: 5px; background: var(--slate-soft); padding: 1px 5px; color: #334155; font-size: 0.9em; }
+    header { border-bottom: 1px solid var(--border); background: #fff; }
+    .header-inner { max-width: 1180px; margin: 0 auto; padding: 16px; }
+    .eyebrow { color: var(--blue); font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    h1 { font-size: 24px; font-weight: 800; margin-top: 4px; }
+    .lede { color: var(--muted); margin-top: 8px; max-width: 880px; font-size: 14px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    .stat { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 10px 14px; }
+    .stat dt { color: var(--muted); font-size: 12px; }
+    .stat dd { font-size: 20px; font-weight: 800; margin-top: 2px; }
+    .overall { margin-top: 16px; }
+    .overall-track { height: 12px; border-radius: 999px; background: var(--slate-soft); overflow: hidden; }
+    .overall-fill { height: 100%; border-radius: 999px; background: var(--blue); }
+    .phase { margin-top: 30px; }
+    .phase-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .phase-badge { border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 800; }
+    .p0 { background: var(--red-soft); color: var(--red); }
+    .p1 { background: var(--amber-soft); color: var(--amber); }
+    .p2 { background: var(--blue-soft); color: var(--blue); }
+    .p3 { background: var(--violet-soft); color: var(--violet); }
+    .pX { background: var(--slate-soft); color: var(--muted); }
+    .phase-title { font-size: 18px; font-weight: 800; }
+    .phase-sub { color: var(--muted); font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #fff;
+      border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; font-size: 13.5px; }
+    th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: var(--slate-soft); font-size: 12px; color: #334155; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    .tag { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .t-done { background: var(--emerald-soft); color: var(--emerald); }
+    .t-prog { background: var(--blue-soft); color: var(--blue); }
+    .t-wait { background: var(--slate-soft); color: var(--muted); }
+    .t-block { background: var(--amber-soft); color: var(--amber); }
+    .doc-name { font-weight: 700; }
+    .doc-path { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+    .note { margin-top: 14px; border-left: 4px solid var(--blue); border-radius: 0 10px 10px 0;
+      background: var(--blue-soft); padding: 11px 14px; color: #1e3a8a; font-size: 13px; }
+    .principles { margin-top: 14px; display: grid; gap: 10px; }
+    @media (min-width: 760px) { .principles { grid-template-columns: repeat(2, 1fr); } }
+    .principle { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 12px 14px; font-size: 13px; }
+    .principle strong { display: block; margin-bottom: 3px; }
+    footer { margin-top: 40px; color: var(--muted); font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <p class="eyebrow">PM 문서화 트랙 · Living Dashboard · 2026-06-20 착수</p>
+      <h1>설계문서 100% 진행 대시보드</h1>
+      <p class="lede">
+        이동원(PM) 전담 문서화 트랙의 단일 추적 화면입니다. 세션이 바뀌어도 이 파일을 <code>@</code>로 첨부하면 작업을 이어갈 수 있습니다.
+        원칙: <strong>강사 채점(A)을 먼저 막고 실무/포트폴리오(B)로 키운다 · 모든 정합은 코드를 읽어 11노드 기준으로 맞춘다 · 코드는 수정하지 않는다.</strong>
+        모든 노드·흐름 기준은 <code>docs/architecture/pipeline_11node_groundtruth.md</code>.
+      </p>
+      <div class="meta-row">
+        <dl class="stat"><dt>전체 문서</dt><dd>22종</dd></dl>
+        <dl class="stat"><dt>완료</dt><dd id="cntDone">2</dd></dl>
+        <dl class="stat"><dt>진행중</dt><dd id="cntProg">1</dd></dl>
+        <dl class="stat"><dt>대기</dt><dd id="cntWait">19</dd></dl>
+        <dl class="stat"><dt>강사 항목4</dt><dd>캡 3 → 목표 5</dd></dl>
+      </div>
+      <div class="overall">
+        <div class="overall-track"><div class="overall-fill" style="width:14%"></div></div>
+        <p class="phase-sub" style="margin-top:6px;">전체 진척 ≈ 14% (기준점 확정 + Phase 0 착수)</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Phase 0 -->
+    <section class="phase">
+      <div class="phase-head">
+        <span class="phase-badge p0">PHASE 0</span>
+        <span class="phase-title">캡 해제 (강사 항목4 직결, +1~2점)</span>
+        <span class="phase-sub">유스케이스·인터페이스 부재 2종 해소 → 상한 캡 3 풀림</span>
+      </div>
+      <table>
+        <thead><tr><th style="width:24%">문서</th><th style="width:9%">상태</th><th style="width:13%">형식</th><th style="width:27%">기준 코드 / DoD</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="doc-name">유스케이스 정의서</div><div class="doc-path">docs/usecase/usecase_spec.md (예정)</div></td>
+            <td><span class="tag t-prog">진행중</span></td>
+            <td>md + mermaid</td>
+            <td>streamlit_app.py 진입점 · pipeline.py / 액터·주흐름·대안·예외 + personas.json 5종 연결</td>
+            <td>점수 레버 1순위</td>
+          </tr>
+          <tr>
+            <td><div class="doc-name">인터페이스 / API 명세서</div><div class="doc-path">docs/interface/interface_spec.md + api.html 교체 (예정)</div></td>
+            <td><span class="tag t-wait">대기</span></td>
+            <td>md + html</td>
+            <td>11노드 입출력 계약 · mcp_bridge Tool 스키마 / 빈 리다이렉트 api.html 실내용 교체</td>
+            <td>프롬프트 명세와 묶음</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Phase 1 -->
+    <section class="phase">
+      <div class="phase-head">
+        <span class="phase-badge p1">PHASE 1</span>
+        <span class="phase-title">드리프트 정합 (일치성 감점 회복)</span>
+        <span class="phase-sub">6에이전트 → 11노드, ERD 정정. 코드를 읽어 갱신 대행</span>
+      </div>
+      <table>
+        <thead><tr><th style="width:24%">문서</th><th style="width:9%">상태</th><th style="width:13%">형식</th><th style="width:27%">기준 코드 / DoD</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td><div class="doc-name">11노드 그라운드 트루스 (SSOT)</div><div class="doc-path">docs/architecture/pipeline_11node_groundtruth.md</div></td><td><span class="tag t-done">완료</span></td><td>md</td><td>pipeline.py:404-435 직접 추출</td><td>모든 정합의 기준점</td></tr>
+          <tr><td><div class="doc-name">멀티에이전트 아키텍처</div><div class="doc-path">docs/architecture/multi_agent_architecture.md</div></td><td><span class="tag t-wait">대기</span></td><td>md + mermaid</td><td>6→11노드 컴포넌트도 교정</td><td>드리프트 핵심</td></tr>
+          <tr><td><div class="doc-name">시스템 시퀀스 흐름</div><div class="doc-path">docs/architecture/system_flow.md</div></td><td><span class="tag t-wait">대기</span></td><td>md + mermaid</td><td>fan-out·join·revision loop 반영</td><td>—</td></tr>
+          <tr><td><div class="doc-name">에이전트 상세 설계</div><div class="doc-path">docs/architecture/agent_design.md</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>노드별 상세 11개</td><td>—</td></tr>
+          <tr><td><div class="doc-name">ADR-005 (11노드 전환)</div><div class="doc-path">docs/decisions/ADR-005-*.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>ADR-003 supersede 표기</td><td>—</td></tr>
+          <tr><td><div class="doc-name">ERD 정정</div><div class="doc-path">docs/architecture/erd.md</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>disclosure DDL·stock_price 6컬럼 정합 (db/init/*.sql 기준)</td><td>강사 신규 지적</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Phase 2 -->
+    <section class="phase">
+      <div class="phase-head">
+        <span class="phase-badge p2">PHASE 2</span>
+        <span class="phase-title">AI 문서 (풀세트 → 요약본)</span>
+        <span class="phase-sub">실무 추가 5종 중 3종 + 오케스트레이션. 풀세트 먼저, 발표용 요약본 파생</span>
+      </div>
+      <table>
+        <thead><tr><th style="width:24%">문서</th><th style="width:9%">상태</th><th style="width:13%">형식</th><th style="width:27%">기준 코드 / DoD</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td><div class="doc-name">모델 카드 (Model Card)</div><div class="doc-path">docs/ai/model_card.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>qwen-2.5-7b·GLM-4.5-flash 선택근거·한계·비용·라이선스 (config.py 기준)</td><td>성숙도 1순위</td></tr>
+          <tr><td><div class="doc-name">프롬프트 명세서</div><div class="doc-path">docs/ai/prompt_spec.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>src/stock_agent/prompts/*.md 입출력 계약 (= 인터페이스 AI판)</td><td>Phase 0 인터페이스와 연계</td></tr>
+          <tr><td><div class="doc-name">평가 보고서 (RAGAS/Guardrail)</div><div class="doc-path">docs/ai/eval_report.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md + 표</td><td>eval/reports/* 수치를 사람이 읽는 보고서로 승격</td><td>결과보고서 핵심 챕터</td></tr>
+          <tr><td><div class="doc-name">오케스트레이션 설계서</div><div class="doc-path">docs/ai/orchestration.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md + mermaid</td><td>Send fan-out·join·revision loop 설계 근거</td><td>SSOT 기반</td></tr>
+          <tr><td><div class="doc-name">AI 문서 핵심 요약본</div><div class="doc-path">docs/ai/ai_summary_1pager.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md/html</td><td>위 4종 → 발표·면접용 1~2장</td><td>풀세트 후 파생</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Phase 3 -->
+    <section class="phase">
+      <div class="phase-head">
+        <span class="phase-badge p3">PHASE 3</span>
+        <span class="phase-title">서사 완성 (실무 / 포트폴리오)</span>
+        <span class="phase-sub">요구사항·시장조사·테스트·결과보고서로 (B) 완성</span>
+      </div>
+      <table>
+        <thead><tr><th style="width:24%">문서</th><th style="width:9%">상태</th><th style="width:13%">형식</th><th style="width:27%">기준 / DoD</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td><div class="doc-name">요구사항 정의서 (SRS + NFR)</div><div class="doc-path">docs/requirements/srs.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>기능 요구사항 ID화 + NFR(응답시간·비용캡·폴백 SLA·PII) 1개 절</td><td>PRD 승격</td></tr>
+          <tr><td><div class="doc-name">시장조사 (독립)</div><div class="doc-path">docs/research/market_research.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>경쟁 서비스·수요 근거</td><td>문제정의 보강</td></tr>
+          <tr><td><div class="doc-name">테스트 명세서 / 계획서</div><div class="doc-path">docs/testing/test_spec.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>tests/* (guardrail 11·retriever 4 등) 시나리오 문서화</td><td>항목2·8 서사</td></tr>
+          <tr><td><div class="doc-name">결과 보고서</div><div class="doc-path">docs/report/result_report.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md + html</td><td>D→C→B 서사 + 평가 챕터 포함</td><td>발표 본체</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 상시 / README -->
+    <section class="phase">
+      <div class="phase-head">
+        <span class="phase-badge pX">상시</span>
+        <span class="phase-title">README 프로그램 + 정합 유지</span>
+        <span class="phase-sub">루트 + 전 폴더 README 규칙 보강(기존 제거 금지) · 재드리프트 방지</span>
+      </div>
+      <table>
+        <thead><tr><th style="width:24%">대상</th><th style="width:9%">상태</th><th style="width:13%">형식</th><th style="width:27%">규칙 / DoD</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td><div class="doc-name">루트 README 필수 7요소 보강</div><div class="doc-path">README.md</div></td><td><span class="tag t-wait">대기</span></td><td>md + mermaid</td><td>썸네일·기술스택·실행·아키텍처·성과·구조 + 협업/데이터/비용/문서영역/변경이력 유지</td><td>GPT Image 2.0 PNG는 PM 핸드오프</td></tr>
+          <tr><td><div class="doc-name">전 폴더 README (7요소)</div><div class="doc-path">각 폴더/README.md</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>한줄설명·소개·기술스택·동작원리·아키텍처·성과·구조</td><td>변경 시 지속 갱신</td></tr>
+          <tr><td><div class="doc-name">문서 마스터 인덱스</div><div class="doc-path">docs/md/프로젝트_문서_마스터인덱스.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>문서별 "기준 코드 경로" 명시 → 추적성</td><td>CLAUDE.md 7.1</td></tr>
+          <tr><td><div class="doc-name">문서화 진행 대시보드 (본 파일)</div><div class="doc-path">docs/roadmap/문서화_진행_대시보드.html</div></td><td><span class="tag t-prog">상시</span></td><td>html</td><td>세션 간 인계용 living 트래커</td><td>@로 첨부해 이어가기</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <div class="note">
+      <strong>GPT Image 2.0 안내:</strong> 썸네일/아키텍처 PNG는 자동 생성 대상이 아닙니다. PM 문서화 트랙은 <strong>Mermaid 원본 + 시각 구성</strong>까지 완성해 README에 1차 렌더(코드블록)로 넣고,
+      이동원 님이 GPT Image 2.0으로 PNG를 뽑아 교체하는 핸드오프 구조입니다. 이미지 대기 때문에 문서 작업이 막히지 않습니다.
+    </div>
+
+    <div class="principles">
+      <div class="principle"><strong>① A→B 순서</strong>강사 채점(캡 해제)을 먼저 막고 그 산출물을 포트폴리오급으로 키운다.</div>
+      <div class="principle"><strong>② 코드 우선 정합</strong>모든 노드·흐름은 11노드 SSOT 기준. 코드는 읽되 수정하지 않는다.</div>
+      <div class="principle"><strong>③ 브랜치/PR</strong>docs/ 브랜치 → PR → PM auto-merge. 커밋 prefix 📝 Docs.</div>
+      <div class="principle"><strong>④ README 보존</strong>필수 요소는 추가·보완하되 기존(협업·데이터·비용·이력)은 제거하지 않는다.</div>
+    </div>
+
+    <footer>
+      stock-agent · PM 문서화 트랙 · 기준일 2026-06-20 (KST) · 본 대시보드는 작업 진행에 따라 갱신됩니다.
+    </footer>
+  </main>
+</body>
+</html>
