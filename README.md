@@ -512,6 +512,8 @@ Chroma는 삭제하지 않고 향후 optional RAG backend 후보로 남깁니다
 
 ## 📘 문서 영역 (`docs/`)
 
+> 📑 **전 문서 탐색은 [문서 마스터 인덱스](docs/md/프로젝트_문서_마스터인덱스.md)에서 시작하세요** — 문서별 "기준 코드 경로"까지 추적합니다.
+
 PM이 주로 관리하는 문서들:
 
 | 문서 | 내용 | 누가 읽어야? |
@@ -585,6 +587,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-22 | v1.16 | 문서 마스터 인덱스(`docs/md/프로젝트_문서_마스터인덱스.md`) 추가 — 전 문서 분류 + 문서별 기준 코드 경로 추적성. `docs/interface`·`docs/usecase`·`docs/md` 폴더 README 보강 (docs 전 폴더 README 정합 완료) |
 | 2026-06-22 | v1.15 | Phase 3 서사 문서 세트 추가 — `docs/requirements/srs.md`(SRS+NFR), `docs/research/market_research.md`(시장조사), `docs/testing/test_spec.md`(테스트 137개 명세), `docs/report/result_report.md`(D→C→B 결과 보고서) + 각 폴더 README |
 | 2026-06-20 | v1.14 | 협업 가이드에 팀 구성·역할 섹션 추가(PR 기준 5인 역할 명시), Phase 2 AI 문서 세트(`docs/ai/` 모델 카드·프롬프트 명세·평가 보고서·오케스트레이션·요약본) 착수 |
 | 2026-06-20 | v1.13 | 루트 README 필수 구성 보강, 실제 Streamlit 캡처와 GPT Image 2.0 썸네일·아키텍처 추가, 코드 기준 Mermaid와 전 폴더 README·UI 개선 제안 정비 |

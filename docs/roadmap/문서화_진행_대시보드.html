@@ -71,14 +71,14 @@
       </p>
       <div class="meta-row">
         <dl class="stat"><dt>전체 문서</dt><dd>22종</dd></dl>
-        <dl class="stat"><dt>완료</dt><dd id="cntDone">21</dd></dl>
+        <dl class="stat"><dt>완료</dt><dd id="cntDone">24</dd></dl>
         <dl class="stat"><dt>진행중</dt><dd id="cntProg">0</dd></dl>
-        <dl class="stat"><dt>대기</dt><dd id="cntWait">2</dd></dl>
+        <dl class="stat"><dt>대기</dt><dd id="cntWait">0</dd></dl>
         <dl class="stat"><dt>강사 항목4</dt><dd>캡 해제 ✅ · 드리프트 정합 ✅</dd></dl>
       </div>
       <div class="overall">
-        <div class="overall-track"><div class="overall-fill" style="width:91%"></div></div>
-        <p class="phase-sub" style="margin-top:6px;">전체 진척 ≈ 91% · <strong>Phase 0+1+2+3 완료</strong> — Phase 3 서사 완성(SRS+NFR·시장조사·테스트명세 137개·결과보고서 D→C→B). 잔여: 상시 트랙(전 폴더 README·문서 마스터 인덱스)</p>
+        <div class="overall-track"><div class="overall-fill" style="width:100%"></div></div>
+        <p class="phase-sub" style="margin-top:6px;">전체 진척 100% · <strong>Phase 0+1+2+3 + 상시 트랙 완료</strong> — 문서 마스터 인덱스(추적성)·전 폴더 README 보강 완료. 잔여는 시각자료 HTML 드리프트(Codex 교정) + 코드 진척 반영뿐</p>
       </div>
     </div>
   </header>
@@ -180,11 +180,11 @@
       <table>
         <thead><tr><th style="width:24%">대상</th><th style="width:9%">상태</th><th style="width:13%">형식</th><th style="width:27%">규칙 / DoD</th><th>비고</th></tr></thead>
         <tbody>
-          <tr><td><div class="doc-name">루트 README 필수 7요소 보강</div><div class="doc-path">README.md</div></td><td><span class="tag t-wait">대기</span></td><td>md + mermaid</td><td>썸네일·기술스택·실행·아키텍처·성과·구조 + 협업/데이터/비용/문서영역/변경이력 유지</td><td>GPT Image 2.0 PNG는 PM 핸드오프</td></tr>
-          <tr><td><div class="doc-name">전 폴더 README (7요소)</div><div class="doc-path">각 폴더/README.md</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>한줄설명·소개·기술스택·동작원리·아키텍처·성과·구조</td><td>변경 시 지속 갱신</td></tr>
+          <tr><td><div class="doc-name">루트 README 필수 7요소 보강</div><div class="doc-path">README.md</div></td><td><span class="tag t-done">완료</span></td><td>md + mermaid</td><td>썸네일·기술스택·실행·아키텍처·성과·구조 + 협업(팀 역할)/데이터/비용/문서영역/변경이력 유지</td><td>GPT Image 2.0 PNG는 PM 핸드오프</td></tr>
+          <tr><td><div class="doc-name">전 폴더 README (docs 영역)</div><div class="doc-path">docs/**/README.md</div></td><td><span class="tag t-done">완료</span></td><td>md</td><td>docs 하위 전 폴더 README 보유 확인, 누락 interface·usecase·md 보강</td><td>코드 폴더는 각 담당</td></tr>
           <tr><td><div class="doc-name">정본 다이어그램 (Mermaid)</div><div class="doc-path">docs/architecture/canonical_diagrams.md</div></td><td><span class="tag t-done">완료</span></td><td>md + mermaid</td><td>11노드 마스터 플로우·시퀀스·폴백 정본. 전 시각자료가 복붙</td><td>PNG 의존 제거</td></tr>
           <tr><td><div class="doc-name">시각자료 인덱스 + 수정 포인트 맵</div><div class="doc-path">docs/시각자료_인덱스.html</div></td><td><span class="tag t-done">완료</span></td><td>html</td><td>전 HTML 카탈로그 + Codex 수정 지시(파일·라인)</td><td>드리프트 교정 허브</td></tr>
-          <tr><td><div class="doc-name">문서 마스터 인덱스</div><div class="doc-path">docs/md/프로젝트_문서_마스터인덱스.md (예정)</div></td><td><span class="tag t-wait">대기</span></td><td>md</td><td>문서별 "기준 코드 경로" 명시 → 추적성</td><td>CLAUDE.md 7.1</td></tr>
+          <tr><td><div class="doc-name">문서 마스터 인덱스</div><div class="doc-path">docs/md/프로젝트_문서_마스터인덱스.md</div></td><td><span class="tag t-done">완료</span></td><td>md</td><td>전 문서 9개 분류 + 문서별 "기준 코드 경로" 명시 → 추적성</td><td>CLAUDE.md 7.1</td></tr>
           <tr><td><div class="doc-name">문서화 진행 대시보드 (본 파일)</div><div class="doc-path">docs/roadmap/문서화_진행_대시보드.html</div></td><td><span class="tag t-prog">상시</span></td><td>html</td><td>세션 간 인계용 living 트래커</td><td>@로 첨부해 이어가기</td></tr>
         </tbody>
       </table>
