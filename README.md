@@ -347,6 +347,20 @@ docker compose --profile app up --build
 > 개발 경험이 적어도 걱정 마세요. 이 규칙은 **여러분의 작업물이 사고로 사라지는 것을 막는 안전망** 입니다.
 > 모르는 게 있으면 PM에게 질문해 주세요.
 
+### 0. 팀 구성과 역할 (누가 무엇을 맡나)
+
+본 레포는 PM 2명(이동원·백형준) 체제로 운영하며, 아래 역할은 실제 머지된 PR 기준으로 정리했습니다.
+
+| 이름 | GitHub | 역할 | 주요 기여 (머지된 PR 기준) |
+|------|--------|------|------|
+| **이동원** | [`mygithub05253`](https://github.com/mygithub05253) | PM · 팀장 · 개발 | 문서·설계 트랙 전반, Competitor Agent(3단 폴백·복합 유사도·MCP 외부 노출), RAGAS 평가 하네스, Strategist resilience·Guardrail 실게이팅, CI 안전망 |
+| **백형준** | [`vividbaek`](https://github.com/vividbaek) | PM · 개발 | UI(Agent 진행 카드·LangGraph streaming), 단계형 투자성향 intake, Curator·InvestmentAnalyst GLM 연동 |
+| **윤수정** | [`Yoonssu`](https://github.com/Yoonssu) | 개발 · 데이터 관리 | Quant Agent(재무·시세 지표·부채비율), Qual Agent 공시 연결, Guardrail 개발, CI 오류 수정 |
+| **문수빈** | [`melinamuun`](https://github.com/melinamuun) | 개발 · 데이터 관리 | Macro Agent(거시환경 평가·라우팅), Supabase DB 연결·macro 759건 적재, LangGraph Send API fan-out |
+| **김도예** | [`doyekeem`](https://github.com/doyekeem) | 개발 · 데이터 관리 | 뉴스 크롤러, 뉴스 RAG 임베딩 파이프라인, Qual Hybrid RAG·Reranker·검색 평가 |
+
+> 역할은 고정 분담이 아니라 주력 영역입니다. 폴더별 세부 책임은 아래 [폴더 책임 분담](#4-폴더-책임-분담-어디에-뭘-넣어야-할까)을 함께 보세요.
+
 ### 1. 브랜치 규칙 (내 작업 공간 만들기)
 
 `main` 코드에 직접 수정하면 안 됩니다. 무조건 본인 브랜치에서 작업:
@@ -571,6 +585,7 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-20 | v1.14 | 협업 가이드에 팀 구성·역할 섹션 추가(PR 기준 5인 역할 명시), Phase 2 AI 문서 세트(`docs/ai/` 모델 카드·프롬프트 명세·평가 보고서·오케스트레이션·요약본) 착수 |
 | 2026-06-20 | v1.13 | 루트 README 필수 구성 보강, 실제 Streamlit 캡처와 GPT Image 2.0 썸네일·아키텍처 추가, 코드 기준 Mermaid와 전 폴더 README·UI 개선 제안 정비 |
 | 2026-06-14 | v1.12 | Competitor Agent 100% 마감 — peer 품질 회귀 골든셋·평가 하네스, 범용 MCP 외부 노출(A2A). 06-14 진행현황 대시보드·ERD/기능명세/Competitor HTML 시각화·README 감사 리포트 추가. 루트 README `pages/`·eval 구조 정합 |
 | 2026-06-13 | v1.11 | Competitor Peer 선정 복합 유사도 고도화(#62), CI 머지 충돌마커 게이트(#63), ERD 테이블명 코드 정합(#64). 대시보드·흐름도에 반영 |
