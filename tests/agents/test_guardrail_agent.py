@@ -1,10 +1,4 @@
-"""Guardrail 게이팅·안전성·관측 회귀 테스트.
-
-def test_guardrail_passes_clean():
-    state = _make_state("중립적 관점: 업종 회복 대기", ["매출 성장 유지", "영업이익률 개선"])
-    out = guardrail_module.run_guardrail(state)
-PR #50(게이팅·관측) + PR #54(PII·욕설·보장표현) 통합 테스트.
-"""
+"""Guardrail 게이팅, 안전성, 관측 회귀 테스트."""
 
 from __future__ import annotations
 

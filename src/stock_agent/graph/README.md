@@ -1,44 +1,52 @@
-# `src/stock_agent/graph/` — LangGraph 오케스트레이션
+# `src/stock_agent/graph/` - LangGraph 오케스트레이션
 
-본 폴더는 6개 에이전트를 **LangGraph StateGraph** 로 연결하는 코드를 담습니다.
+> `StateGraph`와 `Send`로 Agent를 동적 병렬 실행하고 부분 실패를 최종 결과까지 안전하게 전달합니다.
 
-현재 Phase 1 구현은 `pipeline.py`에서 mock agent 함수를 순차 호출합니다. 목표 구현은 `Curator`와 `RequestClassifier` 이후 `Quant`, `Qual`, `Competitor`를 병렬 fan-out으로 실행하고 `Strategist`에서 병합하는 supervisor graph입니다.
+## 폴더 소개
 
-## 파일
+- **What:** 분석 상태, 노드 wrapper, fan-out, join, 이벤트 스트리밍을 `pipeline.py`에서 관리합니다.
+- **Why:** Agent가 서로를 직접 호출하지 않고 명시적 그래프와 공통 상태를 통해 협업하게 합니다.
+- Curator와 RequestClassifier가 요청을 구조화합니다.
+- Quant, Qual, Competitor와 조건부 Macro가 `Send`로 병렬 실행됩니다.
+- Strategist 이후 InvestmentAnalyst, Guardrail, ResultRenderer가 순차 실행됩니다.
+
+## 기술 스택
+
+LangGraph `StateGraph`, `Send`, Python `TypedDict`, Pydantic `AgentState`를 사용합니다.
+
+## 현재 동작
+
+```mermaid
+flowchart LR
+    START --> C[Curator] --> R[RequestClassifier]
+    R --> Q[Quant]
+    R --> L[Qual]
+    R --> P[Competitor]
+    R --> M[Macro 조건부]
+    Q --> S[Strategist]
+    L --> S
+    P --> S
+    M --> S
+    S --> A[InvestmentAnalyst] --> G[Guardrail] --> GA[Guardrail Apply] --> O[ResultRenderer] --> END
+```
+
+정확한 데이터 연결은 [README 시스템 아키텍처](../../../docs/architecture/readme_system_architecture.md)를 참고합니다.
+
+## 파일과 인터페이스
 
 | 파일 | 역할 |
 |------|------|
-| `pipeline.py` | 현재 Phase 1 pipeline. 목표는 StateGraph 정의 + Conditional Edge + fan-out |
-| `state.py` | 후속 예정. `AgentState` Pydantic 모델을 분리할 때 사용 |
-| `nodes.py` | 후속 예정. 각 에이전트를 노드 함수로 래핑 |
+| `pipeline.py` | 그래프 정의, 이벤트 스트리밍, Tier 출력 변환 |
+| `__init__.py` | 앱에서 사용하는 실행 함수 export |
 
-## 목표 흐름 요약
+`stream_phase1_analysis_events()`는 UI 진행 로그를, `run_phase1_analysis()`는 동기 최종 결과를 제공합니다.
 
+## 장애 처리와 검증
+
+- Worker 예외는 `worker_errors`에 누적하고 가능한 결과로 계속 진행합니다.
+- Strategist 예외는 낮은 신뢰도의 보수적 HOLD로 격리합니다.
+- Guardrail 수정 필요 상태는 제한된 재합성을 거칩니다.
+
+```bash
+python -m pytest tests/test_phase1_pipeline.py tests/agents/test_pipeline_guardrail_integration.py
 ```
-START
-→ Input Guardrail
-→ Curator
-→ [Quant, Qual, Competitor 병렬]
-→ Strategist
-→ Guardrail
-→ Tier 1/2/3 Output
-```
-
-자세한 설계는 `docs/architecture/multi_agent_architecture.md` 와 `docs/architecture/system_flow.md` 를 기준으로 합니다.
-
-## A2A 도입 기준
-
-MVP에서는 A2A를 도입하지 않습니다. 현재 repo, Streamlit app, Postgres DB가 하나의 실행 경계 안에 있기 때문에 LangGraph supervisor pattern이 더 단순하고 안전합니다.
-
-A2A는 다음 조건이 생기면 v2에서 검토합니다.
-
-- report agent, backtest agent, notification agent가 별도 서비스로 분리됨
-- 외부 팀 또는 외부 vendor agent와 연동해야 함
-- agent 간 인증/권한/감사 로그가 필요한 독립 실행 환경이 생김
-
-## 구현 시 주의
-
-- `AgentState`에 `request_id`, `as_of_date`, `data_version`, `evidence_bundle`, `cost_trace`를 추가하는 방향을 우선 검토합니다.
-- 병렬 실행 agent는 서로의 결과에 의존하지 않아야 합니다.
-- `Strategist`가 병합하기 전까지 `Quant`, `Qual`, `Competitor`는 자기 전문 영역 결과만 작성합니다.
-- 부분 실패 시 전체 분석을 중단할지, warning과 함께 partial result로 진행할지 정책을 명시해야 합니다.

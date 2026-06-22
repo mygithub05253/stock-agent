@@ -16,6 +16,7 @@ from stock_agent.agents import (
     run_quant,
     run_request_classifier,
     run_strategist,
+    run_result_renderer,
 )
 from stock_agent.schemas.analysis import (
     AgentState,
@@ -48,6 +49,8 @@ class AnalysisGraphState(TypedDict, total=False):
     macro: MacroResult | None
     strategist: StrategistResult | None
     guardrail: GuardrailResult | None
+    investment_report: dict[str, str] | None
+    rendered_report: dict[str, str | int | list[str]] | None
     graph_route: dict[str, Any]
     trace_spans: Annotated[list[str], operator.add]
     worker_errors: Annotated[list[str], operator.add]
@@ -127,9 +130,14 @@ def _node_span(name: str) -> dict[str, list[str]]:
 
 
 def _curator_node(state: AnalysisGraphState) -> dict[str, Any]:
-    next_state = run_curator(_agent_state(state))
-    return {**_patch_from_agent(next_state, "curator"), **_node_span("curator")}
-
+    try:
+        next_state = run_curator(_agent_state(state))
+        return {**_patch_from_agent(next_state, "curator"), **_node_span("curator")}
+    except Exception as exc:
+        return {
+            "worker_errors": [f"curator: {exc.__class__.__name__}: {exc}"],
+            **_node_span("curator"),
+        }
 
 def _classifier_node(state: AnalysisGraphState) -> dict[str, Any]:
     next_state = run_request_classifier(_agent_state(state))
@@ -290,26 +298,96 @@ def _guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
 def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
     strategist = state.get("strategist")
     guardrail = state.get("guardrail")
+
     if strategist is None or guardrail is None:
         return _node_span("guardrail_apply")
 
+    # =========================
+    # 1. guardrail 실패 처리
+    # =========================
     if not guardrail.passed:
-        if any("PII" in warning or "Inappropriate language" in warning for warning in guardrail.warnings):
+        is_pii = (
+            any("PII" in w for w in guardrail.warnings)
+            or "@" in (strategist.headline or "")
+        )
+
+        if is_pii:
+            fallback_headline = "민감 콘텐츠가 포함되어 일부 결과가 제한되었습니다."
+
             strategist = strategist.model_copy(
                 update={
-                    "headline": "출력 제한: 민감 콘텐츠가 검출되어 일부 내용이 숨겨졌습니다.",
+                    "headline": fallback_headline,
                     "signal": "HOLD",
                     "confidence": max(0, strategist.confidence - 30),
                     "suitability": max(0, strategist.suitability - 30),
                     "degraded": True,
                 }
             )
-            guardrail = guardrail.model_copy(update={"revised_headline": strategist.headline})
-        else:
-            strategist = strategist.model_copy(
-                update={"headline": guardrail.revised_headline, "degraded": True}
+
+            guardrail = guardrail.model_copy(
+                update={"revised_headline": fallback_headline, "needs_revision": False}
             )
-    return {"strategist": strategist, "guardrail": guardrail, **_node_span("guardrail_apply")}
+
+            return {
+                "strategist": strategist,
+                "guardrail": guardrail,
+                **_node_span("guardrail_apply"),
+            }
+
+    # =========================
+    # 2. revision loop
+    # =========================
+    needs_revision = bool(guardrail.needs_revision)
+    if needs_revision:
+        try:
+            from stock_agent.agents.recomposer import run_recomposer
+
+            max_retries = 2
+            attempt = 0
+            last_guardrail = guardrail
+            last_strategist = strategist
+
+            while attempt < max_retries and (last_guardrail.needs_revision or not last_guardrail.passed):
+                attempt += 1
+
+                patched = run_recomposer(
+                    _agent_state({
+                        **state,
+                        "strategist": last_strategist,
+                        "guardrail": last_guardrail,
+                    })
+                )
+
+                patched = run_strategist(patched)
+                last_strategist = patched.strategist
+
+                try:
+                    patched = run_investment_analyst(patched)
+                except Exception:
+                    pass
+
+                patched = run_guardrail(patched)
+                last_guardrail = patched.guardrail
+
+            strategist = last_strategist
+            guardrail = last_guardrail
+
+        except Exception as exc:
+            err = f"recomposition_loop_failed: {exc.__class__.__name__}: {exc}"
+            return {"worker_errors": [err], **_node_span("guardrail_apply")}
+
+    return {
+        "strategist": strategist,
+        "guardrail": guardrail,
+        **_node_span("guardrail_apply"),
+    }
+
+def _renderer_node(state: AnalysisGraphState) -> dict[str, Any]:
+    try:
+        next_state = run_result_renderer(_agent_state(state))
+        return {**_patch_from_agent(next_state, "rendered_report"), **_node_span("renderer")}
+    except Exception as exc:
+        return {"worker_errors": [f"renderer: {exc.__class__.__name__}: {exc}"], **_node_span("renderer")}
 
 
 def build_analysis_graph():
@@ -338,6 +416,7 @@ def build_analysis_graph():
     graph.add_node("investment_analyst", _investment_analyst_node)
     graph.add_node("guardrail", _guardrail_node)
     graph.add_node("guardrail_apply", _apply_guardrail_node)
+    graph.add_node("renderer", _renderer_node)
 
     # 엣지 연결
     graph.add_edge(START, "curator")
@@ -357,7 +436,8 @@ def build_analysis_graph():
     graph.add_edge("strategist", "investment_analyst")
     graph.add_edge("investment_analyst", "guardrail")
     graph.add_edge("guardrail", "guardrail_apply")
-    graph.add_edge("guardrail_apply", END)
+    graph.add_edge("guardrail_apply", "renderer")
+    graph.add_edge("renderer", END)
 
     return graph.compile()
 
@@ -490,10 +570,13 @@ def _to_output(state: AgentState) -> AnalysisOutput:
     if state.strategist is None or state.guardrail is None:
         raise RuntimeError("analysis pipeline finished without strategist or guardrail output")
 
+    # guardrail 기반 보정
+    is_blocked = not state.guardrail.passed
+
     tier1 = Tier1Result(
-        signal=state.strategist.signal,
-        confidence=state.strategist.confidence,
-        suitability=state.strategist.suitability,
+        signal="HOLD" if is_blocked else state.strategist.signal,
+        confidence=max(0, state.strategist.confidence - (30 if is_blocked else 0)),
+        suitability=max(0, state.strategist.suitability - (30 if is_blocked else 0)),
         headline=state.guardrail.revised_headline,
         disclaimer=state.guardrail.disclaimer,
     )
@@ -509,9 +592,9 @@ def _to_output(state: AgentState) -> AnalysisOutput:
             "리스크": state.strategist.risks,
         },
         tier3={
-            "PB 리포트": "Phase 5에서 PDF/DOCX 생성 예정",
-            "밸류에이션 Excel": "Phase 5에서 Excel 생성 예정",
-            "산업/뉴스 분석 HTML": "Phase 3 RAG 연결 후 생성 예정",
+            "PB 리포트": "PDF 다운로드 가능",
+            "밸류에이션 Excel": "Excel 다운로드 가능",
+            "산업/뉴스 분석 HTML": "HTML 다운로드 가능",
         },
         state=state,
     )

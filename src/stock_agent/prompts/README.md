@@ -1,51 +1,43 @@
-# `src/stock_agent/prompts/` — LLM 프롬프트 분리 보관
+# `src/stock_agent/prompts/` - Agent 시스템 프롬프트
 
-## 왜 코드와 분리하나요
+> LLM 지시문을 Python 코드에서 분리해 리뷰·평가·변경 추적이 가능하게 합니다.
 
-- **비개발자도 수정 가능** — PM·기획자가 프롬프트만 손볼 수 있어야 합니다.
-- **A/B 테스트 용이** — 같은 에이전트의 프롬프트를 v1/v2 비교 실험.
-- **버전 관리** — Git diff로 프롬프트 변화 추적.
+## 폴더 소개
 
-## 파일 규칙
+- **What:** LLM을 사용하는 Agent별 `system.md`를 보관합니다.
+- **Why:** PM과 개발자가 코드 변경 없이 표현·제약·출력 조건을 검토할 수 있게 합니다.
+- 현재 Curator, RequestClassifier, Quant, Qual, Competitor, InvestmentAnalyst 프롬프트가 있습니다.
+- Strategist와 Guardrail은 현재 결정적 Python 로직을 중심으로 동작합니다.
+- 프롬프트 변경은 관련 단위 테스트와 `eval/run_benchmark.py`로 회귀 확인합니다.
 
+## 기술과 동작 원리
+
+Markdown 프롬프트를 UTF-8로 읽어 LLM 클라이언트에 전달하고, 응답은 [`schemas/analysis.py`](../schemas/analysis.py)의 모델과 Agent parser가 검증합니다.
+
+```mermaid
+flowchart LR
+    M[system.md] --> A[Agent]
+    A --> L[llm client]
+    L --> P[Pydantic validation]
+    P --> E[eval regression]
 ```
+
+## 현재 구조
+
+```text
 prompts/
-├── curator/
-│   ├── system.md              ← 시스템 프롬프트
-│   └── output_schema.md       ← 구조화 출력 지시
-├── quant/
-│   ├── system.md
-│   └── explanation.md
-├── qual/
-│   ├── system.md
-│   └── rag_summary.md
-├── competitor/
-├── strategist/
-│   ├── system.md
-│   ├── self_critique.md
-│   └── tier_output.md
-└── guardrail/
-    ├── system.md
-    └── finance_policy.md
+|- curator/system.md
+|- request_classifier/system.md
+|- quant/system.md
+|- qual/system.md
+|- competitor/system.md
+`- investment_analyst/system.md
 ```
 
-## 작성 가이드
+## 작성 규칙
 
-1. **시스템 프롬프트는 .md** — 줄바꿈·강조·표가 보존돼야 함
-2. **Few-shot 예시는 .json** — 코드에서 동적으로 N개 선택해 삽입
-3. **변경 시 평가 하네스 재실행** — `eval/run_benchmark.py` 로 점수 회귀 확인
-4. **모르면 모른다고 지시** — 출처 없는 추정이나 숫자 생성을 금지
-5. **구조화 출력 고정** — agent output은 Pydantic schema와 맞아야 함
-6. **금융 표현 제한** — “수익 보장”, “무조건 매수”, “확실한 수익” 등은 금지
-7. **분석 신호 표현** — BUY/HOLD/SELL은 투자 권유가 아니라 데이터 기반 분석 신호로 표현
-
-## Agent별 핵심 prompt 조건
-
-| Agent | 핵심 조건 |
-|-------|-----------|
-| Curator | 종목을 임의 확정하지 말고 후보를 반환 |
-| Quant | 계산값을 새로 만들지 말고 Tool 계산 결과만 해석 |
-| Qual | 검색된 RAG chunk에 없는 사실은 말하지 않음 |
-| Competitor | peer 선정 기준과 결측 여부를 명시 |
-| Strategist | signal과 portfolio suitability를 분리 |
-| Guardrail | 위험 표현을 완화하거나 `passed=false` 반환 |
+1. 출처 없는 숫자·사실 생성을 금지합니다.
+2. Tool 계산과 LLM 해석을 구분합니다.
+3. BUY/HOLD/SELL은 권유가 아닌 분석 신호로 표현합니다.
+4. 출력 키와 값 범위를 parser·schema와 맞춥니다.
+5. 하위 README에 Agent별 핵심 계약을 기록합니다.

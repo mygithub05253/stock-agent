@@ -2,6 +2,34 @@
 
 부트캠프 W2 학습 적용 영역. 시스템 신뢰성을 **정량 지표**로 측정합니다.
 
+## 폴더 소개
+
+- **What:** 사용자 페르소나와 결정적 비교 시나리오를 실제 파이프라인에 흘려 회귀를 측정합니다.
+- **Why:** 화면이 열리는지만 확인하지 않고 분류·신호·근거·안전 계약을 수치로 관리합니다.
+- 규칙 기반 평가는 API 비용 없이 모든 실행에서 사용할 수 있습니다.
+- RAGAS는 worker 근거와 답변의 충실도를 LLM judge로 측정합니다.
+- 보고서는 Markdown과 JSON으로 함께 남겨 사람과 자동화가 모두 읽습니다.
+
+## 기술 스택과 동작 원리
+
+pytest, JSON 골든셋, RAGAS, OpenRouter judge, sentence-transformers를 사용합니다.
+
+```mermaid
+flowchart LR
+    G[golden_set] --> R[run_benchmark]
+    R --> P[실제 pipeline]
+    P --> C[rule checks + RAGAS]
+    C --> O[reports md/json]
+```
+
+## 최신 성과
+
+| 평가 | 결과 |
+|------|------|
+| Phase 1 rule-based | **40/41** |
+| RAGAS faithfulness | **0.4096** (목표 0.80 미달) |
+| Competitor 회귀 | **6/6** |
+
 ## 파일 (실제 구현 상태)
 
 ```

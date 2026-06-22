@@ -4,10 +4,14 @@
 |------|-----|
 | 작성자 | PM |
 | 작성일 | 2026-05-10 |
-| 상태 | **Accepted** (PM 결정 — 비용·복잡도 우려 반영) |
+| 상태 | ~~Accepted~~ → **Superseded by [ADR-005](ADR-005-eleven-node-langgraph.md)** (2026-06-20, 11노드 LangGraph 전환) |
 | 영향 범위 | `src/stock_agent/agents/`, `src/stock_agent/graph/pipeline.py` |
 | 선행 ADR | ADR-001 (데이터 B안) |
-| 관련 ADR | ADR-002 (Critic 분리/통합) |
+| 관련 ADR | ADR-002 (Critic 분리/통합), **ADR-005 (11노드 전환, 본 ADR 대체)** |
+
+---
+
+> **⚠️ 이 결정은 [ADR-005](ADR-005-eleven-node-langgraph.md)로 대체되었습니다(2026-06-20).** 현재 구현은 6 에이전트가 아니라 **11노드 LangGraph StateGraph**입니다. 당시의 "비용·발표 명료성" 판단 근거는 기록으로 보존하되, 노드 구성의 현행 기준은 [`pipeline_11node_groundtruth.md`](../architecture/pipeline_11node_groundtruth.md)를 따르세요. 본 ADR의 압축 사상(Macro·Critic 통합)은 이후 LangGraph 재작성에서 Macro=조건부 워커 노드, Critic=Strategist 자체검토+InvestmentAnalyst 보정으로 재배치되었습니다.
 
 ---
 

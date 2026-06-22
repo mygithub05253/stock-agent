@@ -2,6 +2,32 @@
 
 PM이 주로 관리하는 문서 영역입니다. 개발자도 자유롭게 읽고 PR로 의견 제시 가능.
 
+## 폴더 소개
+
+- **What:** PRD, 기능 명세, 아키텍처, 운영, 피드백, 로드맵, 발표 자료를 한곳에서 관리합니다.
+- **Why:** Notion이나 대화에만 남은 결정을 코드와 함께 리뷰·버전 관리하기 위해 사용합니다.
+- Markdown과 Mermaid를 정확한 원본으로 우선합니다.
+- HTML은 발표·회의용 상호작용 시각화로 사용합니다.
+- PNG/SVG와 실제 UI 캡처는 `assets/`와 `guides/`에 보관합니다.
+
+## 문서 흐름
+
+```mermaid
+flowchart LR
+    P[PRD] --> F[기능 명세]
+    F --> A[아키텍처 / ADR]
+    A --> I[구현]
+    I --> E[평가 / 피드백]
+    E --> R[로드맵 / 운영]
+```
+
+## 주요 결과
+
+- 코드 기준 README 시스템 Mermaid와 GPT Image 2.0 요약 이미지를 제공합니다.
+- 2026-06-12 Phase 1 평가 **40/41**, faithfulness **0.4096**을 기록합니다.
+- 2026-06-14 Competitor 회귀 **6/6**을 기록합니다.
+- 폴더별 README가 문서 책임과 갱신 규칙을 안내합니다.
+
 ## 폴더 구조
 
 ```
@@ -27,6 +53,8 @@ docs/
 │       ├── A4_action_recommendation_spec_v1.0.md
 │       └── A5_stock_recommendation_spec_v1.1.md
 ├── architecture/                           ← 시스템 설계
+│   ├── README.md                           ← 구조 문서 인덱스
+│   ├── readme_system_architecture.md       ← 현재 코드 기준 README Mermaid
 │   ├── system_flow.md                      ← 사용자→에이전트→DB→출력 흐름도 (Mermaid)
 │   ├── multi_agent_architecture.md         ← 개발팀용 멀티 에이전트 상세 설계
 │   ├── multi_agent_architecture_review.html← 팀 논의용 멀티 에이전트 HTML 리뷰 문서
@@ -59,7 +87,10 @@ docs/
 │   ├── database.md
 │   └── images/
 ├── glossary.md                             ← 용어집 (비전공자용)
+├── guides/                                 ← 사용 가이드와 UI 개선 제안
+├── superpowers/                            ← 승인 설계와 구현 계획
 └── assets/                                 ← 이미지·다이어그램 SVG/PNG 보관
+    └── readme/                             ← README 썸네일·아키텍처·실제 캡처
 ```
 
 ## 주요 시각화 문서
@@ -68,7 +99,9 @@ docs/
 |------|------|
 | `docs/architecture/multi_agent_architecture_review.html` | 팀 회의에서 멀티 에이전트 구조, agent 책임, DB/Prompt/Tool/Guardrail을 한 화면에서 논의 |
 | `docs/architecture/api.html` | `multi_agent_architecture_review.html`로 이동하는 짧은 호환 링크 |
-| `docs/architecture/system_architecture_dashboard.html` | 전체 stock-agent 구조와 6 에이전트 흐름 설명 |
+| `docs/architecture/system_architecture_dashboard.html` | 전체 stock-agent 구조와 Agent 흐름 설명 |
+| `docs/architecture/readme_system_architecture.md` | 현재 코드 기준 LangGraph·데이터 연결 Mermaid |
+| `docs/assets/readme/stock-agent-architecture.png` | GPT Image 2.0 README 아키텍처 요약 이미지 |
 | `docs/architecture/backtesting_demo_dashboard.html` | 2026-05-22 타깃 예측일 기반 백테스팅 시연 구조 설명 |
 | `docs/assets/backtesting_demo_architecture.svg` | 발표 자료에 삽입 가능한 백테스팅 아키텍처 이미지 |
 
@@ -77,7 +110,7 @@ docs/
 | 순서 | 문서 | 왜 읽는가 |
 |------|------|-----------|
 | 1 | `docs/prd/PRD_v0.6.md` | 프로젝트가 해결하려는 문제, 범위, 성공 기준 확인 |
-| 2 | `docs/architecture/multi_agent_architecture.md` | 6개 agent 책임, LangGraph 목표 구조, DB/Tool/Prompt 계약 확인 |
+| 2 | `docs/architecture/readme_system_architecture.md` | 현재 Agent 실행과 DB/Tool/RAG 연결 확인 |
 | 3 | `docs/architecture/system_flow.md` | 사용자 흐름, agent 흐름, 데이터 흐름을 Mermaid로 확인 |
 | 4 | `docs/architecture/erd.md` | 실제 table과 agent별 데이터 사용 범위 확인 |
 | 5 | `docs/operations/llm_cost_guide.md` | 모델 라우팅, 캐싱, 월 5만원 비용 상한 확인 |
@@ -87,11 +120,11 @@ docs/
 
 | 구분 | 현재 | 목표 |
 |------|------|------|
-| Graph | `pipeline.py`에서 순차 mock 실행 | LangGraph `StateGraph` + Quant/Qual/Competitor 병렬 fan-out |
-| Agent | 6개 agent 함수가 mock 결과 반환 | DB/Tool/LLM/RAG를 연결한 specialist agent |
-| RAG | `pgvector_store.py` 검색 함수만 준비 | Qual Agent가 `rag_documents`, `rag_chunks`를 실제 검색 |
-| Prompt | `prompts/README.md`와 `.gitkeep`만 존재 | agent별 `system.md`, `finance_policy.md`, schema prompt 분리 |
-| Evaluation | Phase 1 pipeline test 2개 | golden set, 출처 부착률, guardrail, consistency 평가 |
+| Graph | LangGraph `StateGraph` + Quant/Qual/Competitor/Macro 동적 병렬 fan-out | 병렬 지연·부분 실패 관측 강화 |
+| Agent | DB/Tool/RAG/LLM 우선, 경로별 보수적 fallback | 근거 품질과 Input/Tool/Output Guardrail 강화 |
+| RAG | PostgreSQL GIN + pgvector Hybrid Search 연결 | faithfulness 0.4096을 목표 0.80까지 개선 |
+| Prompt | Agent 6종 `system.md` 분리 | prompt 변경 자동 평가 범위 확대 |
+| Evaluation | 5개 페르소나 40/41, Competitor 6/6 | rule 100%와 RAGAS 목표 달성 |
 
 ## 문서 작성 규칙
 

@@ -1,5 +1,19 @@
 # `src/stock_agent/mcp_bridge/` — Competitor MCP 데이터 브리지
 
+> DB 장애 시 pykrx 기반 peer 시세를 표준 MCP stdio Tool로 제공하는 독립 데이터 경계입니다.
+
+## 폴더 소개
+
+- **What:** sector roster와 market metrics Tool을 서버·클라이언트로 노출합니다.
+- **Why:** Competitor가 DB 연결 실패를 즉시 하드코딩 mock으로 대체하지 않게 합니다.
+- 실제 별도 자식 프로세스와 표준 `initialize -> tools/list -> call_tool` 흐름을 사용합니다.
+- 외부 소비자는 앱 내부 구현 대신 범용 `discover_tools`, `call_mcp_tool` API를 사용할 수 있습니다.
+- DB -> MCP 실시간 시세 -> mock의 3단 폴백에서 두 번째 경로를 담당합니다.
+
+## 기술 스택과 성과
+
+Python, FastMCP, stdio, asyncio, pykrx를 사용합니다. `tests/mcp_bridge/`가 핸드셰이크를 검증하고 Competitor 회귀 스위트는 **6/6**을 통과합니다.
+
 루브릭 #6(MCP/A2A)의 **"외부 데이터 Tool 1개를 MCP 서버로 노출 + 실동작 1경로"** 를 충족하는
 모듈입니다. Competitor Agent가 **DB에 연결하지 못했을 때**, 하드코딩 mock 대신 자체 MCP 서버를
 **별도 자식 프로세스(stdio 트랜스포트)** 로 띄워 **pykrx 실시간 시세 기반 peer 비교**를 확보합니다.

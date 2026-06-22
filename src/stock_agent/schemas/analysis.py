@@ -147,6 +147,9 @@ class StrategistResult(BaseModel):
     key_reasons: list[str]
     risks: list[str]
     next_actions: list[str]
+    executive_summary: str | None = None
+    investment_thesis: str | None = None
+    action_plan: str | None = None
     # 부분 실패 허용: 일부 워커 에이전트가 빠진 채 종합했는지와 실제 기여한 에이전트 목록.
     degraded: bool = False
     contributing_agents: list[str] = Field(default_factory=list)
@@ -187,6 +190,22 @@ class Tier1Result(BaseModel):
     disclaimer: str
 
 
+class InvestmentReport(BaseModel):
+    executive_summary: str
+    thesis: str | None = None
+    valuation: str | None = None
+    risk_analysis: str | None = None
+    action_plan: str | None = None
+
+
+class RenderedReport(BaseModel):
+    summary: str
+    recommendation: str
+    strengths: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    actions: list[str] = Field(default_factory=list)
+
+
 class AgentState(BaseModel):
     user_query: str
     user_request: UserRequest | None = None
@@ -200,6 +219,8 @@ class AgentState(BaseModel):
     macro: MacroResult | None = None
     strategist: StrategistResult | None = None
     guardrail: GuardrailResult | None = None
+    investment_report: InvestmentReport | None = None
+    rendered_report: RenderedReport | None = None
     graph_route: dict[str, Any] = Field(default_factory=dict)
     trace_spans: list[str] = Field(default_factory=list)
     worker_errors: list[str] = Field(default_factory=list)

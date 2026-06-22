@@ -1,0 +1,14 @@
+[
+  {
+    "id": "samsung_semiconductor_risk",
+    "ticker": "005930",
+    "query": "삼성전자 최근 반도체 실적 리스크 뉴스",
+    "relevant_title_keywords": ["삼성", "반도체"]
+  },
+  {
+    "id": "sk_hynix_hbm",
+    "ticker": "000660",
+    "query": "SK하이닉스 HBM AI 반도체 수요 뉴스",
+    "relevant_title_keywords": ["SK", "하이닉스", "HBM", "반도체"]
+  }
+]

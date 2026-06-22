@@ -1,5 +1,37 @@
 # News Data Pipeline & Semantic Retrieval
 
+> 네이버 금융 뉴스의 수집·정제·중복 제거와 PostgreSQL/pgvector RAG 준비를 담당합니다.
+
+## 현재 구현 요약
+
+- **What:** 종목별 뉴스 수집, 이벤트·감성 분류, 원천 적재, RAG 문서 전처리를 수행합니다.
+- **Why:** Qual Agent가 모델 기억이 아니라 시점과 URL이 있는 근거를 사용하게 합니다.
+- `news_collector.py`가 기사 목록을 수집해 `raw_news`와 `rag_documents`에 적재합니다.
+- `preprocess_news.py`가 기존 원천 payload를 정규화·중복 제거합니다.
+- `embed_news.py`가 임베딩 적재 단계를 제공합니다.
+
+| 기술 | 역할 |
+|------|------|
+| Requests, BeautifulSoup | 네이버 금융 수집 |
+| PostgreSQL, JSONB | 원천과 문서 저장 |
+| sentence-transformers, pgvector | 의미 검색용 임베딩 |
+
+```mermaid
+flowchart LR
+    N[네이버 금융] --> C[news_collector]
+    C --> R[(raw_news)]
+    R --> P[preprocess_news]
+    P --> D[(rag_documents)]
+    D --> E[embed_news]
+    E --> V[(rag_chunks)]
+```
+
+```bash
+python datas/news/news_collector.py
+python datas/news/preprocess_news.py
+python -m pytest tests/rag -v
+```
+
 기업 뉴스, 산업 이슈, 거시경제 기사 및 공시 기반 텍스트 데이터를 수집·정제·검색 가능한 형태로 구조화하는 작업 공간입니다.
 
 본 파트는 단순 뉴스 크롤링이 아니라:

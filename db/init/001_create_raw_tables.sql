@@ -72,27 +72,3 @@ CREATE TABLE IF NOT EXISTS financial_statement (
 
 CREATE INDEX IF NOT EXISTS idx_fs_search ON financial_statement (corp_code, bsns_year, account_nm);
 COMMENT ON TABLE financial_statement IS 'AI 에이전트 수치 계산용 핵심 재무제표 테이블';
-
--- 4. disclosure_report (공시 메타데이터 Index)
-CREATE TABLE IF NOT EXISTS disclosure_report (
-    rcept_no VARCHAR(14) PRIMARY KEY,
-    corp_code VARCHAR(8) NOT NULL,
-    report_nm VARCHAR(200) NOT NULL,
-    rcept_dt DATE NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (corp_code) REFERENCES company(corp_code) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_report_date ON disclosure_report (corp_code, rcept_dt DESC);
-COMMENT ON TABLE disclosure_report IS 'DART 전자공시 시스템 등록 보고서 목차 테이블';
-
--- 5. disclosure_content (공시 원본 텍스트 및 요약 Content)
-CREATE TABLE IF NOT EXISTS disclosure_content (
-    rcept_no VARCHAR(14) PRIMARY KEY,
-    content TEXT, -- PostgreSQL에서는 TEXT가 무제한 용량을 지원하므로 LONGTEXT 대신 TEXT를 씁니다.
-    summary TEXT,
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (rcept_no) REFERENCES disclosure_report(rcept_no) ON DELETE CASCADE
-);
-
-COMMENT ON TABLE disclosure_content IS 'RAG 및 자연어 분석용 비정형 공시 원문 저장 테이블';

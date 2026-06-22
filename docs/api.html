@@ -2,14 +2,126 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="refresh" content="0; url=architecture/multi_agent_architecture_review.html" />
-  <title>stock-agent multi-agent architecture</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>stock-agent 인터페이스 / API 명세</title>
+  <style>
+    :root { --bg:#f8fafc; --card:#fff; --border:#e2e8f0; --text:#0f172a; --muted:#64748b;
+      --blue:#2563eb; --blue-soft:#eff6ff; --emerald:#059669; --amber:#d97706; --slate-soft:#f1f5f9; --radius:12px; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:Pretendard,"Noto Sans KR",system-ui,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; font-size:15px; }
+    code { border-radius:5px; background:var(--slate-soft); padding:1px 5px; color:#334155; font-size:0.88em; }
+    pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px; overflow:auto; font-size:12.5px; font-family:Consolas,monospace; }
+    pre .c { color:#94a3b8; }
+    header { border-bottom:1px solid var(--border); background:#fff; }
+    .wrap { max-width:1080px; margin:0 auto; padding:18px 16px; }
+    .eyebrow { color:var(--blue); font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+    h1 { font-size:23px; font-weight:800; margin-top:4px; }
+    .lede { color:var(--muted); margin-top:8px; max-width:880px; font-size:14px; }
+    main { max-width:1080px; margin:0 auto; padding:22px 16px 64px; }
+    section { margin-top:30px; }
+    h2 { font-size:18px; font-weight:800; }
+    h2 .no { color:var(--blue); margin-right:6px; }
+    .desc { color:var(--muted); font-size:13.5px; margin-top:5px; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; background:#fff; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; font-size:13px; }
+    th,td { text-align:left; padding:9px 11px; border-bottom:1px solid var(--border); vertical-align:top; }
+    th { background:var(--slate-soft); font-size:12px; color:#334155; font-weight:700; }
+    tr:last-child td { border-bottom:0; }
+    .pill { display:inline-block; border-radius:999px; padding:2px 9px; font-size:11px; font-weight:700; background:var(--blue-soft); color:var(--blue); }
+    .note { margin-top:14px; border-left:4px solid var(--blue); border-radius:0 10px 10px 0; background:var(--blue-soft); padding:11px 14px; color:#1e3a8a; font-size:13px; }
+    .src { color:var(--muted); font-size:12px; }
+    a { color:var(--blue); }
+    footer { margin-top:40px; color:var(--muted); font-size:12px; text-align:center; }
+  </style>
 </head>
 <body>
-  <p>
-    멀티 에이전트 아키텍처 HTML은
-    <a href="architecture/multi_agent_architecture_review.html">architecture/multi_agent_architecture_review.html</a>
-    문서를 확인하세요.
-  </p>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">PM 문서화 트랙 · 인터페이스/API 명세 · 2026-06-20</p>
+      <h1>stock-agent 인터페이스 / API 명세</h1>
+      <p class="lede">
+        이 시스템은 REST 서버가 아니라 <strong>LangGraph 11노드 인터페이스 + MCP Tool + 산출물 인터페이스</strong>로 구성됩니다.
+        정본 문서는 <a href="interface/interface_spec.md">docs/interface/interface_spec.md</a>, 계약 스키마는
+        <code>src/stock_agent/schemas/analysis.py</code>, 노드 기준은 <code>docs/architecture/pipeline_11node_groundtruth.md</code>.
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <div class="note">
+      <strong>변경 안내:</strong> 기존 <code>api.html</code>은 빈 리다이렉트였습니다(강사 항목4 지적). 현재는 인터페이스 계약 실내용을 담은 정본 페이지입니다.
+    </div>
+
+    <section>
+      <h2><span class="no">§1</span>내부 노드 인터페이스 (11노드)</h2>
+      <p class="desc">모든 노드는 <code>AgentState</code>(Pydantic)를 읽고 일부 필드를 채워 반환합니다. 시그니처는 전부 <code>run_*(state: AgentState) -&gt; AgentState</code>.</p>
+      <table>
+        <thead><tr><th>#</th><th>노드</th><th>읽는 필드(입력)</th><th>쓰는 필드(출력)</th><th>출력 스키마</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>curator</td><td>user_query, portfolio, user_profile</td><td>curator</td><td><code>CuratorResult</code></td></tr>
+          <tr><td>2</td><td>classifier</td><td>user_query, curator</td><td>user_request, graph_route</td><td><code>UserRequest</code></td></tr>
+          <tr><td>3</td><td>quant</td><td>curator, portfolio</td><td>quant</td><td><code>QuantResult</code></td></tr>
+          <tr><td>4</td><td>qual</td><td>curator</td><td>qual</td><td><code>QualResult</code></td></tr>
+          <tr><td>5</td><td>competitor</td><td>curator</td><td>competitor</td><td><code>CompetitorResult</code></td></tr>
+          <tr><td>6</td><td>macro <span class="pill">조건부</span></td><td>curator</td><td>macro</td><td><code>MacroResult</code></td></tr>
+          <tr><td>7</td><td>strategist</td><td>quant·qual·competitor·macro, portfolio, user_profile</td><td>strategist</td><td><code>StrategistResult</code></td></tr>
+          <tr><td>8</td><td>investment_analyst</td><td>strategist</td><td>strategist(갱신)</td><td><code>StrategistResult</code></td></tr>
+          <tr><td>9</td><td>guardrail</td><td>strategist</td><td>guardrail</td><td><code>GuardrailResult</code></td></tr>
+          <tr><td>10</td><td>guardrail_apply</td><td>strategist, guardrail</td><td>strategist, guardrail</td><td>(갱신)</td></tr>
+          <tr><td>11</td><td>renderer</td><td>state 전체</td><td>rendered_report</td><td><code>RenderedReport</code></td></tr>
+        </tbody>
+      </table>
+      <p class="src">근거: <code>graph/pipeline.py</code>의 각 <code>_node</code>·<code>_patch_from_agent</code>.</p>
+    </section>
+
+    <section>
+      <h2><span class="no">§2</span>라우팅 계약 (graph_route)</h2>
+      <p class="desc">classifier가 산출하며 fan-out 워커 구성을 결정합니다.</p>
+<pre>{
+  <span class="c">// classifier 산출 (pipeline.py:140-151)</span>
+  "analysis_scope": "single_stock | portfolio | sector",
+  "urgency_reason": "surge | drop | earnings | news | general | null",
+  "requested_depth": "summary | standard | deep",
+  "summary_only": true,
+  "worker_plan": ["quant", "qual", "competitor", "macro?"]  <span class="c">// macro는 조건부</span>
+}</pre>
+    </section>
+
+    <section>
+      <h2><span class="no">§3</span>MCP Tool 인터페이스</h2>
+      <p class="desc">서버 <code>FastMCP("stock-agent-peer-data")</code> · stdio · <code>python -m stock_agent.mcp_bridge.peer_data_server</code>. Competitor 폴백 경로가 소비.</p>
+      <table>
+        <thead><tr><th>Tool</th><th>입력</th><th>출력</th></tr></thead>
+        <tbody>
+          <tr><td><code>sector_roster</code></td><td><code>sector: str</code></td><td><code>list[{stock_code, corp_name}]</code></td></tr>
+          <tr><td><code>market_metrics</code></td><td><code>stock_codes: list[str]</code>, <code>base_date: str=""</code></td><td>record 목록 (아래)</td></tr>
+        </tbody>
+      </table>
+<pre>{
+  <span class="c">// market_metrics record (peer_data_server.py:46-77)</span>
+  "stock_code": "000660", "corp_name": "SK하이닉스", "base_date": "2026-05-21",
+  "close_price": 201000, "market_cap": 146000000000000,
+  "per": 12.3, "pbr": 1.8, "roe": 0.14,   <span class="c">// 0 이하·결측은 null</span>
+  "eps": 16300, "bps": 110000             <span class="c">// roe = EPS/BPS 근사</span>
+}</pre>
+      <p class="src">장애 계약: <code>mcp</code>/<code>pykrx</code> 미설치·조회 실패 → <code>RuntimeError</code> → 상위 mock 폴백. 핸드셰이크 검증: <code>tests/mcp_bridge/test_mcp_handshake.py</code>.</p>
+    </section>
+
+    <section>
+      <h2><span class="no">§4</span>산출물 인터페이스 (AnalysisOutput)</h2>
+      <table>
+        <thead><tr><th>계층</th><th>형식</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td>Tier 1</td><td><code>Tier1Result</code></td><td>signal(BUY/HOLD/SELL)·confidence·suitability·headline·disclaimer</td></tr>
+          <tr><td>Tier 2</td><td><code>dict[str, list[str]|str]</code></td><td>정량·정성·Peer·거시·적합도·리스크 근거</td></tr>
+          <tr><td>Tier 3</td><td><code>dict[str, str]</code></td><td>PB 리포트(PDF)·밸류에이션(Excel)·산업/뉴스(HTML) 다운로드</td></tr>
+        </tbody>
+      </table>
+      <p class="src">다운로드: <code>_build_html_report</code>·<code>_build_excel_report</code>·<code>_build_pdf_report</code> (streamlit_app.py). DB 미저장.</p>
+    </section>
+
+    <footer>
+      stock-agent · 인터페이스/API 명세 · 정본 docs/interface/interface_spec.md · 스키마 schemas/analysis.py · 2026-06-20 (KST)
+    </footer>
+  </main>
 </body>
 </html>

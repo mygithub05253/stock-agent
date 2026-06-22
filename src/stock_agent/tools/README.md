@@ -2,6 +2,22 @@
 
 이 폴더는 agent가 사용하는 DB 조회, 외부 API 호출, 계산 함수를 담습니다. `agents/`에는 판단 흐름을 두고, `tools/`에는 데이터 접근과 계산을 둡니다.
 
+## 기술 스택과 동작 원리
+
+PostgreSQL, psycopg/psycopg2와 결정적 Python 계산을 사용합니다.
+
+```mermaid
+flowchart LR
+    A[Agent] --> T[Tool]
+    T --> DB[(PostgreSQL)]
+    T --> C[순수 계산]
+    DB --> T
+    C --> T
+    T --> R[근거·점수·품질 flag]
+```
+
+금융 수치와 peer 순위는 Tool에서 계산하고 LLM은 결과를 해석만 합니다.
+
 ## 파일 구조
 
 | 파일 | 상태 | 기능 | 사용 Agent |
@@ -34,3 +50,9 @@
 - `peer_tool.py`의 순수 계산 함수(`calculate_metric_row`, `calculate_relative_position`, `select_peer_rows` 등)는 DB 없이 단위 테스트 가능하며, `tests/tools/test_peer_tool.py`에서 검증합니다.
 - peer 비교 **품질 회귀**는 `eval/run_competitor_eval.py`(골든셋 `eval/competitor_golden/cases.json`)로 고정합니다 — peer 선정 순서·종합 score·핵심 플래그를 결정적 스냅샷과 대조하며, CI(`tests/test_competitor_eval.py`)에서 비용 0원으로 매번 실행됩니다.
 - Competitor의 LLM narrative는 `llm/openrouter_client.py`를 통해 호출하며, 일시적 장애(429·5xx·네트워크 오류)에 한해 최대 2회 재시도합니다. 수치는 LLM이 만들지 않고 Tool 계산 결과를 해석만 합니다.
+
+## 주요 결과와 검증
+
+- Competitor 순수 계산 회귀: **6/6** (`python eval/run_competitor_eval.py`)
+- Tool 단위 테스트: `python -m pytest tests/tools -v`
+- 스키마·DB 변경 시 `python scripts/check_db.py`로 실제 테이블을 확인합니다.

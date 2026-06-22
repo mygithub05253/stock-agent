@@ -1,8 +1,18 @@
 # `src/stock_agent/agents/` — 에이전트 구현
 
-본 폴더는 시스템의 에이전트 구현을 담습니다.
+> 분류, 전문 분석, 합성, 안전 검증, 결과 렌더링을 각각 한 책임으로 구현한 실행 단위 모음입니다.
 
-현재 Phase 1은 mock 함수 기반으로 동작하며, 목표 구조는 각 에이전트를 LangGraph 노드로 등록해 `src/stock_agent/graph/pipeline.py` 에서 오케스트레이션하는 것입니다. 자세한 아키텍처 기준은 `docs/architecture/multi_agent_architecture.md` 를 따릅니다.
+## 폴더 소개
+
+- **What:** `run_*` 함수가 Pydantic `AgentState`를 받아 자신의 결과 필드만 갱신합니다.
+- **Why:** 데이터 조회·LLM·오케스트레이션과 판단 책임을 분리해 독립 테스트와 폴백을 가능하게 합니다.
+- Quant, Qual, Competitor, Macro는 LangGraph `Send`로 실제 병렬 실행됩니다.
+- DB·RAG·LLM 경로와 결정적 fallback이 함께 구현되어 있습니다.
+- ResultRenderer는 Tier 1/2/3와 다운로드 산출물용 데이터를 만듭니다.
+
+## 기술 스택과 동작 원리
+
+Python, Pydantic 2, PostgreSQL Tool, pgvector RAG, OpenRouter/GLM client를 사용합니다. 각 Agent는 [`graph/pipeline.py`](../graph/pipeline.py)가 노드로 감싸며 다른 Agent를 직접 호출하지 않습니다.
 
 ## 파일 매핑
 
@@ -18,6 +28,9 @@
 | `macro.py` | Macro Agent | 거시경제 지표(금리/환율/물가/성장) 기반 투자 환경 평가 | W3 (Tool) |
 | `strategist.py` | Strategist & Synthesizer Agent | 정량·정성·Peer 결과 종합 → BUY/HOLD/SELL 성격의 분석 신호 + PB 리포트 작성 | W3 (ReAct) |
 | `guardrail.py` | Guardrail & Evaluator Agent | PII/욕설/투자권유 필터 + RAGAS 자동 채점 | **W2 + W5** |
+| `result_renderer.py` | Result Renderer | Tier 구조와 다운로드 산출물 생성 | UI |
+| `recomposer.py` | Recomposer | Guardrail 수정 요구 시 제한 재합성 | 안전 |
+| `fallback.py` | 공통 fallback 판별 | 예상 가능한 외부 장애만 폴백 | 안정성 |
 
 ⭐ = 부트캠프 학습 핵심 적용 에이전트
 
@@ -57,7 +70,7 @@
 
 - **프롬프트는 코드에 섞지 않고** `src/stock_agent/prompts/` 에 별도 파일로 관리합니다. 비개발자(PM·기획)가 프롬프트만 수정할 수 있어야 합니다.
 - 각 에이전트는 **Pydantic 스키마**(`src/stock_agent/schemas/`)에 정의된 입출력만 사용합니다. JSON 자유 형식 금지.
-- LLM 호출은 향후 **반드시** `src/stock_agent/llm/factory.py` 의 추상 함수를 통해 합니다. 모델 라우팅과 비용 추적이 한 곳에 모이도록.
+- LLM 호출은 `src/stock_agent/llm/`의 GLM·OpenRouter 클라이언트를 통해 수행하고, Agent에서 API 키·HTTP 세부사항을 직접 다루지 않습니다.
 - DB 조회, API 호출, 계산식은 `agents/`에 직접 넣지 않고 `src/stock_agent/tools/` 또는 `src/stock_agent/rag/` 로 분리합니다.
 - 모든 agent output에는 가능한 한 `source`, `as_of_date`, `data_version`, `warnings`를 포함할 수 있도록 schema 확장을 고려합니다.
 - 에이전트 단위 테스트는 `tests/agents/test_<agent_name>.py` 에 작성합니다.
@@ -81,11 +94,13 @@
 - 에이전트 1개 = 담당 1명 원칙. 같은 파일 동시 작업 금지.
 - 공통 인터페이스(`AgentState` 스키마, `BaseAgent` 추상 클래스)가 변경되면 PR 시 전체 팀 알림 필수.
 
-## 구현 우선순위
+## 주요 결과와 다음 개선
 
-1. Curator를 `company` DB 기반 종목 lookup으로 교체
-2. Quant를 `stock_price`, `financial_statement` 기반 계산으로 교체
-3. Qual에 `rag/pgvector_store.py` 검색 결과 연결
-4. Competitor에 peer 선정 기준과 비교 지표 연결
-5. Strategist에 포트폴리오 적합도와 self-critique 반영
-6. Guardrail을 Input/Tool/Output 3계층으로 확장
+- 현재 UI는 핵심 진행 Agent 9개의 이벤트와 결과를 표시합니다.
+- Quant, Qual, Competitor, Macro는 실제 데이터 우선·fallback 허용 방식으로 실행됩니다.
+- 다음 개선은 RAG faithfulness 0.4096을 목표 0.80까지 높이는 근거 품질과 Input/Tool/Output Guardrail 세분화입니다.
+
+```bash
+python -m pytest tests/agents -v
+python -m pytest tests/test_phase1_pipeline.py tests/test_result_renderer.py
+```

@@ -114,3 +114,41 @@ def test_retrieve_disclosures_uses_corp_code_filter(monkeypatch):
     assert "rag_documents" in cursor.query
     assert "disclosure" in cursor.params
     assert "00126380" in cursor.params
+
+
+def test_rerank_documents_is_disabled_by_default(monkeypatch):
+    monkeypatch.delenv("RAG_RERANKER_ENABLED", raising=False)
+    docs = [
+        {"id": "first", "body": "weak match"},
+        {"id": "second", "body": "strong match"},
+    ]
+
+    reranked = retriever.rerank_documents("query", docs, k=1)
+
+    assert [doc["id"] for doc in reranked] == ["first"]
+    assert "reranker_score" not in reranked[0]
+
+
+def test_rerank_documents_uses_cross_encoder_when_enabled(monkeypatch):
+    class FakeReranker:
+        def predict(self, pairs):
+            assert pairs == [
+                ("query", "weak match"),
+                ("query", "strong match"),
+            ]
+            return [0.1, 0.9]
+
+    monkeypatch.setenv("RAG_RERANKER_ENABLED", "true")
+    monkeypatch.setattr(retriever, "get_reranker_model", lambda: FakeReranker())
+    monkeypatch.setattr(retriever, "RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
+    docs = [
+        {"id": "first", "body": "weak match", "retrieval_method": "hybrid_rrf"},
+        {"id": "second", "body": "strong match", "retrieval_method": "hybrid_rrf"},
+    ]
+
+    reranked = retriever.rerank_documents("query", docs, k=2)
+
+    assert [doc["id"] for doc in reranked] == ["second", "first"]
+    assert reranked[0]["retrieval_method"] == "hybrid_rrf_reranked"
+    assert reranked[0]["reranker_model"] == "BAAI/bge-reranker-v2-m3"
+    assert reranked[0]["reranker_score"] == 0.9

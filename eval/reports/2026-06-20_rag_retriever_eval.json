@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-06-20T06:44:44.945730+00:00",
+  "k": 5,
+  "summary": {
+    "case_count": 2,
+    "hit_rate": 1.0,
+    "mrr": 1.0,
+    "ndcg_at_k": 0.9264639325303283
+  },
+  "results": [
+    {
+      "id": "samsung_semiconductor_risk",
+      "ticker": "005930",
+      "query": "삼성전자 최근 반도체 실적 리스크 뉴스",
+      "retrieved": 5,
+      "hit_at_k": true,
+      "mrr": 1.0,
+      "ndcg_at_k": 1.0,
+      "titles": [
+        "[단독] 삼성전자, 주주명부 열람 수용…소액주주 임시주총 청구 본격.....",
+        "삼성노사 잠정합의안 투표율 80%…일부 주주 \"합의 무효\"",
+        "적극 투표 나서는 삼성전자 노조원들...DX 반발 확산",
+        "적극 투표 나서는 삼성전자 노조원들...DX 반발 확산",
+        "\"장비 한대 5천억\"…더 높아진 벽, '천하제일 반도체대회' [김경민의..."
+      ],
+      "methods": [
+        "hybrid_rrf",
+        "hybrid_rrf",
+        "hybrid_rrf",
+        "hybrid_rrf",
+        "hybrid_rrf"
+      ]
+    },
+    {
+      "id": "sk_hynix_hbm",
+      "ticker": "000660",
+      "query": "SK하이닉스 HBM AI 반도체 수요 뉴스",
+      "retrieved": 5,
+      "hit_at_k": true,
+      "mrr": 1.0,
+      "ndcg_at_k": 0.8529278650606567,
+      "titles": [
+        "\"삼성전자·SK하이닉스 2배\"…단일종목 레버리지 ETF·ETN 27일...",
+        "\"삼성 직원 포르쉐 계약\" AI이미지 확산…사업부별 '계급도'까지",
+        "[MZ 재테크] “남들 삼전·하닉으로 벌 때 뭐했나”…이번엔 2배 ET...",
+        "[ETF워치]'삼성전자·하이닉스 레버리지' 27일 출시..운용사 경쟁...",
+        "AI 버블론 잠재운 엔비디아…다음주도 반도체주 달릴까 [인베스팅 인....."
+      ],
+      "methods": [
+        "hybrid_rrf",
+        "hybrid_rrf",
+        "hybrid_rrf",
+        "hybrid_rrf",
+        "hybrid_rrf"
+      ]
+    }
+  ]
+}

@@ -2,6 +2,18 @@
 
 `run_benchmark.py`가 사용하는 페르소나 입력과 기대 결과입니다.
 
+## 폴더 소개
+
+- **What:** 5개 대표 사용자 질문, 성향, 포트폴리오와 기대 분류를 저장합니다.
+- **Why:** 코드 변경 전후의 신호·면책·intent·urgency 계약을 같은 입력으로 비교합니다.
+- 입력은 `personas.json`, 기대 계약은 `expected_outputs.json`으로 분리합니다.
+- JSON은 pytest와 평가 스크립트가 함께 소비합니다.
+- 골든셋 변경은 기준 완화가 아닌 실제 사용자 시나리오 확장으로 리뷰합니다.
+
+## 기술과 동작
+
+JSON -> `eval/run_benchmark.py` -> 실제 LangGraph pipeline -> rule-based/RAGAS 평가 순서입니다. 최신 5개 케이스는 규칙 기반 항목 **40/41**을 통과했습니다.
+
 | 파일 | 내용 |
 |------|------|
 | `personas.json` | 5개 페르소나 케이스 — `case_id·persona·query·user_profile·portfolio` |

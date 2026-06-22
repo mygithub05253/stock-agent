@@ -6,6 +6,20 @@
 
 이유: LLM이 자유 JSON을 만들면 누락/오타가 발생. 스키마 강제로 시스템 안정성 확보.
 
+## 기술 스택과 동작 원리
+
+Pydantic 2의 type validation, enum/literal, nested model, `model_copy`를 사용합니다.
+
+```mermaid
+flowchart LR
+    U[UI input] --> S[UserProfile / Portfolio]
+    S --> A[AgentState]
+    A --> R[Agent Result models]
+    R --> O[AnalysisOutput]
+```
+
+모델 변경은 생산자와 소비자를 동시에 수정하고 `python -m pytest tests/test_competitor_schema.py tests/test_phase1_pipeline.py`로 검증합니다.
+
 ## 현재 파일
 
 | 파일 | 모델 | 사용처 |
@@ -32,3 +46,11 @@
 - BUY/HOLD/SELL은 `recommendation`보다 `signal`이라는 이름을 우선 사용합니다.
 - 금융 문맥에서 “권유”로 오해될 수 있는 필드명은 피합니다.
 - 정량 계산 결과와 LLM 해석 결과를 구분합니다.
+
+## 디렉토리 구조
+
+```text
+schemas/
+|- analysis.py  # 전체 분석 입출력과 상태
+`- __init__.py  # 공개 모델 export
+```

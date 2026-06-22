@@ -24,7 +24,14 @@ services:
       - "${STREAMLIT_PORT:-8501}:8501"
     volumes:
       - .:/app
-    command: ["streamlit", "run", "streamlit_app.py"]
+    command:
+      [
+        "streamlit",
+        "run",
+        "streamlit_app.py",
+        "--server.fileWatcherType=none",
+        "--browser.gatherUsageStats=false",
+      ]
 
   db:
     image: pgvector/pgvector:pg16

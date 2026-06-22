@@ -1,36 +1,42 @@
-# `src/stock_agent/llm/` — LLM 추상화 + 비용 라우팅
+# `src/stock_agent/llm/` - LLM 클라이언트와 폴백 경계
 
-## 핵심 원칙
+> 외부 모델 호출, 재시도, 응답 파싱을 Agent 도메인 로직과 분리합니다.
 
-> **모든 LLM 호출은 반드시 본 모듈을 거친다.** 직접 `openai.ChatCompletion.create()` 호출 금지.
+## 폴더 소개
 
-이유는 두 가지:
-1. **모델 라우팅** — 작업 난이도에 따라 작은/큰 모델 자동 선택 → 비용 절감
-2. **비용 추적** — 모든 호출의 입출력 토큰·비용을 LangSmith + DB에 기록
+- **What:** GLM과 OpenRouter의 chat completion 호출 adapter를 제공합니다.
+- **Why:** API 키, timeout, 재시도, 응답 형태를 Agent마다 중복 구현하지 않게 합니다.
+- `glm_client.py`는 OpenAI-compatible GLM 호출을 담당합니다.
+- `openrouter_client.py`는 Qwen 계열 모델 호출과 일시 오류 재시도를 담당합니다.
+- 외부 호출 실패 시 상위 Agent가 규칙 기반 결과로 fallback합니다.
+
+## 기술 스택
+
+Python `requests`, OpenAI-compatible HTTP API, JSON parsing을 사용합니다.
+
+## 동작 원리
+
+```mermaid
+flowchart LR
+    A[InvestmentAnalyst / Competitor] --> C[llm client]
+    C --> API[GLM or OpenRouter]
+    API --> P[구조화 응답 파싱]
+    C -->|일시 오류| R[제한 재시도]
+    R -->|실패| F[상위 Agent fallback]
+```
 
 ## 파일
 
 | 파일 | 역할 |
 |------|------|
-| `factory.py` | `get_llm(task_type)` 팩토리 함수. task_type 으로 모델 자동 선택 |
-| `glm_client.py` | GLM OpenAI-compatible chat/completions 호출 adapter |
-| `routing.py` | task_type → 모델 매핑 정책 (예: parsing → gpt-4o-mini, decision → solar) |
-| `tracker.py` | LangSmith 트레이싱 + 비용 추적 |
+| `glm_client.py` | GLM chat/completions adapter |
+| `openrouter_client.py` | OpenRouter 호출, 응답 정규화, 재시도 |
 
-## 모델 정책 (자세히는 `docs/operations/llm_cost_guide.md`)
+## 설정과 비용 정책
 
-| Task Type | Primary | Fallback | 1회 비용 |
-|-----------|---------|----------|----------|
-| `parsing` (의도 파싱·구조화) | gpt-4o-mini | Solar | ~10원 |
-| `rag_summary` (RAG 요약) | Solar | gpt-4o-mini | 0원 |
-| `decision` (최종 매수/매도) | gpt-4o | Solar | ~50원 |
-| `guardrail` (필터·검증) | gpt-4o-mini | rule-based | ~5원 |
-
-## 로컬 GLM 설정
-
-`.env`에는 키를 커밋하지 않습니다. 로컬 실행 시 프로세스 환경변수로만 주입합니다.
+키를 저장소에 커밋하지 않고 실행 프로세스 환경변수로 주입합니다. 월 비용 원칙은 [`docs/operations/llm_cost_guide.md`](../../../docs/operations/llm_cost_guide.md)를 따릅니다.
 
 ```bash
-GLM_API_KEY=... \
-scripts/run_local_streamlit.sh
+GLM_API_KEY=... scripts/run_local_streamlit.sh
+python -m pytest tests/llm -v
 ```

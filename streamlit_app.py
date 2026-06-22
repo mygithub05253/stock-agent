@@ -1,5 +1,8 @@
 from html import escape
+from io import BytesIO
+from datetime import datetime
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import streamlit as st
 
@@ -513,6 +516,258 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
             st.rerun()
 
 
+def _artifact_basename(output: Any) -> str:
+    stock_code = getattr(output.state.curator, "stock_code", None) if output.state.curator else None
+    date_part = datetime.now().strftime("%Y%m%d")
+    return f"stock_agent_{stock_code or 'report'}_{date_part}"
+
+
+def _section_rows(output: Any) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = [
+        ("signal", output.tier1.signal),
+        ("confidence", f"{output.tier1.confidence}%"),
+        ("suitability", f"{output.tier1.suitability}%"),
+        ("headline", output.tier1.headline),
+        ("disclaimer", output.tier1.disclaimer),
+    ]
+    if output.state.curator:
+        rows.extend(
+            [
+                ("corp_name", output.state.curator.corp_name),
+                ("stock_code", output.state.curator.stock_code),
+                ("corp_code", output.state.curator.corp_code),
+                ("sector", output.state.curator.sector),
+            ]
+        )
+    return rows
+
+
+def _build_html_report(output: Any) -> bytes:
+    rr = output.state.rendered_report
+    sections = []
+    for title, items in output.tier2.items():
+        section_items = "".join(f"<li>{escape(str(item))}</li>" for item in items)
+        sections.append(f"<section><h2>{escape(title)}</h2><ul>{section_items}</ul></section>")
+    tier3_items = "".join(
+        f"<li><strong>{escape(name)}</strong>: {escape(value)}</li>"
+        for name, value in output.tier3.items()
+    )
+    html = f"""<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>stock-agent report</title>
+  <style>
+    body {{ font-family: Arial, "Noto Sans KR", sans-serif; margin: 32px; color: #0f172a; }}
+    header {{ border-bottom: 2px solid #0f766e; padding-bottom: 16px; margin-bottom: 24px; }}
+    h1 {{ margin: 0 0 8px; font-size: 28px; }}
+    h2 {{ margin-top: 24px; color: #0f766e; font-size: 18px; }}
+    .badge {{ display: inline-block; padding: 4px 10px; border-radius: 999px; background: #0f766e; color: white; font-weight: 700; }}
+    .metric {{ display: inline-block; margin-right: 12px; padding: 8px 10px; border: 1px solid #dbe4ef; border-radius: 8px; }}
+    section {{ margin-bottom: 18px; }}
+    li {{ margin: 7px 0; line-height: 1.55; }}
+    .notice {{ color: #475569; font-size: 13px; }}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{escape(output.tier1.headline)}</h1>
+    <p><span class="badge">{escape(output.tier1.signal)}</span></p>
+    <p>
+      <span class="metric">신뢰도 {output.tier1.confidence}%</span>
+      <span class="metric">포트폴리오 적합도 {output.tier1.suitability}%</span>
+    </p>
+    <p class="notice">{escape(output.tier1.disclaimer)}</p>
+  </header>
+  {f"<section><h2>요약</h2><p>{escape(rr.summary)}</p><p>{escape(rr.recommendation)}</p></section>" if rr else ""}
+  {''.join(sections)}
+  <section><h2>Tier 3 산출물 상태</h2><ul>{tier3_items}</ul></section>
+</body>
+</html>
+"""
+    return html.encode("utf-8")
+
+
+def _xml_text(value: Any) -> str:
+    return escape(str(value), quote=True)
+
+
+def _xlsx_col_name(index: int) -> str:
+    name = ""
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        name = chr(65 + remainder) + name
+    return name
+
+
+def _xlsx_sheet(rows: list[list[Any]]) -> str:
+    row_xml = []
+    for r_idx, row in enumerate(rows, start=1):
+        cells = []
+        for c_idx, value in enumerate(row, start=1):
+            ref = f"{_xlsx_col_name(c_idx)}{r_idx}"
+            cells.append(
+                f'<c r="{ref}" t="inlineStr"><is><t>{_xml_text(value)}</t></is></c>'
+            )
+        row_xml.append(f'<row r="{r_idx}">{"".join(cells)}</row>')
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<sheetData>{"".join(row_xml)}</sheetData></worksheet>'
+    )
+
+
+def _build_excel_report(output: Any) -> bytes:
+    summary_rows = [["항목", "값"], *[list(row) for row in _section_rows(output)]]
+    tier2_rows = [["섹션", "내용"]]
+    for section, items in output.tier2.items():
+        tier2_rows.extend([[section, item] for item in items])
+    tier3_rows = [["산출물", "상태"], *[[name, value] for name, value in output.tier3.items()]]
+    quant_rows = [["지표", "값"]]
+    if output.state.quant:
+        quant_rows.extend([[name, value] for name, value in output.state.quant.metrics.items()])
+    sheets = [
+        ("Summary", summary_rows),
+        ("Tier2", tier2_rows),
+        ("Tier3", tier3_rows),
+        ("Quant", quant_rows),
+    ]
+
+    workbook_sheets = "".join(
+        f'<sheet name="{name}" sheetId="{idx}" r:id="rId{idx}"/>'
+        for idx, (name, _rows) in enumerate(sheets, start=1)
+    )
+    workbook_rels = "".join(
+        f'<Relationship Id="rId{idx}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{idx}.xml"/>'
+        for idx in range(1, len(sheets) + 1)
+    )
+    overrides = "".join(
+        f'<Override PartName="/xl/worksheets/sheet{idx}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        for idx in range(1, len(sheets) + 1)
+    )
+
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            f"{overrides}</Types>",
+        )
+        zf.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            "</Relationships>",
+        )
+        zf.writestr(
+            "xl/workbook.xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            f"<sheets>{workbook_sheets}</sheets></workbook>",
+        )
+        zf.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f"{workbook_rels}</Relationships>",
+        )
+        for idx, (_name, rows) in enumerate(sheets, start=1):
+            zf.writestr(f"xl/worksheets/sheet{idx}.xml", _xlsx_sheet(rows))
+    return buffer.getvalue()
+
+
+def _pdf_text(text: str) -> str:
+    return "<" + text.encode("utf-16-be").hex().upper() + ">"
+
+
+def _build_pdf_report(output: Any) -> bytes:
+    lines = [
+        "stock-agent PB 리포트",
+        output.tier1.headline,
+        f"판단: {output.tier1.signal} / 신뢰도: {output.tier1.confidence}% / 적합도: {output.tier1.suitability}%",
+        output.tier1.disclaimer,
+        "",
+        "[투자 근거]",
+        *[f"- {item}" for item in (output.state.rendered_report.strengths if output.state.rendered_report else [])[:6]],
+        "",
+        "[리스크]",
+        *[f"- {item}" for item in (output.state.rendered_report.risks if output.state.rendered_report else [])[:6]],
+        "",
+        "[권장 행동]",
+        *[f"- {item}" for item in (output.state.rendered_report.actions if output.state.rendered_report else [])[:4]],
+    ]
+    content_lines = ["BT", "/F1 13 Tf", "50 790 Td"]
+    for idx, line in enumerate(lines[:34]):
+        if idx:
+            content_lines.append("0 -21 Td")
+        content_lines.append(f"{_pdf_text(line[:58])} Tj")
+    content_lines.append("ET")
+    stream = "\n".join(content_lines).encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type0 /BaseFont /HYGoThic-Medium /Encoding /UniKS-UCS2-H /DescendantFonts [6 0 R] >>",
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HYGoThic-Medium /CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 2 >> >>",
+    ]
+    pdf = BytesIO()
+    pdf.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for idx, obj in enumerate(objects, start=1):
+        offsets.append(pdf.tell())
+        pdf.write(f"{idx} 0 obj\n".encode("ascii"))
+        pdf.write(obj)
+        pdf.write(b"\nendobj\n")
+    xref_at = pdf.tell()
+    pdf.write(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+    pdf.write(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.write(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.write(
+        f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode(
+            "ascii"
+        )
+    )
+    return pdf.getvalue()
+
+
+def _render_download_artifacts(output: Any) -> None:
+    basename = _artifact_basename(output)
+    st.markdown("#### 산출물 다운로드")
+    col_pdf, col_xlsx, col_html = st.columns(3)
+    with col_pdf:
+        st.download_button(
+            "PDF 리포트",
+            data=_build_pdf_report(output),
+            file_name=f"{basename}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    with col_xlsx:
+        st.download_button(
+            "Excel 밸류에이션",
+            data=_build_excel_report(output),
+            file_name=f"{basename}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    with col_html:
+        st.download_button(
+            "HTML 분석",
+            data=_build_html_report(output),
+            file_name=f"{basename}.html",
+            mime="text/html",
+            use_container_width=True,
+        )
+
+
 def _render_output() -> None:
     output = st.session_state.get("analysis_output")
     if output is None:
@@ -552,6 +807,54 @@ def _render_output() -> None:
         )
         if output.state.worker_errors:
             st.warning(" / ".join(output.state.worker_errors))
+
+    # Rendered report (Tier cards)
+    if output.state.rendered_report:
+        rr = output.state.rendered_report
+        tier3_items = "".join(
+            f"<li><span class='tier-card-muted'>{escape(name)}</span><br>"
+            f"{escape(value)}</li>"
+            for name, value in output.tier3.items()
+        )
+        strength_items = "".join(f"<li>{escape(item)}</li>" for item in rr.strengths[:4])
+        risk_items = "".join(f"<li>{escape(item)}</li>" for item in rr.risks[:4])
+        action_items = "".join(f"<li>{escape(item)}</li>" for item in rr.actions[:4])
+
+        st.subheader("요약 카드")
+        st.markdown(
+            f"""
+            <div class="tier-grid">
+              <section class="tier-card tier-card-primary">
+                <div class="tier-card-kicker">Tier 1 · 핵심 판단</div>
+                <h3>{escape(rr.summary)}</h3>
+                <div class="tier-card-metrics">
+                  <span>판단 <b>{escape(rr.recommendation)}</b></span>
+                  <span>신뢰도 <b>{tier1.confidence}%</b></span>
+                  <span>적합도 <b>{tier1.suitability}%</b></span>
+                </div>
+              </section>
+              <section class="tier-card">
+                <div class="tier-card-kicker">Tier 2 · 투자 근거</div>
+                <ul class="tier-list tier-list-good">{strength_items or "<li>표시할 근거가 없습니다.</li>"}</ul>
+              </section>
+              <section class="tier-card">
+                <div class="tier-card-kicker">Tier 3 · 리스크</div>
+                <ul class="tier-list tier-list-warn">{risk_items or "<li>표시할 리스크가 없습니다.</li>"}</ul>
+              </section>
+              <section class="tier-card">
+                <div class="tier-card-kicker">다음 행동</div>
+                <ul class="tier-list">{action_items or "<li>추가 행동 제안이 없습니다.</li>"}</ul>
+              </section>
+              <section class="tier-card tier-card-disabled">
+                <div class="tier-card-kicker">Tier 3 · 산출물</div>
+                <ul class="tier-list">{tier3_items}</ul>
+                <div class="tier-card-note">아래 버튼으로 현재 분석 결과를 파일로 내려받을 수 있습니다.</div>
+              </section>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        _render_download_artifacts(output)
 
     events = st.session_state.get("agent_events") or []
     if events:
@@ -613,6 +916,82 @@ def main() -> None:
         div[data-testid="stMultiSelect"] label p {
             font-size: 0.85rem;
             font-weight: 600;
+        }
+        .tier-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+            gap: 0.75rem;
+            margin: 0.5rem 0 1rem;
+        }
+        .tier-card {
+            border: 1px solid #dbe4ef;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 0.95rem;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        }
+        .tier-card-primary {
+            grid-column: 1 / -1;
+            border-color: #99f6e4;
+            background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%);
+        }
+        .tier-card-disabled {
+            background: #f8fafc;
+            border-style: dashed;
+        }
+        .tier-card-kicker {
+            margin-bottom: 0.45rem;
+            color: #0f766e;
+            font-size: 0.78rem;
+            font-weight: 900;
+            letter-spacing: 0.02em;
+        }
+        .tier-card h3 {
+            margin: 0.1rem 0 0.65rem;
+            color: #0f172a;
+            font-size: 1.2rem;
+            line-height: 1.35;
+        }
+        .tier-card-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+        .tier-card-metrics span {
+            border: 1px solid #ccfbf1;
+            border-radius: 999px;
+            background: #ffffff;
+            padding: 0.28rem 0.65rem;
+            color: #334155;
+            font-size: 0.82rem;
+        }
+        .tier-list {
+            margin: 0;
+            padding-left: 1.15rem;
+            color: #334155;
+        }
+        .tier-list li {
+            margin: 0.42rem 0;
+            line-height: 1.45;
+        }
+        .tier-list-good li::marker {
+            color: #0f766e;
+        }
+        .tier-list-warn li::marker {
+            color: #b45309;
+        }
+        .tier-card-muted {
+            color: #64748b;
+            font-weight: 800;
+        }
+        .tier-card-note {
+            margin-top: 0.65rem;
+            border-radius: 8px;
+            background: #e2e8f0;
+            padding: 0.45rem 0.6rem;
+            color: #475569;
+            font-size: 0.8rem;
+            font-weight: 700;
         }
         .agent-progress-panel {
             width: 100%;
@@ -834,6 +1213,9 @@ def main() -> None:
             }
             .agent-card-grid {
                 grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+            }
+            .tier-grid {
+                grid-template-columns: 1fr;
             }
             .agent-progress-head {
                 align-items: flex-start;

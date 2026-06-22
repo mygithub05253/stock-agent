@@ -1,7 +1,80 @@
 # stock-agent — BDAI 12기 팀 프로젝트
 
-> **한국 주식 투자자 의사결정 지원 멀티에이전트 시스템**
-> 회원의 포트폴리오·투자성향에 맞춰 정량·정성·Peer·매크로 데이터를 종합하고 BUY/HOLD/SELL 성격의 **분석 신호**를 근거와 함께 제공합니다.
+> 사용자 투자성향과 포트폴리오에 맞춰 정량·정성·Peer·거시 데이터를 종합하는 한국 주식 멀티에이전트 분석 시스템
+
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit 1.37+](https://img.shields.io/badge/Streamlit-1.37%2B-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![LangGraph 0.2+](https://img.shields.io/badge/LangGraph-0.2%2B-1C3C3C)](https://langchain-ai.github.io/langgraph/)
+[![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
+[![Rule checks 40/41](https://img.shields.io/badge/Rule_checks-40%2F41-0F766E)](eval/reports/2026-06-12_benchmark.md)
+[![Competitor regression 6/6](https://img.shields.io/badge/Competitor_regression-6%2F6-2563EB)](eval/reports/2026-06-20_competitor_eval.md)
+
+![stock-agent 프로젝트 썸네일](docs/assets/readme/stock-agent-thumbnail.png)
+
+## 프로젝트 소개
+
+**What** — Streamlit에서 7단계 투자성향과 포트폴리오를 입력받아 LangGraph 전문 Agent가 분석 신호와 근거를 생성합니다.<br>
+**Why** — 한 가지 지표나 모델 답변에 의존하지 않고 재무·뉴스·경쟁사·거시·개인 적합도를 함께 검토하기 위해 만들었습니다.<br>
+**핵심 기능** — 병렬 Agent 분석, BUY/HOLD/SELL 성격의 Tier 1/2/3 결과, Guardrail 검증, PDF·Excel·HTML 산출물을 제공합니다.
+
+> 출력은 투자 권유가 아닌 데이터 기반 분석 신호입니다. 최종 투자 판단과 책임은 사용자에게 있습니다.
+
+## 기술 스택
+
+| 영역 | 기술 | 역할 |
+|------|------|------|
+| 언어·모델 | Python 3.11+, Pydantic 2 | Agent 상태, 입출력 계약, 데이터 검증 |
+| UI | Streamlit | 온보딩, 포트폴리오 입력, 진행 상태, Tier 결과 |
+| 오케스트레이션 | LangGraph `StateGraph`, `Send` | 전문 Agent 동적 병렬 실행과 결과 병합 |
+| LLM | OpenRouter Qwen, GLM, 규칙 기반 폴백 | 최종 분석 문장 보정과 장애 시 보수적 결과 |
+| 데이터 | DART, pykrx, 뉴스, ECOS | 재무·공시·시세·정성·거시 근거 |
+| 저장·RAG | PostgreSQL 16, pgvector | 정형 데이터와 뉴스·공시 Hybrid Search |
+| 연동 | MCP | Competitor의 실시간 peer 데이터 폴백과 외부 소비 |
+| 평가 | pytest, RAGAS, 규칙 기반 골든셋 | 회귀, 근거 충실도, 출력 계약 검증 |
+| 인프라 | Docker, Docker Compose, GitHub Actions | 로컬 통합 실행과 PR 자동 검증 |
+
+## 5분 실행
+
+```bash
+git clone https://github.com/Pocat-1-team/stock-agent.git
+cd stock-agent
+python -m venv .venv
+```
+
+```powershell
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+python -m streamlit run streamlit_app.py
+```
+
+```bash
+# macOS / Linux
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+scripts/run_local_streamlit.sh
+```
+
+브라우저에서 `http://localhost:8501`을 엽니다. DB와 앱을 함께 실행하려면 `docker compose --profile app up --build`를 사용합니다. 환경변수와 DB 초기화까지 포함한 설명은 [상세 빠른 시작](#-빠른-시작)을 참고하세요.
+
+## 시스템 아키텍처
+
+![stock-agent 시스템 아키텍처](docs/assets/readme/stock-agent-architecture.png)
+
+현재 파이프라인은 `Curator -> RequestClassifier -> Quant/Qual/Competitor/Macro 병렬 실행 -> Strategist -> InvestmentAnalyst -> Guardrail -> ResultRenderer` 순서입니다. 구조의 정확한 연결과 폴백은 [Mermaid 원본](docs/architecture/readme_system_architecture.md), 더 넓은 배경은 [전체 시스템 흐름](docs/architecture/system_flow.md)에서 확인할 수 있습니다.
+
+## 주요 결과와 성과 지표
+
+| 지표 | 결과 | 근거 |
+|------|:----:|------|
+| Phase 1 규칙 기반 검증 | **40/41 (97.6%)** | [2026-06-12 평가 리포트](eval/reports/2026-06-12_benchmark.md) |
+| Competitor peer 회귀 | **6/6 (100%)** | [2026-06-20 회귀 리포트](eval/reports/2026-06-20_competitor_eval.md) |
+| 파이프라인 골든셋 | **5개 페르소나** | [`eval/golden_set/`](eval/golden_set/README.md) |
+| 사용자 온보딩 | **7단계 질문** | `src/stock_agent/intake.py` |
+| 화면 진행 추적 | **9개 Agent** | `streamlit_app.py`의 `_AGENT_PROGRESS_ORDER` |
+| RAGAS faithfulness | **0.4096 / 목표 0.80** | 목표 미달 상태를 공개하고 RAG 근거 품질 개선 대상으로 관리 |
+
+실제 실행 화면은 [온보딩 캡처](docs/assets/readme/current-streamlit-onboarding.png)와 [분석 결과 캡처](docs/assets/readme/current-streamlit-results.png)에서 확인할 수 있습니다.
 
 ---
 
@@ -18,7 +91,7 @@
 
 | 용어 | 한 줄 설명 |
 |------|-----------|
-| **에이전트(Agent)** | LLM에게 도구(검색·계산)를 주고 스스로 판단하게 만드는 단위. 우리 시스템엔 6명이 있음 |
+| **에이전트(Agent)** | 검색·계산·분류·합성처럼 하나의 책임을 맡는 실행 단위. UI는 핵심 진행 Agent 9개를 추적 |
 | **LLM** | Large Language Model. GPT·Claude·Solar 같은 대화 모델 |
 | **RAG** | Retrieval-Augmented Generation. "검색해서 그 결과를 바탕으로 답변" |
 | **LangGraph** | 여러 에이전트를 그래프로 연결해 동작시키는 파이썬 라이브러리 |
@@ -41,10 +114,10 @@
 
 | 영역 | 상태 | 비고 |
 |------|------|------|
-| Phase 1 E2E | 구현됨 | 삼성전자 1종목 mock 기준 `Curator → Quant/Qual/Competitor → Strategist → Guardrail` |
-| UI | 구현됨 | `streamlit_app.py`에서 Tier 1/Tier 2 결과 카드 확인 |
+| Phase 1 E2E | 구현됨 | `StateGraph`에서 Curator·Classifier 이후 Quant/Qual/Competitor/Macro 병렬 실행, 합성·검증·렌더링 |
+| UI | 구현됨 | `streamlit_app.py`에서 7단계 온보딩, Agent 진행 상태, Tier 1/2/3와 다운로드 확인 |
 | 공통 개발환경 | 구현됨 | Docker Compose로 `Streamlit app + Postgres pgvector` 실행 |
-| RAG 저장소 | 방향 확정 | MVP 기본은 Postgres + pgvector, Chroma는 optional backend 후보 |
+| RAG 저장소 | 구현됨 | Postgres + pgvector 기반 문서·청크 저장과 Hybrid Search |
 | LangSmith | 준비 중 | 환경변수 placeholder만 반영, 실제 tracing 모듈은 후속 작업 |
 | CI 안전망 | 구현됨 | `.github/workflows/ci.yml` — compileall + pytest 게이트로 PR 자동 검증 |
 
@@ -52,8 +125,8 @@
 1. **InvestorProfile Agent** — 온보딩 답변 → 투자성향·기간·손실감내·유동성 니즈 구조화
 2. **Curator Agent** — 사용자 자연어와 포트폴리오 → 분석 대상 종목/후보 큐레이션
 3. **RequestClassifier Agent** — 질문 → intent·scope·urgency 구조화
-4. **Qual Worker Agent ★** — 뉴스·공시 RAG로 호재/악재 분석 (현재 MVP mock)
-5. **Quant Worker Agent** — DART 재무 + pykrx 시세 기반 정량 분석 (현재 MVP mock)
+4. **Qual Worker Agent ★** — 뉴스·공시 RAG와 근거 부족 폴백으로 호재·악재 분석
+5. **Quant Worker Agent** — DART 재무 + pykrx 시세 기반 정량 분석
 6. **Competitor Agent** — 동종업계 Peer 추출 + 횡비교 (DB→MCP 실시간 시세→mock 3단 폴백, 품질 회귀 골든셋·MCP 외부 노출 완비)
 7. **Strategist & Synthesizer Agent** — worker 결과와 포트폴리오 맥락 종합
 8. **InvestmentAnalyst Agent** — GLM으로 최종 분석 신호와 포트폴리오 적합도 보정
@@ -111,7 +184,8 @@ stock-agent/
 │   └── init/                      Postgres + pgvector 초기화 SQL
 │
 ├── src/stock_agent/               🤖 애플리케이션 코드 (Streamlit이 import)
-│   ├── agents/                    6개 에이전트 구현
+│   ├── agents/                    분류·전문 분석·합성·검증 Agent 구현
+│   ├── mcp_bridge/                Competitor peer 데이터 MCP 브리지
 │   ├── graph/                     LangGraph 오케스트레이션
 │   ├── prompts/                   LLM 프롬프트 (코드와 분리 보관)
 │   ├── harness/                   횡단 컴포넌트 (가드레일·출처추적·용어풀이)
@@ -273,6 +347,20 @@ docker compose --profile app up --build
 > 개발 경험이 적어도 걱정 마세요. 이 규칙은 **여러분의 작업물이 사고로 사라지는 것을 막는 안전망** 입니다.
 > 모르는 게 있으면 PM에게 질문해 주세요.
 
+### 0. 팀 구성과 역할 (누가 무엇을 맡나)
+
+본 레포는 PM 2명(이동원·백형준) 체제로 운영하며, 아래 역할은 실제 머지된 PR 기준으로 정리했습니다.
+
+| 이름 | GitHub | 역할 | 주요 기여 (머지된 PR 기준) |
+|------|--------|------|------|
+| **이동원** | [`mygithub05253`](https://github.com/mygithub05253) | PM · 팀장 · 개발 | 문서·설계 트랙 전반, Competitor Agent(3단 폴백·복합 유사도·MCP 외부 노출), RAGAS 평가 하네스, Strategist resilience·Guardrail 실게이팅, CI 안전망 |
+| **백형준** | [`vividbaek`](https://github.com/vividbaek) | PM · 개발 | UI(Agent 진행 카드·LangGraph streaming), 단계형 투자성향 intake, Curator·InvestmentAnalyst GLM 연동 |
+| **윤수정** | [`Yoonssu`](https://github.com/Yoonssu) | 개발 · 데이터 관리 | Quant Agent(재무·시세 지표·부채비율), Qual Agent 공시 연결, Guardrail 개발, CI 오류 수정 |
+| **문수빈** | [`melinamuun`](https://github.com/melinamuun) | 개발 · 데이터 관리 | Macro Agent(거시환경 평가·라우팅), Supabase DB 연결·macro 759건 적재, LangGraph Send API fan-out |
+| **김도예** | [`doyekeem`](https://github.com/doyekeem) | 개발 · 데이터 관리 | 뉴스 크롤러, 뉴스 RAG 임베딩 파이프라인, Qual Hybrid RAG·Reranker·검색 평가 |
+
+> 역할은 고정 분담이 아니라 주력 영역입니다. 폴더별 세부 책임은 아래 [폴더 책임 분담](#4-폴더-책임-분담-어디에-뭘-넣어야-할까)을 함께 보세요.
+
 ### 1. 브랜치 규칙 (내 작업 공간 만들기)
 
 `main` 코드에 직접 수정하면 안 됩니다. 무조건 본인 브랜치에서 작업:
@@ -326,7 +414,7 @@ docker compose --profile app up --build
 | `datas/macro/` | 데이터팀 (매크로) | ECOS·FRED 수집 |
 | `datas/dart/` | 데이터팀 (DART) | DART 재무·공시 수집 |
 | `db/init/` | 데이터팀 + 백엔드 | Postgres 스키마 SQL |
-| `src/stock_agent/agents/` | 에이전트 담당 | 6개 에이전트 구현 |
+| `src/stock_agent/agents/` | 에이전트 담당 | 분류·전문 분석·합성·검증 Agent 구현 |
 | `src/stock_agent/graph/` | 에이전트 담당 | LangGraph 오케스트레이션 |
 | `src/stock_agent/prompts/` | 에이전트 + PM | LLM 프롬프트 (코드와 분리) |
 | `src/stock_agent/rag/` | 에이전트 (RAG) | Postgres pgvector + Reranker |
@@ -424,6 +512,8 @@ Chroma는 삭제하지 않고 향후 optional RAG backend 후보로 남깁니다
 
 ## 📘 문서 영역 (`docs/`)
 
+> 📑 **전 문서 탐색은 [문서 마스터 인덱스](docs/md/프로젝트_문서_마스터인덱스.md)에서 시작하세요** — 문서별 "기준 코드 경로"까지 추적합니다.
+
 PM이 주로 관리하는 문서들:
 
 | 문서 | 내용 | 누가 읽어야? |
@@ -497,6 +587,11 @@ docker compose --profile app run --rm app python scripts/check_db.py
 
 | 날짜 | 버전 | 변경 |
 |------|------|------|
+| 2026-06-22 | v1.17 | 시각자료 HTML 11노드 드리프트 정합 — `system_architecture_dashboard.html`(6→11노드 카드 보강)·`agent_flow_dashboard.html`(9→11노드·LangGraph 달성 반영)·`multi_agent_architecture_review.html`(prose)·`midterm_presentation.html`(ADR-005 supersede 각주). 시각자료 인덱스 교정 상태 완료 갱신 |
+| 2026-06-22 | v1.16 | 문서 마스터 인덱스(`docs/md/프로젝트_문서_마스터인덱스.md`) 추가 — 전 문서 분류 + 문서별 기준 코드 경로 추적성. `docs/interface`·`docs/usecase`·`docs/md` 폴더 README 보강 (docs 전 폴더 README 정합 완료) |
+| 2026-06-22 | v1.15 | Phase 3 서사 문서 세트 추가 — `docs/requirements/srs.md`(SRS+NFR), `docs/research/market_research.md`(시장조사), `docs/testing/test_spec.md`(테스트 137개 명세), `docs/report/result_report.md`(D→C→B 결과 보고서) + 각 폴더 README |
+| 2026-06-20 | v1.14 | 협업 가이드에 팀 구성·역할 섹션 추가(PR 기준 5인 역할 명시), Phase 2 AI 문서 세트(`docs/ai/` 모델 카드·프롬프트 명세·평가 보고서·오케스트레이션·요약본) 착수 |
+| 2026-06-20 | v1.13 | 루트 README 필수 구성 보강, 실제 Streamlit 캡처와 GPT Image 2.0 썸네일·아키텍처 추가, 코드 기준 Mermaid와 전 폴더 README·UI 개선 제안 정비 |
 | 2026-06-14 | v1.12 | Competitor Agent 100% 마감 — peer 품질 회귀 골든셋·평가 하네스, 범용 MCP 외부 노출(A2A). 06-14 진행현황 대시보드·ERD/기능명세/Competitor HTML 시각화·README 감사 리포트 추가. 루트 README `pages/`·eval 구조 정합 |
 | 2026-06-13 | v1.11 | Competitor Peer 선정 복합 유사도 고도화(#62), CI 머지 충돌마커 게이트(#63), ERD 테이블명 코드 정합(#64). 대시보드·흐름도에 반영 |
 | 2026-06-13 | v1.10 | 발표·온보딩용 에이전트 흐름도(`docs/architecture/agent_flow_dashboard.html`) 추가 — 9 에이전트 파이프라인 + 노드 클릭 상세(입출력·데이터·폴백)·인프라 레이어·폴백 전략·현재 vs LangGraph 목표 |

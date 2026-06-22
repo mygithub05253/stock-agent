@@ -2,6 +2,26 @@
 
 이 폴더는 PRD 기준 기능별 상세 명세서를 관리한다. 기능 명세서는 한 파일에 여러 기능을 섞지 않고, **기능 1개 = Markdown 명세서 1개**를 원칙으로 한다.
 
+## 폴더 소개
+
+- **What:** 기본(B), 고급(A), 시연(D) 기능의 트리거·입력·처리·출력·예외를 정의합니다.
+- **Why:** UI, Agent, 데이터, 평가 담당자가 같은 기능 계약을 구현하게 합니다.
+- Markdown이 명세 원본이고 HTML dashboard는 탐색·발표용입니다.
+- `IMPLEMENTATION_STATUS.md`가 명세와 실제 코드의 대응 상태를 관리합니다.
+- 하위 폴더 README가 기능군별 시작점을 제공합니다.
+
+## 동작 원리
+
+```mermaid
+flowchart LR
+    P[PRD] --> S[기능 명세]
+    S --> C[코드 / 프롬프트 / DB]
+    C --> T[테스트 / 평가]
+    T --> I[IMPLEMENTATION_STATUS]
+```
+
+기술 형식은 Markdown, Mermaid, HTML이며 검증은 코드 링크·pytest·평가 리포트로 수행합니다.
+
 ## 폴더 구조
 
 ```text
@@ -90,7 +110,7 @@ D1_backtesting_validation_spec_v0.1.md
 | 고급 | A1 | 5개년 밸류에이션 | `advanced/A1_valuation_5y_spec_v0.7.md` |
 | 고급 | A2 | 산업·정성 분석 | `advanced/A2_industry_qualitative_spec_v0.8.md` |
 | 고급 | A3 | 동종업계 횡비교 | `advanced/A3_peer_comparison_spec_v1.0.md` |
-| 고급 | A4 | BUY/HOLD/SELL 권유 | `advanced/A4_action_recommendation_spec_v1.0.md` |
+| 고급 | A4 | BUY/HOLD/SELL 분석 신호 | `advanced/A4_action_recommendation_spec_v1.0.md` |
 | 고급 | A5 | 종목 추천 | `advanced/A5_stock_recommendation_spec_v1.1.md` |
 | 고급 | A6 | PB 리포트 다운로드 | 예정 |
 | 데모 | D1 | 백테스팅 예측 검증 데모 | `demo/D1_backtesting_validation_spec_v0.1.md` |

@@ -12,7 +12,7 @@ from stock_agent.llm.openrouter_client import (
     OpenRouterClientError,
     openrouter_chat_json,
 )
-from stock_agent.schemas.analysis import AgentState, StrategistResult
+from stock_agent.schemas.analysis import AgentState, StrategistResult, InvestmentReport
 
 
 _PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "investment_analyst" / "system.md"
@@ -99,6 +99,24 @@ def run_investment_analyst(state: AgentState) -> AgentState:
                 model=settings.openrouter_model,
                 fallback_used=False,
             )
+            # Try to populate InvestmentReport if LLM returned extended fields
+            try:
+                inv_payload = {}
+                if parsed.get("executive_summary"):
+                    inv_payload["executive_summary"] = parsed.get("executive_summary")
+                if parsed.get("investment_thesis"):
+                    inv_payload["thesis"] = parsed.get("investment_thesis")
+                if parsed.get("valuation"):
+                    inv_payload["valuation"] = parsed.get("valuation")
+                if parsed.get("risk_analysis"):
+                    inv_payload["risk_analysis"] = parsed.get("risk_analysis")
+                if parsed.get("action_plan"):
+                    inv_payload["action_plan"] = parsed.get("action_plan")
+                if inv_payload:
+                    state.investment_report = InvestmentReport(**inv_payload)
+            except ValidationError:
+                # ignore if report schema doesn't match
+                pass
             return state
         except (OpenRouterClientError, ValidationError, OSError, ValueError) as exc:
             llm_errors.append(f"OpenRouter Qwen 호출 실패: {exc}")
@@ -128,6 +146,23 @@ def run_investment_analyst(state: AgentState) -> AgentState:
             model=settings.glm_model,
             fallback_used=bool(llm_errors or not settings.openrouter_api_key),
         )
+        # Try to populate InvestmentReport from GLM parsed output as well
+        try:
+            inv_payload = {}
+            if parsed.get("executive_summary"):
+                inv_payload["executive_summary"] = parsed.get("executive_summary")
+            if parsed.get("investment_thesis"):
+                inv_payload["thesis"] = parsed.get("investment_thesis")
+            if parsed.get("valuation"):
+                inv_payload["valuation"] = parsed.get("valuation")
+            if parsed.get("risk_analysis"):
+                inv_payload["risk_analysis"] = parsed.get("risk_analysis")
+            if parsed.get("action_plan"):
+                inv_payload["action_plan"] = parsed.get("action_plan")
+            if inv_payload:
+                state.investment_report = InvestmentReport(**inv_payload)
+        except ValidationError:
+            pass
     except (GLMClientError, ValidationError, OSError, ValueError) as exc:
         state.strategist = state.strategist.model_copy(
             update={

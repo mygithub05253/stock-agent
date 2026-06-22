@@ -67,6 +67,8 @@ def run_quant(state: AgentState) -> AgentState:
     corp_code = state.curator.corp_code
 
     as_of_date = getattr(state, "as_of_date", None)
+
+    
     if not as_of_date:
         from datetime import datetime
         as_of_date = datetime.now().strftime("%Y-%m-%d")
@@ -172,6 +174,7 @@ def run_quant(state: AgentState) -> AgentState:
         risks.append(
             "현재 정량 결과에는 일부 mock/기본값이 포함되어 있으므로 검증이 필요합니다."
         )
+        # 상세 실패 사유는 UI의 정량 근거 섹션과 테스트 계약에서 reasons로 노출한다.
         for fallback_reason in fallback_reasons:
             reasons.append(fallback_reason)
 
@@ -191,3 +194,4 @@ def run_quant(state: AgentState) -> AgentState:
     )
     
     return state
+

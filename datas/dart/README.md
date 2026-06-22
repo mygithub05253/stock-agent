@@ -1,5 +1,27 @@
 # DART & KRX Data
 
+> OpenDART의 기업·재무·공시와 KRX 시세를 PostgreSQL 분석 테이블로 정규화하는 수집 영역입니다.
+
+## 현재 구현 요약
+
+- **What:** 기업 마스터, 재무제표, 공시 메타·원문, 일별 가격을 수집합니다.
+- **Why:** Quant·Qual·Competitor가 공식 원천과 기준일이 있는 데이터를 사용하게 합니다.
+- `collector.py`는 기업과 보고서 기본 수집 진입점입니다.
+- `collect_prices.py`, `collect_financials.py`, `collect_contents.py`가 책임별 배치를 제공합니다.
+- `collect_heavyweights.py`는 시연 대상 주요 기업의 통합 수집 흐름입니다.
+
+| 기술 | 역할 |
+|------|------|
+| OpenDART REST/XML | 기업코드, 재무, 공시 |
+| pykrx | KRX 종목·시세·시가총액 |
+| psycopg2, PostgreSQL | 정규화와 멱등 적재 |
+
+```bash
+python datas/dart/collector.py
+python datas/dart/collect_prices.py
+python scripts/check_db.py
+```
+
 기업 재무제표, 공시 원문 및 주가 데이터 수집/전처리 작업 공간입니다.
 본 파트는 단순한 웹 스크래핑이 아니라, 
 금융감독원(DART)의 재무/공시 팩트와 한국거래소(KRX)의 시장 데이터를 결합하여 

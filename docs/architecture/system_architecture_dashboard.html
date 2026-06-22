@@ -43,7 +43,7 @@
       </a>
       <nav class="hidden items-center gap-1 text-sm font-medium text-slate-600 md:flex">
         <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#flow">데이터 흐름</a>
-        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#agents">6 에이전트</a>
+        <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#agents">11 노드</a>
         <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#diagrams">Mermaid</a>
         <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#database">DB</a>
         <a class="rounded-md px-3 py-2 hover:bg-slate-100" href="#roadmap">로드맵</a>
@@ -57,11 +57,11 @@
       <div class="rounded-lg border border-slate-200 bg-white p-6">
         <p class="text-sm font-semibold text-blue-700">PM 문서 기반 Top-down View</p>
         <h1 class="mt-3 max-w-4xl text-3xl font-bold leading-tight tracking-normal text-slate-950 sm:text-4xl">
-          개인투자자의 결정을 돕는 6 에이전트 분석 시스템
+          개인투자자의 결정을 돕는 11노드 LangGraph 분석 시스템
         </h1>
         <p class="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-          Streamlit 화면에서 시작된 사용자 질문을 Curator가 해석하고, Quant·Qual·Competitor가 병렬 분석한 뒤
-          Strategist와 Guardrail이 근거 있는 분석 신호와 책임 고지를 완성합니다.
+          Streamlit 화면에서 시작된 사용자 질문을 Curator·RequestClassifier가 해석하고, Quant·Qual·Competitor·(조건부)Macro가 병렬 분석한 뒤
+          Strategist·InvestmentAnalyst가 종합하고 Guardrail·Guardrail Apply·ResultRenderer가 근거 있는 분석 신호와 책임 고지를 완성합니다(LangGraph 11노드).
         </p>
         <div class="mt-6 grid gap-3 sm:grid-cols-3">
           <div class="rounded-lg border border-blue-100 bg-blue-50 p-4">
@@ -164,7 +164,7 @@
       <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-sm font-semibold text-blue-700">Interactive Agent Explorer</p>
-          <h2 class="mt-1 text-2xl font-bold text-slate-950">6개 에이전트 상세 명세</h2>
+          <h2 class="mt-1 text-2xl font-bold text-slate-950">11노드 상세 명세</h2>
         </div>
         <p class="max-w-xl text-sm leading-6 text-slate-600">에이전트를 선택하면 역할, 입력/출력 Pydantic 스키마, 사용하는 데이터와 툴을 확인할 수 있습니다.</p>
       </div>
@@ -556,6 +556,18 @@ flowchart TD
         files: ["src/stock_agent/agents/curator.py", "src/stock_agent/schemas/analysis.py"]
       },
       {
+        id: "classifier",
+        name: "RequestClassifier",
+        badge: "요청 분류",
+        phase: "W3 라우팅 / worker_plan 결정",
+        color: "bg-amber-100 text-amber-800",
+        desc: "질문을 intent·scope·urgency·depth로 구조화하고, 실행할 워커(worker_plan)와 macro 조건부 실행을 결정합니다.",
+        inputs: ["AgentState.user_query", "CuratorResult", "Portfolio", "UserProfile"],
+        outputs: ["user_request(intent·analysis_scope·urgency·depth)", "graph_route(worker_plan)"],
+        tools: ["GLM-4.5-flash", "rule 기반 분류 폴백"],
+        files: ["src/stock_agent/agents/request_classifier.py", "src/stock_agent/graph/pipeline.py"]
+      },
+      {
         id: "quant",
         name: "Quant Worker",
         badge: "정량 분석",
@@ -592,6 +604,18 @@ flowchart TD
         files: ["src/stock_agent/agents/competitor.py", "src/stock_agent/schemas/analysis.py"]
       },
       {
+        id: "macro",
+        name: "Macro Agent",
+        badge: "거시 환경 (조건부)",
+        phase: "거시경제 평가 / Send 조건부 실행",
+        color: "bg-cyan-100 text-cyan-800",
+        desc: "포트폴리오·섹터 분석이거나 업종이 확인된 단일 종목일 때만 Send로 실행되어 금리·환율·경기 등 거시 투자환경을 평가합니다.",
+        inputs: ["CuratorResult", "raw_macro / macro time series", "analysis_scope"],
+        outputs: ["MacroResult.score", "MacroResult.environment", "MacroResult.reasons / risks"],
+        tools: ["ECOS", "raw_macro", "Strategist 가중 소비"],
+        files: ["src/stock_agent/agents/macro.py", "src/stock_agent/graph/pipeline.py"]
+      },
+      {
         id: "strategist",
         name: "Strategist & Synthesizer",
         badge: "종합 결정",
@@ -604,6 +628,18 @@ flowchart TD
         files: ["src/stock_agent/agents/strategist.py", "src/stock_agent/graph/pipeline.py"]
       },
       {
+        id: "investment_analyst",
+        name: "InvestmentAnalyst",
+        badge: "sLLM 최종 보정",
+        phase: "Qwen→GLM→rule 3단 라우팅",
+        color: "bg-indigo-100 text-indigo-800",
+        desc: "Strategist 결과를 OpenRouter Qwen-2.5-7b로 1차 보정하고, 실패 시 GLM-4.5-flash→결정적 결과로 폴백해 최종 신호·적합도와 InvestmentReport를 완성합니다.",
+        inputs: ["StrategistResult", "UserProfile", "Portfolio"],
+        outputs: ["StrategistResult(갱신: signal·confidence·suitability)", "InvestmentReport", "model_provider / fallback_used"],
+        tools: ["OpenRouter Qwen-2.5-7b", "GLM-4.5-flash", "rule 폴백"],
+        files: ["src/stock_agent/agents/investment_analyst.py", "src/stock_agent/llm/"]
+      },
+      {
         id: "guardrail",
         name: "Guardrail & Evaluator",
         badge: "안전 검증",
@@ -614,6 +650,30 @@ flowchart TD
         outputs: ["GuardrailResult.passed", "GuardrailResult.warnings", "GuardrailResult.revised_headline", "GuardrailResult.disclaimer"],
         tools: ["RAGAS", "PII masking", "banned phrase filter", "eval/golden_set"],
         files: ["src/stock_agent/agents/guardrail.py", "src/stock_agent/harness/"]
+      },
+      {
+        id: "guardrail_apply",
+        name: "Guardrail Apply",
+        badge: "적용 + 재합성 루프",
+        phase: "PII 차단 + revision loop (≤2)",
+        color: "bg-slate-200 text-slate-800",
+        desc: "Guardrail 판정을 적용합니다. 민감정보 감지 시 headline 마스킹 + HOLD 강등(−30), 통과 못 하면 recomposer→strategist→analyst→guardrail을 최대 2회 재호출합니다.",
+        inputs: ["StrategistResult", "GuardrailResult", "needs_revision / passed"],
+        outputs: ["StrategistResult(갱신)", "GuardrailResult(갱신)", "worker_errors"],
+        tools: ["recomposer", "PII masking", "revision loop"],
+        files: ["src/stock_agent/graph/pipeline.py (_apply_guardrail_node)"]
+      },
+      {
+        id: "renderer",
+        name: "ResultRenderer",
+        badge: "결과 렌더",
+        phase: "Tier 1/2/3 출력",
+        color: "bg-teal-100 text-teal-800",
+        desc: "전체 state를 Tier 1(한 줄 결론)·Tier 2(근거)·Tier 3(상세) 결과로 렌더링합니다.",
+        inputs: ["전체 AgentState", "StrategistResult", "GuardrailResult"],
+        outputs: ["rendered_report (Tier 1/2/3)"],
+        tools: ["UI 컴포넌트", "책임 고지 부착"],
+        files: ["src/stock_agent/graph/pipeline.py (_renderer_node)", "ui/components/"]
       }
     ];
 
