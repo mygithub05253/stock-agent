@@ -84,7 +84,7 @@ docs/architecture/canonical_diagrams.md §1 "마스터 파이프라인 플로우
 
     <!-- 🔴 11노드 갱신 필요 -->
     <section class="group">
-      <div class="group-head"><span class="gbadge g-fix">🔴 11노드 갱신 필요</span><span class="group-title">드리프트 — 구 6/9 에이전트 도식</span><span class="group-sub">canonical §1/§2로 교체</span></div>
+      <div class="group-head"><span class="gbadge g-fix">✅ 11노드 갱신 완료</span><span class="group-title">드리프트 — 구 6/9 에이전트 도식 (2026-06-22 정합 완료)</span><span class="group-sub">전 HTML 11노드 정합</span></div>
       <div class="cards">
 
         <article class="vcard ok">
@@ -99,52 +99,51 @@ docs/architecture/canonical_diagrams.md §1 "마스터 파이프라인 플로우
           </div>
         </article>
 
-        <article class="vcard fix">
-          <div class="vtop"><span class="vname">시스템 아키텍처 대시보드</span></div>
+        <article class="vcard ok">
+          <div class="vtop"><span class="vname">시스템 아키텍처 대시보드</span> <span class="pin">✅ 정합 완료</span></div>
           <code class="vpath">docs/architecture/system_architecture_dashboard.html</code>
-          <p class="vwhat">발표·온보딩용 인터랙티브 시스템 구성도. nav·헤드라인에 "6 에이전트" 표기.</p>
+          <p class="vwhat">발표·온보딩용 인터랙티브 시스템 구성도.</p>
           <div class="fixbox">
-            <span class="fixlabel">Codex 수정 지시</span>
+            <span class="fixlabel">완료 (2026-06-22 PM)</span>
             <ul>
-              <li><span class="pin">46행</span> nav "6 에이전트" → "11 노드"(앵커 <code>#agents</code> 유지).</li>
-              <li><span class="pin">60행</span> "6 에이전트 분석 시스템" → "11노드 LangGraph 분석 시스템".</li>
-              <li><code>#agents</code> 섹션 카드에 <strong>Macro·InvestmentAnalyst·Guardrail Apply·ResultRenderer</strong> 추가(총 11). 내부 Mermaid가 있으면 canonical §1로 교체.</li>
+              <li>nav(46행)·헤드라인(60행)·섹션 제목(167행)을 "11노드"로 교체.</li>
+              <li>agents 배열에 <strong>classifier·Macro·InvestmentAnalyst·Guardrail Apply·ResultRenderer</strong> 5노드 추가 → <strong>총 11노드</strong>(코드 경로·입출력 스키마 포함). 추가 작업 불필요.</li>
             </ul>
           </div>
         </article>
 
-        <article class="vcard fix">
-          <div class="vtop"><span class="vname">멀티에이전트 PM 리뷰</span></div>
+        <article class="vcard ok">
+          <div class="vtop"><span class="vname">멀티에이전트 PM 리뷰</span> <span class="pin">✅ 정합 확인</span></div>
           <code class="vpath">docs/architecture/multi_agent_pm_review.html</code>
-          <p class="vwhat">PM 관점 아키텍처 리뷰(구 6에이전트 시기 산출물 가능성).</p>
+          <p class="vwhat">PM 관점 아키텍처 리뷰.</p>
           <div class="fixbox">
-            <span class="fixlabel">Codex 수정 지시</span>
+            <span class="fixlabel">확인 (2026-06-22 PM)</span>
             <ul>
-              <li>노드/에이전트 목록을 11노드 기준으로 정합 검토. 도식 있으면 canonical §1로 교체. (먼저 파일 정독 후 드리프트 여부 확정)</li>
+              <li>정독 결과 에이전트 수 단정(6/9) 드리프트 없음. 추가 교정 불필요.</li>
             </ul>
           </div>
         </article>
 
-        <article class="vcard fix">
-          <div class="vtop"><span class="vname">에이전트 흐름 대시보드</span></div>
+        <article class="vcard ok">
+          <div class="vtop"><span class="vname">에이전트 흐름 대시보드</span> <span class="pin">✅ 정합 완료</span></div>
           <code class="vpath">docs/architecture/agent_flow_dashboard.html</code>
-          <p class="vwhat">발표·온보딩용 — 노드 클릭 시 입출력·데이터소스·폴백 상세. README가 "9 에이전트"로 소개.</p>
+          <p class="vwhat">발표·온보딩용 — 노드 클릭 시 입출력·데이터소스·폴백 상세.</p>
           <div class="fixbox">
-            <span class="fixlabel">Codex 수정 지시</span>
+            <span class="fixlabel">완료 (2026-06-22 PM)</span>
             <ul>
-              <li>9개 구성을 <strong>11노드</strong>로 정합: <strong>Guardrail Apply·ResultRenderer</strong>를 별도 노드로 추가, classifier의 worker_plan 분기·조건부 macro 반영. "현재 vs 목표(LangGraph)" 비교가 이미 충족됐으므로 "목표 달성"으로 갱신.</li>
+              <li>헤드라인·pill·prose를 <strong>11노드</strong>로 교체, worker_plan 분기·조건부 macro 반영. "현재 vs 목표"를 <strong>LangGraph 달성</strong>(build_analysis_graph·graph.stream 라이브)으로 갱신, 잔여(토큰 스트리밍·sLLM·영속화·RAGAS)만 목표로 표기.</li>
             </ul>
           </div>
         </article>
 
-        <article class="vcard fix">
-          <div class="vtop"><span class="vname">중간발표 자료</span></div>
+        <article class="vcard ok">
+          <div class="vtop"><span class="vname">중간발표 자료</span> <span class="pin">✅ 각주 보완</span></div>
           <code class="vpath">docs/presentation/midterm_presentation.html</code>
-          <p class="vwhat">중간 발표 슬라이드. ADR-003 6-에이전트 채택 근거 인용.</p>
+          <p class="vwhat">중간 발표 슬라이드(과거 이력). ADR-003 6-에이전트 채택 근거 인용.</p>
           <div class="fixbox">
-            <span class="fixlabel">Codex 수정 지시</span>
+            <span class="fixlabel">완료 (2026-06-22 PM)</span>
             <ul>
-              <li><span class="pin">1028행</span> "ADR-003: 6-에이전트 구조 채택" 옆에 <strong>"→ ADR-005에서 11노드로 전환(superseded)"</strong> 각주 추가. (과거 발표 이력이므로 본문 통째 교체보다 각주 보완 권장)</li>
+              <li>1028행 ADR-003 옆에 <strong>"ADR-005에서 11노드로 전환(superseded)"</strong> 각주 추가. 과거 발표 이력(체크리스트 "9개 에이전트")은 기록으로 보존.</li>
             </ul>
           </div>
         </article>

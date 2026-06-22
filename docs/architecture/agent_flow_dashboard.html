@@ -183,30 +183,30 @@
     <section class="hero" style="margin-top:0;">
       <div class="card">
         <p class="section-label">System Flow · 한눈에 보는 멀티에이전트</p>
-        <h1>한 번의 질문이 9개 에이전트를 거쳐 근거 있는 BUY/HOLD/SELL 신호가 되기까지</h1>
+        <h1>한 번의 질문이 11개 노드를 거쳐 근거 있는 BUY/HOLD/SELL 신호가 되기까지</h1>
         <p class="lede">
-          사용자의 투자성향과 포트폴리오가 입력되면 <strong>Curator</strong>가 분석 대상을 정하고,
-          <strong>Quant·Qual·Competitor·Macro</strong> 4개 워커가 정량·정성·Peer·매크로를 병렬 수집한 뒤,
-          <strong>Strategist</strong>가 가중 종합하고 <strong>InvestmentAnalyst(GLM)</strong>가 보정하며
-          마지막으로 <strong>Guardrail</strong>이 위험 표현을 게이팅합니다. 아래 노드를 클릭하면 각 에이전트의
+          사용자의 투자성향과 포트폴리오가 입력되면 <strong>Curator·RequestClassifier</strong>가 분석 대상과 worker_plan을 정하고,
+          <strong>Quant·Qual·Competitor·(조건부)Macro</strong> 워커가 정량·정성·Peer·매크로를 병렬 수집한 뒤,
+          <strong>Strategist</strong>가 가중 종합하고 <strong>InvestmentAnalyst(Qwen→GLM)</strong>가 보정하며
+          <strong>Guardrail·Guardrail Apply</strong>가 위험 표현을 게이팅·재합성(≤2)하고 <strong>ResultRenderer</strong>가 Tier 1/2/3로 출력합니다. 아래 노드를 클릭하면 각 노드의
           입력·출력·데이터소스·폴백을 상세히 볼 수 있습니다.
         </p>
         <div class="pill-row">
-          <span class="pill"><strong>9</strong> 에이전트</span>
+          <span class="pill"><strong>11</strong> 노드</span>
           <span class="pill"><strong>4</strong> 워커 fan-out</span>
           <span class="pill"><strong>3단계</strong> 폴백 (Competitor)</span>
           <span class="pill">LLM: <strong>GLM</strong> + OpenRouter</span>
           <span class="pill">저장소: <strong>Postgres + pgvector</strong></span>
           <span class="pill">실시간: <strong>MCP(pykrx)</strong></span>
         </div>
-        <p class="hint">⚠️ 이 문서는 코드(main HEAD) 기준 스냅샷입니다. 파이프라인 구조가 바뀌면 갱신하세요. 현재는 동기 순차 실행이며, LangGraph 전환은 진행 예정(아래 "현재 vs 목표" 참고).</p>
+        <p class="hint">⚠️ 이 문서는 코드(main HEAD) 기준 스냅샷입니다. 파이프라인 구조가 바뀌면 갱신하세요. 현재는 <strong>LangGraph StateGraph 11노드</strong>로 실행되며 <code>Send</code> fan-out·conditional 라우팅이 적용됩니다(아래 "현재 vs 목표" 참고).</p>
       </div>
     </section>
 
     <section id="flow">
       <p class="section-label">Pipeline</p>
-      <h2 class="section-title">전체 실행 흐름 (run_phase1_analysis)</h2>
-      <p class="section-desc">코드의 실제 호출 순서입니다. 4개 워커는 현재 순차 호출되지만 서로 의존이 없어 LangGraph 전환 시 그대로 병렬 fan-out 됩니다. 각 노드 클릭 → 아래 상세 패널 이동.</p>
+      <h2 class="section-title">전체 실행 흐름 (build_analysis_graph · graph.stream)</h2>
+      <p class="section-desc">코드의 실제 실행 순서입니다. classifier의 worker_plan에 따라 4개 워커가 <code>Send</code>로 병렬 fan-out되고 Strategist로 join됩니다(macro는 조건부). 각 노드 클릭 → 아래 상세 패널 이동.</p>
 
       <div class="flow">
         <div class="flow-node" data-agent="investor" role="button" tabindex="0">
@@ -390,26 +390,27 @@
       <p class="section-desc">발표 시 "어디까지 했고 다음이 무엇인지"를 솔직히 보여주는 슬라이드입니다.</p>
       <div class="cmp">
         <article class="cmp-card now">
-          <h3><span class="tag tag-now">현재</span> 동기 순차 파이프라인</h3>
+          <h3><span class="tag tag-now">달성</span> LangGraph StateGraph 11노드</h3>
           <ul>
-            <li><code>pipeline.py</code>가 9개 <code>run_*</code> 함수를 위에서 아래로 호출</li>
-            <li>워커는 서로 의존 없지만 순차 실행 (병렬 아님)</li>
-            <li>역할 분리·폴백·게이팅·MCP·Macro 가중은 모두 동작</li>
-            <li>출력은 완성 후 <code>st.status</code>로 일괄 표시</li>
+            <li><code>build_analysis_graph()</code>가 11노드 그래프를 컴파일, <code>graph.stream()</code>으로 라이브 실행</li>
+            <li><code>Send</code>로 워커 fan-out → Strategist join (병렬)</li>
+            <li>RequestClassifier <code>worker_plan</code>으로 <strong>conditional 라우팅</strong> + macro 조건부 실행</li>
+            <li>노드별 이벤트를 <code>st.status</code>로 실시간 표시 (graph.stream)</li>
+            <li>역할 분리·폴백·게이팅·MCP·Macro 가중·revision loop 모두 동작</li>
           </ul>
         </article>
         <article class="cmp-card target">
-          <h3><span class="tag tag-target">목표</span> LangGraph StateGraph</h3>
+          <h3><span class="tag tag-target">잔여</span> 폴리시 고도화</h3>
           <ul>
-            <li><code>Send</code>로 4워커 fan-out → Strategist join</li>
-            <li>RequestClassifier 결과로 <strong>conditional 라우팅</strong></li>
-            <li>오픈웨이트 sLLM 노드 실호출 (루브릭 #3a)</li>
-            <li><code>st.write_stream</code> 토큰 스트리밍 (루브릭 #10)</li>
+            <li>토큰 단위 <code>st.write_stream</code> 스트리밍 (현재는 노드 단위, 루브릭 #10)</li>
+            <li>오픈웨이트 sLLM 전용 노드 확대 (현재 OpenRouter Qwen-2.5-7b, 루브릭 #3)</li>
+            <li>영속화 테이블(users·holdings·analysis_cache) DDL</li>
+            <li>RAGAS faithfulness 0.41 → 0.80</li>
           </ul>
         </article>
       </div>
       <div class="section-note">
-        이 흐름도의 노드/카드 구조는 LangGraph 전환 후에도 그대로 유효합니다 — 바뀌는 것은 "호출 방식(순차→그래프)"이지 "에이전트 책임"이 아닙니다. 그래서 지금 흐름을 먼저 고정해두면 전환 작업의 기준점이 됩니다.
+        이 흐름도의 노드/카드 구조는 코드의 LangGraph StateGraph(<code>pipeline.py: build_analysis_graph</code>)와 1:1 정합합니다. 기준: <code>docs/architecture/pipeline_11node_groundtruth.md</code>(11노드 SSOT).
       </div>
     </section>
 
