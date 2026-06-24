@@ -307,12 +307,18 @@ def parse_holdings_text(text: str) -> HoldingParseResult:
     return HoldingParseResult(holdings=build_holding_weights(holdings), warnings=warnings)
 
 
-def build_holding_weights(holdings: list[Holding]) -> list[Holding]:
-    total_value = sum(holding.market_value or 0 for holding in holdings)
-    if total_value <= 0:
+def build_holding_weights(
+    holdings: list[Holding],
+    *,
+    total_assets: int | float | None = None,
+) -> list[Holding]:
+    denominator = total_assets
+    if denominator is None:
+        denominator = sum(holding.market_value or 0 for holding in holdings)
+    if denominator <= 0:
         return holdings
     return [
-        holding.model_copy(update={"weight": (holding.market_value or 0) / total_value})
+        holding.model_copy(update={"weight": (holding.market_value or 0) / denominator})
         for holding in holdings
     ]
 
@@ -327,6 +333,16 @@ def build_holding_from_selection(corp_name: str, qty: int, avg_price: int | None
         avg_price=avg_price if avg_price is not None else current_price,
         qty=qty,
         current_price=current_price,
+    )
+
+
+def build_portfolio_from_holdings(holdings: list[Holding], cash_amount: int) -> Portfolio:
+    holdings_value = sum(holding.market_value or 0 for holding in holdings)
+    total_assets = holdings_value + cash_amount
+    cash_weight = cash_amount / total_assets if total_assets > 0 else 0
+    return Portfolio(
+        holdings=build_holding_weights(holdings, total_assets=total_assets),
+        cash_weight=cash_weight,
     )
 
 
