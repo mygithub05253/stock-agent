@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from contextlib import contextmanager
@@ -68,6 +69,9 @@ class Trace:
 
 def _emit_to_langfuse(trace: Trace) -> bool:
     """langfuse가 사용 가능하면 trace를 전송한다. 미설치·실패 시 False 반환."""
+    if not os.getenv("LANGFUSE_PUBLIC_KEY") or not os.getenv("LANGFUSE_SECRET_KEY"):
+        return False
+
     try:
         from langfuse import Langfuse  # type: ignore
     except Exception:
@@ -75,13 +79,32 @@ def _emit_to_langfuse(trace: Trace) -> bool:
 
     try:
         client = Langfuse()  # 키는 환경변수(LANGFUSE_*)에서 자동 로드
-        root = client.trace(id=trace.trace_id, name=trace.name)
-        for span in trace.spans:
-            root.span(
-                name=span.name,
-                metadata=span.attributes,
-                level="ERROR" if span.status == "error" else "DEFAULT",
+        if hasattr(client, "trace"):
+            root = client.trace(id=trace.trace_id, name=trace.name)
+            for span in trace.spans:
+                root.span(
+                    name=span.name,
+                    metadata=span.attributes,
+                    level="ERROR" if span.status == "error" else "DEFAULT",
+                )
+        else:
+            trace_context = {"trace_id": trace.trace_id}
+            client.create_event(
+                trace_context=trace_context,
+                name=trace.name,
+                metadata={"span_count": len(trace.spans)},
             )
+            for span in trace.spans:
+                client.create_event(
+                    trace_context=trace_context,
+                    name=span.name,
+                    metadata={
+                        **span.attributes,
+                        "duration_ms": span.duration_ms,
+                    },
+                    level="ERROR" if span.status == "error" else "DEFAULT",
+                    status_message=span.status,
+                )
         client.flush()
         return True
     except Exception as exc:  # 관측 실패가 본 파이프라인을 막아서는 안 된다.

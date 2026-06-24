@@ -70,3 +70,33 @@ def test_pipeline_guardrail_retries_revisable_failure(monkeypatch):
     assert out.state.guardrail.passed is True
     assert out.state.guardrail.needs_revision is False
     assert out.tier1.headline == "추가 근거를 반영해 보유 유지 검토가 우세합니다."
+
+
+def test_pipeline_guardrail_revision_strategy_failure_is_degraded(monkeypatch):
+    calls = {"strategist": 0}
+
+    def fake_run_strategist(state):
+        calls["strategist"] += 1
+        if calls["strategist"] > 1:
+            raise RuntimeError("revision strategist unavailable")
+        state.strategist = StrategistResult(
+            signal="BUY",
+            confidence=80,
+            suitability=80,
+            headline="근거가 부족한 매수 의견입니다.",
+            key_reasons=["단일 근거"],
+            risks=[],
+            next_actions=[],
+        )
+        return state
+
+    monkeypatch.setattr(pipeline, "run_strategist", fake_run_strategist)
+    _stub_worker_nodes(monkeypatch)
+
+    out = pipeline.run_phase1_analysis("test query")
+
+    assert calls["strategist"] == 2
+    assert out.state.strategist.degraded is True
+    assert out.state.strategist.fallback_used is True
+    assert any("recomposition_strategy_failed" in err for err in out.state.worker_errors)
+    assert out.state.guardrail.needs_revision is True

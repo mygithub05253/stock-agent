@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     langsmith_endpoint: str = "https://api.smith.langchain.com"
     langsmith_api_key: str | None = None
     langsmith_project: str = "stock-agent-local"
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
     glm_api_key: str | None = None
     glm_base_url: str = "https://api.z.ai/api/paas/v4"
     glm_model: str = "glm-4.5-flash"

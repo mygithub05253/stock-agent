@@ -350,15 +350,37 @@ def _apply_guardrail_node(state: AnalysisGraphState) -> dict[str, Any]:
             while attempt < max_retries and (last_guardrail.needs_revision or not last_guardrail.passed):
                 attempt += 1
 
-                patched = run_recomposer(
-                    _agent_state({
-                        **state,
-                        "strategist": last_strategist,
+                try:
+                    patched = run_recomposer(
+                        _agent_state({
+                            **state,
+                            "strategist": last_strategist,
+                            "guardrail": last_guardrail,
+                        })
+                    )
+                    patched = run_strategist(patched)
+                except Exception as exc:
+                    err = (
+                        "recomposition_strategy_failed: "
+                        f"{exc.__class__.__name__}: {exc}"
+                    )
+                    degraded = last_strategist.model_copy(
+                        update={
+                            "degraded": True,
+                            "fallback_used": True,
+                            "risks": [
+                                *last_strategist.risks,
+                                "Guardrail 재작성 중 전략 재합성에 실패해 마지막 안전 보정 결과를 유지합니다.",
+                            ],
+                        }
+                    )
+                    return {
+                        "strategist": degraded,
                         "guardrail": last_guardrail,
-                    })
-                )
+                        "worker_errors": [err],
+                        **_node_span("guardrail_apply"),
+                    }
 
-                patched = run_strategist(patched)
                 last_strategist = patched.strategist
 
                 try:

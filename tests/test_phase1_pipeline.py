@@ -70,7 +70,7 @@ def test_stream_phase1_analysis_events_reports_agent_progress() -> None:
         "investment_analyst",
         "guardrail",
     }
-    assert any(event["node"] == "macro" and event["status"] == "skipped" for event in node_events)
+    assert any(event["node"] == "macro" and event["status"] == "done" for event in node_events)
     assert all(event["status"] in {"done", "skipped", "error"} for event in node_events)
     assert complete["type"] == "complete"
     assert complete["output"].state.strategist is not None

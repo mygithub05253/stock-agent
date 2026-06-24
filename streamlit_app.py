@@ -10,22 +10,13 @@ from stock_agent.graph import stream_phase1_analysis_events
 from stock_agent.intake import (
     STOCK_CATALOG,
     build_holding_from_selection,
-    build_holding_weights,
+    build_portfolio_from_holdings,
     get_stock_options,
     get_onboarding_card,
     infer_user_profile,
     onboarding_card_count,
 )
 from stock_agent.schemas import Portfolio, UserProfile
-
-
-_DEFAULT_QTY_BY_CORP = {
-    "SK하이닉스": 2,
-    "삼성전자": 3,
-    "한미반도체": 2,
-    "KB금융": 5,
-    "신한지주": 5,
-}
 
 
 _DEFAULT_AVG_PRICE_RATIO_BY_CORP = {
@@ -104,6 +95,24 @@ def _reset_intake() -> None:
     _init_intake_state()
 
 
+def _clear_analysis_state() -> None:
+    for key in ["analysis_output", "agent_events", "intake_messages"]:
+        st.session_state.pop(key, None)
+    st.session_state.setdefault("intake_messages", [])
+
+
+def _clear_portfolio_state() -> None:
+    for key in ["intake_portfolio", "cash_amount"]:
+        st.session_state.pop(key, None)
+    _clear_analysis_state()
+    st.session_state.setdefault("cash_amount", 0)
+
+
+def _clear_profile_state() -> None:
+    st.session_state.pop("inferred_profile", None)
+    _clear_portfolio_state()
+
+
 def _format_risk_label(risk_tolerance: str) -> str:
     return {"low": "안정형", "medium": "중립형", "high": "공격형"}.get(
         risk_tolerance,
@@ -148,6 +157,8 @@ def _render_onboarding_step() -> None:
     with col_next:
         next_label = "성향 분석" if step == total_steps - 1 else "다음"
         if st.button(next_label, type="primary"):
+            if answers.get(card["id"]) != selected_option["value"]:
+                _clear_profile_state()
             answers[card["id"]] = selected_option["value"]
             st.session_state["onboarding_answers"] = answers
             if step == total_steps - 1:
@@ -221,7 +232,7 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
                     qty = st.number_input(
                         f"{corp_name} 수량",
                         min_value=0,
-                        value=_DEFAULT_QTY_BY_CORP.get(corp_name, 0),
+                        value=0,
                         step=1,
                         label_visibility="visible",
                         key=f"stock_qty_{corp_name}",
@@ -241,7 +252,6 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
                         build_holding_from_selection(corp_name, int(qty), avg_price=int(avg_price))
                     )
 
-    holdings_value = sum(holding.market_value or 0 for holding in selected_holdings)
     cash_amount = st.number_input(
         "보유 현금",
         min_value=0,
@@ -250,13 +260,7 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
         format="%d",
     )
     st.session_state["cash_amount"] = int(cash_amount)
-    total_assets = holdings_value + int(cash_amount)
-    cash_weight = int(cash_amount) / total_assets if total_assets > 0 else 0
-
-    portfolio = Portfolio(
-        holdings=build_holding_weights(selected_holdings),
-        cash_weight=cash_weight,
-    )
+    portfolio = build_portfolio_from_holdings(selected_holdings, int(cash_amount))
     if portfolio.holdings:
         _render_portfolio_summary(portfolio)
     else:
@@ -265,12 +269,13 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
     col_back, col_next = st.columns([1, 1])
     with col_back:
         if st.button("성향 질문으로 돌아가기"):
+            _clear_profile_state()
             st.session_state["intake_stage"] = "onboarding"
             st.rerun()
     with col_next:
         if st.button("투자성향 확인", type="primary", disabled=not portfolio.holdings):
             st.session_state["intake_portfolio"] = portfolio.model_dump(mode="json")
-            st.session_state.pop("analysis_output", None)
+            _clear_analysis_state()
             st.session_state["intake_stage"] = "analysis"
             st.rerun()
 
@@ -511,8 +516,8 @@ def _render_analysis_step(user_profile: UserProfile, portfolio: Portfolio) -> No
             st.rerun()
     with col_edit:
         if st.button("포트폴리오 다시 입력"):
+            _clear_analysis_state()
             st.session_state["intake_stage"] = "portfolio"
-            st.session_state.pop("analysis_output", None)
             st.rerun()
 
 
