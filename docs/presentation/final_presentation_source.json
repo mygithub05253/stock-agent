@@ -4,12 +4,14 @@
     "subtitle": "개인 포트폴리오 기반 한국 주식 멀티에이전트 분석 보조 시스템",
     "team": "PoCaT BDAI 12기 1조",
     "date": "2026-06-27",
-    "durationMinutes": 15
+    "durationMinutes": 15,
+    "mode": "심사 설득형"
   },
   "slides": [
     {
       "id": 1,
       "kind": "title",
+      "kicker": "Final Presentation",
       "title": "stock-agent",
       "headline": "개인투자자의 의사결정을 구조화하는 멀티에이전트 분석 보조 시스템",
       "bullets": [
@@ -22,8 +24,24 @@
     },
     {
       "id": 2,
+      "kind": "team",
+      "kicker": "Team & Ownership",
+      "title": "팀 역할: Agent별 책임을 나눠 실제 구현까지 연결했다",
+      "bullets": [
+        "이동원: PM·문서/설계·Competitor·평가/CI",
+        "백형준: UI·투자성향 intake·LangGraph streaming·LLM 연동",
+        "윤수정: Quant·Qual 공시·Guardrail·출력",
+        "문수빈: Macro·Supabase·LangGraph fan-out",
+        "김도예: 뉴스 크롤러·RAG 임베딩·Qual Hybrid 검색"
+      ],
+      "takeaway": "발표는 팀 역할 → 문제 정의 → Agent 구조 → 시연 영상 → 사업성과 한계 순서로 빠르게 전개한다.",
+      "speakerNote": "팀 역할을 앞에서 짚고, 이후 Agent 슬라이드마다 담당 구현과 연결한다."
+    },
+    {
+      "id": 3,
       "kind": "metrics",
-      "title": "Why Now: 개인투자 시장은 커졌지만 판단 부담도 커졌다",
+      "kicker": "Why Now",
+      "title": "개인투자 시장은 커졌지만 판단 부담도 커졌다",
       "metrics": [
         {
           "label": "개인투자자",
@@ -42,23 +60,25 @@
         }
       ],
       "takeaway": "투자는 대중화되었지만, 판단은 더 빠르고 복잡한 모바일 환경으로 이동했다.",
-      "speakerNote": "출처는 발표 본문에 크게 노출하지 않고 Q&A 대응용으로만 기억한다."
+      "speakerNote": "출처는 본문에 크게 노출하지 않고 Q&A 대응용으로만 기억한다."
     },
     {
-      "id": 3,
+      "id": 4,
       "kind": "problem",
+      "kicker": "Problem Definition",
       "title": "문제: 정보는 많지만 근거 있는 통합 판단은 어렵다",
       "bullets": [
         "1~3종목 집중투자 비중 59.7%: 포트폴리오 리스크가 개인에게 집중",
         "디지털 금융이해력 59.3점: 모바일 금융 사용은 보편화됐지만 이해도는 부족",
-        "2024년 개인 평균 수익률 -16.77%: 표본 분석 기준 시장 대비 부진"
+        "개인 평균 수익률 부진: 흩어진 정보가 행동 편향을 줄여주지 못함"
       ],
       "takeaway": "핵심 문제는 정보 부족이 아니라, 흩어진 정보를 내 포트폴리오 맥락에서 해석하는 능력의 부족이다.",
-      "speakerNote": "-16.77%는 공식통계가 아니라 NH투자증권·머니투데이 표본 분석임을 질문 시 명확히 말한다."
+      "speakerNote": "수익률 수치는 표본 분석 기준이므로 숫자보다 문제 구조를 강조한다."
     },
     {
-      "id": 4,
+      "id": 5,
       "kind": "comparison",
+      "kicker": "Market Gap",
       "title": "기존 대안은 한 가지 축만 해결한다",
       "columns": [
         "대안",
@@ -98,40 +118,26 @@
         ]
       ],
       "takeaway": "시장 공백은 내 보유 종목 기준으로 여러 근거를 검증해주는 분석 보조다.",
-      "speakerNote": "stock-agent는 제안이 아니라 현재 구현한 MVP라는 표현을 사용한다."
+      "speakerNote": "stock-agent는 아이디어가 아니라 현재 구현한 MVP라는 표현을 사용한다."
     },
     {
-      "id": 5,
+      "id": 6,
       "kind": "agent-rationale",
+      "kicker": "Why Multi-Agent",
       "title": "왜 멀티 Agent인가",
       "bullets": [
-        "정량 Agent: DART·시세 기반 재무/밸류에이션 지표 계산",
-        "정성 Agent: 뉴스·공시 RAG로 호재/악재 근거 탐색",
-        "Peer·Macro Agent: 같은 업종 비교와 거시 환경 보완",
-        "Guardrail: 투자 권유·위험 표현을 규칙 기반으로 완화"
+        "계산과 해석 분리: 정량 수치는 Tool/DB가 만들고 LLM은 설명과 합성에 집중",
+        "관점 분리: Quant·Qual·Peer·Macro가 서로 다른 실패 범위와 책임을 가짐",
+        "부분 실패 허용: 한 Agent가 실패해도 fallback과 warning으로 분석 흐름 유지",
+        "최종 안전 검증: Guardrail이 투자 권유, PII, 근거 부족 표현을 마지막에 점검"
       ],
       "takeaway": "한 모델이 모든 판단을 말하는 구조보다, 역할을 나눠 계산·검색·합성·검증을 분리하는 구조가 더 설명 가능하다.",
       "speakerNote": "악마의 대변인이라는 표현 대신 Guardrail과 전문 Agent 관점 분리라고 말한다."
     },
     {
-      "id": 6,
-      "kind": "demo",
-      "title": "사용 흐름: 7단계 성향 입력에서 Tier 결과까지",
-      "bullets": [
-        "1. 투자 목적·기간·손실 감내 등 7단계 성향 수집",
-        "2. 보유 종목·평단·현금 비중 입력",
-        "3. Agent 진행 상태를 실시간으로 확인",
-        "4. HOLD/신뢰도/포트폴리오 적합도와 근거 확인"
-      ],
-      "visuals": [
-        "docs/assets/readme/current-streamlit-onboarding.png",
-        "docs/assets/readme/current-streamlit-results.png"
-      ],
-      "speakerNote": "라이브 데모가 실패해도 이 슬라이드가 데모 대체 역할을 한다."
-    },
-    {
       "id": 7,
       "kind": "architecture",
+      "kicker": "System Architecture",
       "title": "시스템 구성: UI, DB/RAG, LangGraph, 안전 검증",
       "bullets": [
         "Streamlit UI에서 온보딩과 결과를 제공",
@@ -140,11 +146,13 @@
         "LLM은 해석·합성에 사용하고, Guardrail은 규칙 기반으로 검증"
       ],
       "visual": "docs/assets/readme/stock-agent-architecture.png",
+      "takeaway": "데이터 수집, 검색, 분석, 안전 검증을 한 흐름으로 연결한 것이 시스템의 핵심이다.",
       "speakerNote": "7장은 레이어, 8장은 11노드 흐름으로 나누어 설명한다."
     },
     {
       "id": 8,
       "kind": "flow",
+      "kicker": "LangGraph Flow",
       "title": "11노드 Agent 파이프라인",
       "nodes": [
         "Curator",
@@ -164,94 +172,269 @@
     },
     {
       "id": 9,
-      "kind": "deep-dive",
-      "title": "핵심 Agent: 근거, 비교, 안전장치",
-      "bullets": [
-        "Competitor: DB→MCP→mock 3단 폴백과 6/6 회귀 평가",
-        "Qual RAG: Hybrid 검색과 reranker 평가로 hit@5 1.0 기록",
-        "Guardrail: 7게이트로 위험 표현·PII를 검증하고 재합성 루프 수행"
+      "kind": "agent-detail",
+      "kicker": "Agent 1",
+      "title": "Curator·RequestClassifier: 질문을 실행 계획으로 바꾼다",
+      "summary": "사용자 자연어와 포트폴리오를 분석 가능한 종목·섹터·worker_plan으로 구조화하는 앞단 Agent입니다.",
+      "flow": [
+        "사용자 질의·보유 포트폴리오 수신",
+        "분석 대상 종목/후보와 섹터 확정",
+        "intent·scope·urgency·depth 분류",
+        "Quant·Qual·Competitor·Macro worker_plan 생성"
       ],
-      "takeaway": "Agent의 장점은 기능 추가가 아니라 실패와 책임 범위를 분리할 수 있다는 점이다.",
-      "speakerNote": "구현된 사실만 말한다. Quant·Qual의 프롬프트는 있지만 일부 LLM 연결은 제한적이라고 질문 시 답한다."
+      "cards": [
+        {
+          "label": "Input",
+          "text": "user_query, portfolio, onboarding profile"
+        },
+        {
+          "label": "Decision",
+          "text": "single_stock / sector / portfolio 범위와 macro 실행 여부"
+        },
+        {
+          "label": "Output",
+          "text": "CuratorResult, RequestClassification, graph_route"
+        }
+      ],
+      "takeaway": "Agent 구조의 출발점은 '무엇을 분석할지'와 '어떤 Agent를 실행할지'를 먼저 고정하는 것이다.",
+      "speakerNote": "여기서 LangGraph Send API fan-out의 이유를 연결한다."
     },
     {
       "id": 10,
-      "kind": "differentiation",
-      "title": "stock-agent의 차별점",
-      "bullets": [
-        "보유 종목·현금 비중·투자성향을 함께 보는 포트폴리오 맥락",
-        "도구 계산과 LLM 해석을 분리해 환각 위험 완화",
-        "부분 실패를 허용하는 degraded fallback",
-        "낮은 RAGAS 점수까지 공개하는 평가 문화"
+      "kind": "agent-detail",
+      "kicker": "Agent 2",
+      "title": "Quant Agent: LLM이 숫자를 만들지 않게 한다",
+      "summary": "DART 재무와 pykrx 시세를 기반으로 PER/PBR, 성장률, 수익성, 재무 리스크를 계산합니다.",
+      "flow": [
+        "Curator가 확정한 stock_code/corp_code 수신",
+        "시세와 재무제표 Tool 호출",
+        "PER/PBR/성장률/부채비율 등 지표 계산",
+        "score, valuation_signal, reasons, risks 반환"
       ],
-      "speakerNote": "좋은 점만 말하지 않고 솔직한 평가 공개를 차별점으로 둔다."
+      "cards": [
+        {
+          "label": "원칙",
+          "text": "수치 생성은 Tool/DB 담당, LLM은 임의 보정 금지"
+        },
+        {
+          "label": "Fallback",
+          "text": "DB/API 실패 시 보수적 fallback과 warning 남김"
+        },
+        {
+          "label": "전달값",
+          "text": "Strategist가 가중 합성할 정량 score와 핵심 이유"
+        }
+      ],
+      "takeaway": "정량 Agent는 설명 가능한 계산 근거를 제공해 LLM 환각 위험을 낮춘다.",
+      "speakerNote": "Quant는 '정확한 수치 계산 담당'이라는 한 문장으로 빠르게 설명한다."
     },
     {
       "id": 11,
-      "kind": "validation",
-      "title": "검증 결과: 강점과 한계를 같이 공개했다",
-      "metrics": [
+      "kind": "qual-rag",
+      "kicker": "Agent 3",
+      "title": "Qual Agent: 뉴스 수집에서 evidence/risk까지",
+      "summary": "팀원이 정리한 뉴스 수집 → RAG 임베딩 → Hybrid/RRF 검색 → reranker → Qual evidence/risk 생성 흐름을 발표용으로 압축했습니다.",
+      "flow": [
+        "뉴스 수집: 네이버 금융 종목 뉴스와 공시 문서 적재",
+        "RAG 임베딩: raw_news → docs/chunks, bge-m3 벡터화",
+        "Hybrid/RRF: pgvector 의미 검색 + keyword ts_rank를 RRF로 결합",
+        "Reranker: 선택적으로 top-k 후보를 cross-encoder 기준 재정렬",
+        "QualResult: evidence, sentiment, event_type, risk, fallback_reason 생성"
+      ],
+      "cards": [
         {
-          "label": "Phase 1 rule checks",
-          "value": "40/41",
-          "caption": "97.6%"
+          "label": "담당 자료",
+          "text": "docs/agents/news_rag_pipeline.html, docs/agents/qual_agent_flow.html 기반"
         },
         {
-          "label": "Competitor 회귀",
-          "value": "6/6",
-          "caption": "100%"
+          "label": "핵심 가치",
+          "text": "출처 없는 요약이 아니라 검색 근거를 Qual evidence로 전달"
         },
         {
-          "label": "Qual RAG hit@5",
-          "value": "1.0",
-          "caption": "MRR 1.0 / nDCG 0.93"
-        },
-        {
-          "label": "RAGAS faithfulness",
-          "value": "0.41",
-          "caption": "목표 0.80 미달"
+          "label": "안정성",
+          "text": "DB/임베딩 실패 시 fallback evidence와 reason을 남겨 Guardrail까지 전달"
         }
       ],
-      "takeaway": "검색은 잘 맞지만 생성이 근거를 충분히 반영하지 못하는 한계를 다음 개선 과제로 잡았다.",
-      "speakerNote": "D→C→B 개선 서사를 20초 안에만 언급한다."
+      "takeaway": "Qual Agent는 '뉴스를 읽어준다'가 아니라, 검색 가능한 근거를 만들어 정성 리스크로 변환한다.",
+      "speakerNote": "30초 버전: 뉴스 수집, 임베딩 저장, Hybrid 검색, reranker, evidence/risk 생성 순서만 말한다."
     },
     {
       "id": 12,
-      "kind": "business",
-      "title": "상업성: 개인투자자용 PB-lite 분석 보조",
-      "bullets": [
-        "B2C: 개인투자자의 보유 종목 점검과 리포트 생성",
-        "B2B: 증권·핀테크 앱의 설명형 AI 분석 모듈",
-        "교육: 투자 판단 과정을 설명하는 실습형 튜터",
-        "리서치 보조: 뉴스·공시·peer 요약 자동화"
+      "kind": "agent-detail",
+      "kicker": "Agent 4",
+      "title": "Competitor Agent: 같은 섹터 안에서 상대 위치를 계산한다",
+      "summary": "대상 종목의 peer를 찾고, 밸류에이션·수익성·성장성·재무 안정성을 비교합니다.",
+      "flow": [
+        "Curator가 확정한 sector와 stock_code 수신",
+        "company, stock_price, financial_statement에서 peer 후보 조회",
+        "시총 band와 복합 유사도로 비교군 선정",
+        "상대 위치 score, warnings, peer_summary 반환"
       ],
-      "speakerNote": "규제 리스크 때문에 자동매매나 확정 추천이 아니라 분석 보조로 포지셔닝한다."
+      "cards": [
+        {
+          "label": "3단 경로",
+          "text": "DB 성공 → MCP 실시간 시세 → 데모 최후 보루 mock"
+        },
+        {
+          "label": "계산 기준",
+          "text": "PER/PBR/ROE/성장률/마진/부채비율/데이터 품질"
+        },
+        {
+          "label": "역할",
+          "text": "사용자에게 '내 종목이 업종 내 어디쯤인지' 설명"
+        }
+      ],
+      "takeaway": "Peer 비교를 분리했기 때문에 단일 종목 분석이 업종 맥락 없이 흐르는 문제를 줄인다.",
+      "speakerNote": "MCP는 '외부 데이터 경로를 표준 인터페이스로 노출한 점' 정도만 짚는다."
     },
     {
       "id": 13,
-      "kind": "limits",
-      "title": "한계와 발전 가능성",
-      "bullets": [
-        "RAG faithfulness 0.41 → 인용 스팬과 context gating으로 개선",
-        "users·holdings·analysis_cache 영속화 테이블 구현 필요",
-        "실데이터 범위와 커버 종목 확대 필요",
-        "PB 리포트 PDF/Excel 다운로드와 운영 비용 제어 고도화"
+      "kind": "agent-detail",
+      "kicker": "Agent 5",
+      "title": "Macro Agent: 개별 종목을 거시 환경 안에 놓는다",
+      "summary": "금리, 환율, CPI, GDP, 뉴스심리지수 등 거시 지표를 업종 영향으로 해석합니다.",
+      "flow": [
+        "sector와 as_of_date 기준 macro context 조회",
+        "금리·물가·성장·환율·심리 지표를 정규화",
+        "업종별 민감도에 따라 score와 risks 계산",
+        "portfolio/sector 분석 또는 sector가 있는 단일 종목에서 조건부 실행"
       ],
-      "speakerNote": "한계를 숨기지 않고 다음 스프린트 작업으로 연결한다."
+      "cards": [
+        {
+          "label": "조건부 실행",
+          "text": "Classifier worker_plan에 macro가 있을 때만 Send"
+        },
+        {
+          "label": "해석 방향",
+          "text": "금리/환율/물가가 업종 수익성에 미치는 압력 설명"
+        },
+        {
+          "label": "Fallback",
+          "text": "macro DB/tool 실패 시 보수적 지표와 warning 반환"
+        }
+      ],
+      "takeaway": "Macro는 개별 종목 판단이 시장 환경과 분리되어 보이는 문제를 보완한다.",
+      "speakerNote": "모든 요청에 macro를 돌리는 게 아니라 조건부 실행이라는 점을 강조한다."
     },
     {
       "id": 14,
-      "kind": "team",
-      "title": "팀 역할과 결론",
-      "bullets": [
-        "이동원: PM·문서/설계·Competitor·평가/CI",
-        "백형준: UI·투자성향 intake·LangGraph streaming·LLM 연동",
-        "윤수정: Quant·Qual 공시·Guardrail·출력",
-        "문수빈: Macro·Supabase·LangGraph fan-out",
-        "김도예: 뉴스 크롤러·RAG 임베딩·Qual 검색 평가"
+      "kind": "agent-detail",
+      "kicker": "Agent 6",
+      "title": "Strategist·InvestmentAnalyst: 근거를 포트폴리오 맥락으로 합성한다",
+      "summary": "Worker 결과를 단순 평균하지 않고, 사용자 보유 비중과 투자성향을 반영해 최종 분석 신호를 만듭니다.",
+      "flow": [
+        "Quant·Qual·Competitor·Macro 결과 join",
+        "Macro 포함 여부에 따라 가중치 재조정",
+        "보유 비중·위험성향·투자기간으로 suitability 보정",
+        "sLLM/GLM이 thesis와 risk narrative를 보완"
       ],
-      "takeaway": "우리는 투자 판단을 자동화한 것이 아니라, 판단에 필요한 근거를 Agent 구조로 분해하고 다시 합성했다.",
-      "speakerNote": "마지막 문장은 또박또박 말하고 Q&A로 넘긴다."
+      "cards": [
+        {
+          "label": "가중 합성",
+          "text": "Quant 40~45%, Qual 25~30%, Competitor 20~25%, Macro 15%"
+        },
+        {
+          "label": "개인화",
+          "text": "같은 종목이라도 보유 비중과 위험성향에 따라 suitability가 달라짐"
+        },
+        {
+          "label": "Fallback",
+          "text": "LLM 실패 시 rule-based Strategist 결과를 유지"
+        }
+      ],
+      "takeaway": "개인화는 중간 근거를 바꾸는 것이 아니라, 최종 해석과 적합도에서 반영한다.",
+      "speakerNote": "투자 권유가 아니라 포트폴리오 맥락화된 분석 신호라고 반복한다."
+    },
+    {
+      "id": 15,
+      "kind": "agent-detail",
+      "kicker": "Agent 7",
+      "title": "Guardrail·ResultRenderer: 안전하게 보여주는 마지막 단계",
+      "summary": "최종 출력 전 PII, 욕설, 수익 보장, 투자 권유성 표현, 근거 부족을 점검하고 Tier 결과로 렌더링합니다.",
+      "flow": [
+        "Strategist 결과를 Guardrail 7게이트로 검사",
+        "PII나 금지 표현 발견 시 보수적 HOLD와 마스킹 적용",
+        "근거 부족은 recomposer revision loop로 최대 2회 재합성",
+        "ResultRenderer가 Tier 1/2/3와 다운로드 산출물 구조화"
+      ],
+      "cards": [
+        {
+          "label": "Safety",
+          "text": "투자 권유·수익 보장·민감정보 노출을 최종 차단"
+        },
+        {
+          "label": "Transparency",
+          "text": "fallback과 근거 부족은 사용자 경고로 승격"
+        },
+        {
+          "label": "Output",
+          "text": "한 줄 신호, 근거 카드, 상세 리포트로 분리"
+        }
+      ],
+      "takeaway": "좋은 분석보다 중요한 것은 위험한 표현을 그대로 내보내지 않는 구조다.",
+      "speakerNote": "심사위원에게 금융 도메인에서 안전 검증이 왜 필요한지 짧게 설명한다."
+    },
+    {
+      "id": 16,
+      "kind": "demo-video",
+      "kicker": "Demo Video",
+      "title": "시연은 라이브 대신 영상으로 안정적으로 보여준다",
+      "bullets": [
+        "0:00 온보딩: 투자 목적·기간·손실 감내 등 7단계 입력",
+        "0:25 포트폴리오: 보유 종목, 평단, 현금 비중 입력",
+        "0:45 Agent 진행: Quant·Qual·Competitor·Macro 진행 상태 확인",
+        "1:15 결과: HOLD/신뢰도/포트폴리오 적합도와 근거 카드 확인"
+      ],
+      "visuals": [
+        "docs/assets/readme/current-streamlit-onboarding.png",
+        "docs/assets/readme/current-streamlit-results.png"
+      ],
+      "takeaway": "발표장 리스크를 줄이기 위해 라이브 조작은 최소화하고, 준비된 시연 영상으로 전체 사용자 흐름을 보여준다.",
+      "speakerNote": "이 슬라이드에서 로컬 시연 영상으로 전환한다. 저장소에는 아직 영상 파일이 없으므로 HTML/PPTX에는 포스터형 슬라이드만 넣었다."
+    },
+    {
+      "id": 17,
+      "kind": "differentiation",
+      "kicker": "Differentiation",
+      "title": "stock-agent의 차별점",
+      "bullets": [
+        "포트폴리오 맥락: 보유 종목·현금 비중·투자성향을 함께 해석",
+        "도구와 LLM 분리: 숫자 계산은 Tool, 설명과 합성은 LLM",
+        "Agent별 실패 격리: 부분 실패를 warning과 fallback으로 흡수",
+        "검색 근거 중심: 뉴스·공시를 RAG evidence로 변환해 출처 없는 요약을 줄임",
+        "금융 안전장치: Guardrail과 재합성 루프로 위험 표현을 완화"
+      ],
+      "takeaway": "우리는 추천 엔진을 만든 것이 아니라, 개인투자자의 판단 근거를 구조화하는 분석 보조 시스템을 만들었다.",
+      "speakerNote": "여기서는 구현 차별점만 말하고 경쟁사 비교를 반복하지 않는다."
+    },
+    {
+      "id": 18,
+      "kind": "business",
+      "kicker": "Business Potential",
+      "title": "상업성: 개인투자자용 PB-lite 분석 보조",
+      "bullets": [
+        "B2C: 개인투자자의 보유 종목 점검과 정기 리포트 생성",
+        "B2B: 증권·핀테크 앱에 설명형 AI 분석 모듈로 탑재",
+        "교육: 투자 판단 과정을 설명하는 실습형 튜터",
+        "리서치 보조: 뉴스·공시·peer 요약 자동화",
+        "수익화: 프리미엄 리포트, 포트폴리오 모니터링, API 모듈"
+      ],
+      "takeaway": "규제 리스크를 줄이기 위해 자동매매나 확정 추천이 아니라 설명 가능한 분석 보조로 포지셔닝한다.",
+      "speakerNote": "상업성은 '개인용 PB-lite'와 'B2B 분석 모듈' 두 축으로 말한다."
+    },
+    {
+      "id": 19,
+      "kind": "closing",
+      "kicker": "Limits & Closing",
+      "title": "한계와 결론: 더 정확한 근거 연결이 다음 단계다",
+      "bullets": [
+        "근거 품질: RAG 인용 스팬, context gating, reranker 운영 기준 고도화",
+        "데이터 영속화: users·holdings·analysis_cache 테이블과 이력 관리 필요",
+        "커버리지: 실데이터 종목 범위와 뉴스/공시 수집 안정성 확대",
+        "제품화: PB 리포트 PDF/Excel, 알림, 운영 비용 제어 필요"
+      ],
+      "takeaway": "stock-agent는 투자 판단을 자동화한 것이 아니라, 판단에 필요한 근거를 Agent 구조로 분해하고 다시 합성했다.",
+      "speakerNote": "마지막 문장은 천천히 말하고 Q&A로 넘긴다."
     }
   ]
 }

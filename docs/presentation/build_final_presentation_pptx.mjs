@@ -600,6 +600,171 @@ function renderDeepDive(data) {
   slide.speakerNotes.textFrame.setText(data.speakerNote ?? "");
 }
 
+function renderAgentDetail(data) {
+  const slide = presentation.slides.add();
+  addBase(slide, data);
+  addSlideTitle(slide, data, data.summary);
+
+  const flow = data.flow ?? [];
+  const flowCount = flow.length;
+  const flowGap = 14;
+  const flowWidth = (1136 - flowGap * (flowCount - 1)) / flowCount;
+  flow.forEach((step, index) => {
+    const left = 72 + index * (flowWidth + flowGap);
+    const accent = [BLUE, CYAN, GREEN, AMBER, RED][index % 5];
+    addRound(slide, { left, top: 184, width: flowWidth, height: 142 }, {
+      fill: index % 2 ? PANEL_2 : PANEL,
+      lineFill: accent,
+      borderRadius: 18,
+    });
+    addRound(slide, { left: left + 18, top: 204, width: 34, height: 34 }, {
+      fill: accent,
+      line: NO_LINE,
+      borderRadius: "rounded-full",
+    });
+    addText(slide, String(index + 1), { left: left + 18, top: 210, width: 34, height: 22 }, {
+      fontSize: 16,
+      bold: true,
+      color: BG,
+      alignment: "center",
+    });
+    addText(slide, step, { left: left + 18, top: 254, width: flowWidth - 36, height: 54 }, {
+      fontSize: flowCount > 4 ? 16 : 18,
+      color: TEXT,
+      lineSpacing: 1.08,
+    });
+  });
+
+  (data.cards ?? []).forEach((card, index) => {
+    const left = 72 + index * 386;
+    const accent = [BLUE, CYAN, GREEN][index % 3];
+    addRound(slide, { left, top: 364, width: 350, height: 130 }, {
+      fill: "#101f35",
+      lineFill: "#294967",
+      borderRadius: 18,
+    });
+    addText(slide, card.label, { left: left + 22, top: 386, width: 306, height: 28 }, {
+      fontSize: 22,
+      bold: true,
+      color: accent,
+    });
+    addText(slide, card.text, { left: left + 22, top: 426, width: 306, height: 46 }, {
+      fontSize: 18,
+      color: TEXT,
+      lineSpacing: 1.08,
+    });
+  });
+
+  addTakeaway(slide, data.takeaway, 552);
+  slide.speakerNotes.textFrame.setText(data.speakerNote ?? "");
+}
+
+function renderQualRag(data) {
+  const slide = presentation.slides.add();
+  addBase(slide, data);
+  addSlideTitle(slide, data, data.summary);
+
+  const flow = data.flow ?? [];
+  const gap = 12;
+  const width = (1136 - gap * 4) / 5;
+  flow.forEach((step, index) => {
+    const [head, ...bodyParts] = step.split(": ");
+    const left = 72 + index * (width + gap);
+    const accent = [BLUE, CYAN, GREEN, AMBER, RED][index];
+    addRound(slide, { left, top: 174, width, height: 174 }, {
+      fill: index % 2 ? PANEL_2 : PANEL,
+      lineFill: accent,
+      borderRadius: 18,
+    });
+    addPill(slide, `0${index + 1}`, { left: left + 18, top: 194, width: 58, height: 28 }, accent);
+    addText(slide, head, { left: left + 18, top: 238, width: width - 36, height: 30 }, {
+      fontSize: 20,
+      bold: true,
+      color: accent,
+    });
+    addText(slide, bodyParts.join(": "), { left: left + 18, top: 282, width: width - 36, height: 48 }, {
+      fontSize: 15,
+      color: TEXT,
+      lineSpacing: 1.08,
+    });
+  });
+
+  (data.cards ?? []).forEach((card, index) => {
+    const left = 72 + index * 386;
+    const accent = [CYAN, GREEN, AMBER][index % 3];
+    addRound(slide, { left, top: 382, width: 350, height: 116 }, {
+      fill: "#101f35",
+      lineFill: "#294967",
+      borderRadius: 18,
+    });
+    addText(slide, card.label, { left: left + 22, top: 402, width: 306, height: 26 }, {
+      fontSize: 21,
+      bold: true,
+      color: accent,
+    });
+    addText(slide, card.text, { left: left + 22, top: 438, width: 306, height: 42 }, {
+      fontSize: 17,
+      color: TEXT,
+      lineSpacing: 1.08,
+    });
+  });
+
+  addTakeaway(slide, data.takeaway, 552);
+  slide.speakerNotes.textFrame.setText(data.speakerNote ?? "");
+}
+
+function renderDemoVideo(data) {
+  const slide = presentation.slides.add();
+  addBase(slide, data);
+  addSlideTitle(slide, data, "라이브 조작 대신 준비된 영상으로 사용자 흐름을 안정적으로 전달");
+
+  addRound(slide, { left: 72, top: 160, width: 700, height: 384 }, {
+    fill: "#06172a",
+    lineFill: "#275078",
+    borderRadius: 24,
+  });
+  slide.images.add({
+    blob: awaitImage(data.visuals[0]),
+    contentType: "image/png",
+    alt: "Streamlit onboarding poster",
+    fit: "cover",
+    geometry: "roundRect",
+    borderRadius: 18,
+    position: { left: 94, top: 188, width: 318, height: 246 },
+  });
+  slide.images.add({
+    blob: awaitImage(data.visuals[1]),
+    contentType: "image/png",
+    alt: "Streamlit result poster",
+    fit: "cover",
+    geometry: "roundRect",
+    borderRadius: 18,
+    position: { left: 432, top: 188, width: 318, height: 246 },
+  });
+  addRound(slide, { left: 340, top: 444, width: 164, height: 52 }, {
+    fill: "#0b2a35",
+    lineFill: CYAN,
+    borderRadius: "rounded-full",
+  });
+  addText(slide, "▶ DEMO VIDEO", { left: 340, top: 458, width: 164, height: 24 }, {
+    fontSize: 18,
+    bold: true,
+    color: CYAN,
+    alignment: "center",
+  });
+
+  (data.bullets ?? []).forEach((bullet, index) => {
+    cardText(slide, bullet, { left: 812, top: 164 + index * 82, width: 396, height: 62 }, {
+      fill: index % 2 ? PANEL_2 : PANEL,
+      fontSize: 18,
+      insets: { top: 13, right: 16, bottom: 10, left: 16 },
+    });
+  });
+
+  addTakeaway(slide, data.takeaway, 574);
+  slide.speakerNotes.textFrame.setText(data.speakerNote ?? "");
+}
+
 function renderTeam(data) {
   const slide = presentation.slides.add();
   addBase(slide, data);
@@ -675,23 +840,36 @@ for (const slideData of source.slides) {
     case "flow":
       renderFlow(slideData);
       break;
+    case "agent-detail":
+      renderAgentDetail(slideData);
+      break;
+    case "qual-rag":
+      renderQualRag(slideData);
+      break;
+    case "demo-video":
+      renderDemoVideo(slideData);
+      break;
     case "deep-dive":
       renderDeepDive(slideData);
       break;
     case "differentiation":
       renderCardGrid(slideData, {
-        columns: 2,
-        cardHeight: 132,
+        columns: 1,
+        cardHeight: 60,
+        gap: 10,
         subtitle: "기능 나열보다 평가 가능성과 실패 대응이 차별점",
-        takeawayTop: 546,
+        top: 154,
+        takeawayTop: 552,
       });
       break;
     case "business":
       renderCardGrid(slideData, {
-        columns: 2,
-        cardHeight: 120,
+        columns: 1,
+        cardHeight: 60,
+        gap: 10,
         subtitle: "추천 서비스가 아니라 설명 가능한 분석 보조 모듈",
-        takeawayTop: 542,
+        top: 154,
+        takeawayTop: 552,
       });
       break;
     case "limits":
@@ -699,6 +877,14 @@ for (const slideData of source.slides) {
         columns: 2,
         cardHeight: 120,
         subtitle: "한계를 숨기지 않고 다음 개선 과제로 연결",
+        takeawayTop: 542,
+      });
+      break;
+    case "closing":
+      renderCardGrid(slideData, {
+        columns: 2,
+        cardHeight: 120,
+        subtitle: "한계를 숨기지 않고 다음 개선 방향과 최종 메시지로 연결",
         takeawayTop: 542,
       });
       break;
