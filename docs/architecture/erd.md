@@ -180,8 +180,8 @@
     }
 ```
 
-> 📌 **db/init에 실제 존재(코드 기준)** = `company`, `stock_price`, `financial_statement`, `disclosure_report`, `disclosure_content`, `rag_documents`, `rag_chunks`, `raw_news`, `raw_macro`
-> 📌 **설계만(미구현)** = `financial_ratio`(파생 재무비율 — DDL 미작성), `users`·`holdings`·`analysis_history`(회원·포트·분석 이력 — 현재 런타임 Pydantic만, DDL 미작성). 위 mermaid에서 점선/제안 표기로 읽으세요.
+> 📌 **db/init에 실제 존재(코드 기준)** = `company`, `stock_price`, `financial_statement`, `rag_documents`, `rag_chunks`, `raw_news`, `raw_macro`
+> 📌 **설계만(미구현)** = `disclosure_report`·`disclosure_content`(공시 메타/원문 — DDL 미작성), `financial_ratio`(파생 재무비율 — DDL 미작성), `users`·`holdings`·`analysis_history`(회원·포트·분석 이력 — 현재 런타임 Pydantic만, DDL 미작성). 위 mermaid에서 점선/제안 표기로 읽으세요.
 >
 > ⚠️ 정합 기준: 상충 시 **실제 SQL(`db/init/`)이 우선**입니다. 자세한 매핑은 아래 [0.1 구현 상태](#01-구현-상태-코드-기준)를 참고하세요.
 

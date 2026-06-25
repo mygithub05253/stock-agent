@@ -9,9 +9,10 @@
 | 2026-06-12 | Phase 1 benchmark | rule **40/41**, faithfulness **0.4096** |
 | 2026-06-14 | Competitor regression | **6/6** |
 | 2026-06-20 | Competitor regression 재검증 | **6/6** |
+| 2026-06-20 | News RAG retriever eval | hit_rate **1.0**, MRR **1.0**, nDCG@5 **0.9265** |
 
 ## 생성 원리
 
-`eval/run_benchmark.py`와 `eval/run_competitor_eval.py`가 같은 날짜·stem의 `.md`와 `.json`을 만듭니다. 결과를 손으로 고치지 않고 입력·평가 코드를 수정한 뒤 다시 생성합니다.
+`eval/run_benchmark.py`, `eval/run_competitor_eval.py`, `eval/run_rag_retriever_eval.py`가 같은 날짜·stem의 `.md` 또는 `.json`을 만듭니다. 결과를 손으로 고치지 않고 입력·평가 코드를 수정한 뒤 다시 생성합니다.
 
 [평가 인덱스](../README.md)
