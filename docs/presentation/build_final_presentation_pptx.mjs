@@ -156,16 +156,22 @@ function addBase(slide, data) {
 }
 
 function addSlideTitle(slide, data, subtitle) {
-  addText(slide, data.title, { left: 72, top: 70, width: 1000, height: 64 }, {
-    fontSize: 36,
+  const titleLength = Array.from(String(data.title ?? "")).length;
+  const isLongTitle = titleLength > 34;
+  const titleFontSize = titleLength > 48 ? 30 : isLongTitle ? 32 : 36;
+  const titleHeight = isLongTitle ? 74 : 60;
+  const subtitleTop = isLongTitle ? 140 : 122;
+  addText(slide, data.title, { left: 72, top: 70, width: 1060, height: titleHeight }, {
+    fontSize: titleFontSize,
     bold: true,
     color: TEXT,
     lineSpacing: 0.96,
   });
   if (subtitle) {
-    addText(slide, subtitle, { left: 74, top: 122, width: 980, height: 32 }, {
+    addText(slide, subtitle, { left: 74, top: subtitleTop, width: 980, height: 34 }, {
       fontSize: 18,
       color: MUTED,
+      lineSpacing: 1.05,
     });
   }
 }
