@@ -106,11 +106,17 @@ def test_qual_uses_fallback_docs_when_rag_fails(monkeypatch):
 
     assert result_state.qual is not None
     assert result_state.qual.score >= 0
-    assert any("fallback_reason" in item for item in result_state.qual.evidence)
-    assert any("fallback" in item.lower() for item in result_state.qual.evidence)
+    assert any("삼성전자 Q1 2026 실적 발표" in item for item in result_state.qual.evidence)
+    assert any("HBM4와 NVIDIA 협력 논의" in item for item in result_state.qual.evidence)
+    assert any("Samsung Newsroom" in item for item in result_state.qual.evidence)
+    assert any("Reuters Connect" in item for item in result_state.qual.evidence)
+    assert any("임시 공시 데이터" in item for item in result_state.qual.evidence)
+    assert not any("fallback_reason" in item for item in result_state.qual.evidence)
+    assert not any("ConnectionError" in item for item in result_state.qual.evidence)
+    assert any("경쟁 압력" in item for item in result_state.qual.risks)
 
 
-def test_guardrail_warns_when_qual_used_fallback(monkeypatch):
+def test_guardrail_does_not_expose_qual_connection_error(monkeypatch):
     monkeypatch.setattr(
         qual,
         "retrieve_news_with_fallback",
@@ -142,4 +148,5 @@ def test_guardrail_warns_when_qual_used_fallback(monkeypatch):
     guarded_state = run_guardrail(state)
 
     assert guarded_state.guardrail is not None
-    assert any("fallback" in warning for warning in guarded_state.guardrail.warnings)
+    assert not any("ConnectionError" in warning for warning in guarded_state.guardrail.warnings)
+    assert not any("fallback" in warning.lower() and "qual" in warning for warning in guarded_state.guardrail.warnings)

@@ -27,6 +27,19 @@ _DEFAULT_AVG_PRICE_RATIO_BY_CORP = {
     "신한지주": 0.96,
 }
 
+_DEFAULT_QTY_BY_CORP = {
+    "SK하이닉스": 1,
+    "삼성전자": 2,
+    "한미반도체": 1,
+    "리노공업": 1,
+    "이오테크닉스": 1,
+    "DB하이텍": 2,
+    "HPSP": 2,
+    "ISC": 1,
+    "이수페타시스": 2,
+    "하나마이크론": 2,
+}
+
 
 _AGENT_PROGRESS_ORDER = [
     "curator",
@@ -232,7 +245,7 @@ def _render_portfolio_step(user_profile: UserProfile) -> Portfolio | None:
                     qty = st.number_input(
                         f"{corp_name} 수량",
                         min_value=0,
-                        value=0,
+                        value=_DEFAULT_QTY_BY_CORP.get(corp_name, 0),
                         step=1,
                         label_visibility="visible",
                         key=f"stock_qty_{corp_name}",
