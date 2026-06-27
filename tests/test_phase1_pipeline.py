@@ -305,7 +305,8 @@ def test_summary_depth_keeps_workers_but_limits_ui_evidence() -> None:
     assert output.state.competitor is not None
     assert len(output.state.qual.evidence) > 1
     assert len(output.state.competitor.evidence) > 1
-    assert len(output.tier2["정성 근거"]) == 1
+    assert len(output.tier2["정성 근거"]) == 4
+    assert any("삼성전자 Q1 2026 실적 발표" in item for item in output.tier2["정성 근거"])
     assert len(output.tier2["Peer 비교"]) == 1
 
 

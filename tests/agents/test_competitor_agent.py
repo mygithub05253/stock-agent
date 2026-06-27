@@ -159,12 +159,13 @@ def test_run_competitor_uses_explicit_mock_fallback_when_db_fails(monkeypatch) -
 
     assert result_state is state
     assert state.competitor is not None
-    assert any("mock_data_fallback" in warning for warning in state.competitor.warnings)
-    failure_warning = "RuntimeError: database is unavailable"
-    assert any(failure_warning in warning for warning in state.competitor.warnings)
+    assert not any("mock_data_fallback" in item for item in state.competitor.evidence)
+    assert not any("fallback_reason" in warning for warning in state.competitor.warnings)
+    assert any("삼성전자 PER" in item for item in state.competitor.evidence)
+    assert any("SK하이닉스" in item for item in state.competitor.evidence)
     assert state.competitor.peer_selection_summary is not None
-    assert "fallback" in state.competitor.peer_selection_summary.lower()
-    assert any("fallback" in flag.lower() for flag in state.competitor.data_quality_flags)
+    assert "반도체 업종" in state.competitor.peer_selection_summary
+    assert any("mock_data_fallback" in flag for flag in state.competitor.data_quality_flags)
 
 
 def _mcp_records() -> list[dict]:

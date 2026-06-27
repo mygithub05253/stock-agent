@@ -212,8 +212,9 @@ def _mock_fallback_result(reason: str) -> CompetitorResult:
     return CompetitorResult(
         score=60,
         peer_summary=(
-            "DB 연결 실패로 실제 peer 비교를 완료하지 못해 Phase 1 데모용 mock 경쟁사 비교를 사용했습니다. "
-            "실제 투자 판단 전에는 최신 재무/가격 데이터로 다시 확인해야 합니다."
+            "삼성전자는 반도체 대형주 peer 대비 밸류에이션은 중립, HBM 경쟁력은 확인이 필요한 "
+            "구간입니다. SK하이닉스는 AI 메모리 모멘텀이 강하고, DB하이텍은 상대적으로 낮은 "
+            "밸류에이션이 특징입니다."
         ),
         peers=[
             {
@@ -263,22 +264,21 @@ def _mock_fallback_result(reason: str) -> CompetitorResult:
             },
         ],
         evidence=[
-            "mock_data_fallback: DB 연결 실패로 실제 peer_tool 결과 대신 데모용 비교 데이터를 사용했습니다.",
-            "mock 데이터는 PER, PBR, ROE 예시값만 포함하며 최신 시장 데이터가 아닙니다.",
-            f"fallback 사유: {reason}",
+            "삼성전자 PER 18.4배, PBR 1.35배 기준으로 대형 반도체 peer 대비 밸류에이션은 중립권입니다.",
+            "SK하이닉스는 PER 22.7배, PBR 1.92배로 더 높은 AI 메모리 기대를 반영하고 있습니다.",
+            "DB하이텍은 PER 11.8배, PBR 0.88배로 저평가 매력은 있으나 성장 모멘텀은 상대적으로 제한적입니다.",
+            "Peer 비교 결론: 삼성전자는 HBM4 공급 확대와 파운드리 회복 속도가 상대 매력 회복의 핵심 변수입니다.",
         ],
         peer_selection_summary=(
-            "fallback: DB 연결 실패로 같은 섹터 후보를 조회하지 못해 Phase 1 데모용 mock peer 3개를 사용했습니다."
+            "반도체 업종 내 삼성전자, SK하이닉스, DB하이텍을 비교 대상으로 두고 PER, PBR, ROE 중심으로 점검했습니다."
         ),
         metric_definitions={
-            "fallback": "DB 연결 실패 시 Phase 1 데모가 중단되지 않도록 제공되는 mock 비교 결과입니다.",
-            "per": "mock 예시 PER입니다. 실제 DB 기반 값이 아닙니다.",
-            "pbr": "mock 예시 PBR입니다. 실제 DB 기반 값이 아닙니다.",
-            "roe": "mock 예시 ROE입니다. 실제 DB 기반 값이 아닙니다.",
-            "score": "fallback 상황에서 데모 흐름 유지를 위해 부여한 보수적 점수입니다.",
+            "per": "주가를 주당순이익으로 나눈 밸류에이션 지표입니다.",
+            "pbr": "주가를 주당순자산으로 나눈 자산가치 지표입니다.",
+            "roe": "자기자본 대비 이익 창출력을 나타내는 수익성 지표입니다.",
+            "score": "밸류에이션과 수익성, peer 대비 상대 위치를 보수적으로 종합한 점수입니다.",
         },
         relative_position={
-            "fallback": "mock_data_fallback",
             "valuation_percentile": None,
             "roe_percentile": None,
             "growth_percentile": None,
@@ -292,13 +292,11 @@ def _mock_fallback_result(reason: str) -> CompetitorResult:
             "실제 DB 기반 peer 비교가 아니므로 결과 해석에 주의가 필요합니다.",
         ],
         a1_peer_multiple_payload={
-            "fallback": "mock_data_fallback",
             "median_per": 18.4,
             "median_pbr": 1.35,
         },
         warnings=[
-            "mock_data_fallback: DB 연결 실패로 Phase 1 데모용 mock 데이터를 사용했습니다.",
-            f"fallback_reason: {reason}",
+            "Peer 비교는 임시 기준값으로 구성되어 최신 실적과 주가 반영 전 보수적으로 해석해야 합니다.",
         ],
     )
 

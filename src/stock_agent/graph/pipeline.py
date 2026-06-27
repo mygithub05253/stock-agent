@@ -582,9 +582,9 @@ def stream_phase1_analysis_events(
     }
 
 
-def _tier_items(items: list[str], state: AgentState) -> list[str]:
+def _tier_items(items: list[str], state: AgentState, summary_limit: int = 1) -> list[str]:
     if state.user_request and state.user_request.requested_depth == "summary":
-        return items[:1]
+        return items[:summary_limit]
     return items
 
 
@@ -607,7 +607,7 @@ def _to_output(state: AgentState) -> AnalysisOutput:
         tier1=tier1,
         tier2={
             "정량 근거": _tier_items(state.quant.reasons if state.quant else [], state),
-            "정성 근거": _tier_items(state.qual.evidence if state.qual else [], state),
+            "정성 근거": _tier_items(state.qual.evidence if state.qual else [], state, summary_limit=4),
             "Peer 비교": _tier_items(state.competitor.evidence if state.competitor else [], state),
             "거시경제": _tier_items(state.macro.reasons if state.macro else [], state),
             "포트폴리오 적합도": state.strategist.next_actions,

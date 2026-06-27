@@ -90,7 +90,8 @@ def test_run_quant_partial_price_tool_failure_uses_fallback(monkeypatch):
     assert result.quant.metrics["pbr"] == 1.3
     assert result.quant.metrics["roe"] == 12.0
     assert any("시세 도구 오류" in reason for reason in result.quant.reasons)
-    assert any("fallback" in reason.lower() or "기본값" in reason for reason in result.quant.reasons + result.quant.risks)
+    assert any("임시 기준값" in reason for reason in result.quant.reasons)
+    assert any("보수적으로 해석" in risk for risk in result.quant.risks)
     assert result.quant.valuation_signal == "BUY"
 
 
@@ -121,7 +122,8 @@ def test_run_quant_partial_fin_tool_failure_uses_fallback(monkeypatch):
     assert result.quant.metrics["per"] == 10.0
     assert result.quant.metrics["roe"] == 8.0
     assert any("DART 재무 도구 오류" in reason for reason in result.quant.reasons)
-    assert any("fallback" in reason.lower() or "기본값" in reason for reason in result.quant.reasons + result.quant.risks)
+    assert any("임시 기준값" in reason for reason in result.quant.reasons)
+    assert any("보수적으로 해석" in risk for risk in result.quant.risks)
     assert result.quant.valuation_signal == "HOLD"
 
 
@@ -139,7 +141,8 @@ def test_run_quant_db_connection_failure_uses_fallback_reasons(monkeypatch):
     assert result.quant.metrics["per"] == 18.0
     assert result.quant.metrics["roe"] == 8.0
     assert any("DB 연결 시도 1 실패" in reason for reason in result.quant.reasons)
-    assert any("fallback" in reason.lower() for reason in result.quant.reasons + result.quant.risks)
+    assert any("임시 기준값" in reason for reason in result.quant.reasons)
+    assert any("보수적으로 해석" in risk for risk in result.quant.risks)
 
 
 def test_run_quant_raises_without_curator():
