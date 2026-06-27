@@ -169,10 +169,10 @@ def run_quant(state: AgentState) -> AgentState:
 
     if fallback_reasons:
         reasons.append(
-            "일부 정량 지표는 데모 또는 기본값으로 대체되어 있습니다. 실제 투자 판단 전 DB/툴 연결 결과를 재확인하세요."
+            "일부 정량 지표는 임시 기준값으로 보완했습니다. 실제 투자 판단 전 최신 시세와 재무 데이터를 재확인하세요."
         )
         risks.append(
-            "현재 정량 결과에는 일부 mock/기본값이 포함되어 있으므로 검증이 필요합니다."
+            "정량 지표 일부는 최신 원천 데이터 확인 전까지 보수적으로 해석해야 합니다."
         )
         # 상세 실패 사유는 UI의 정량 근거 섹션과 테스트 계약에서 reasons로 노출한다.
         for fallback_reason in fallback_reasons:
@@ -194,4 +194,3 @@ def run_quant(state: AgentState) -> AgentState:
     )
     
     return state
-

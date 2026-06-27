@@ -423,8 +423,11 @@ def run_macro(state: AgentState) -> AgentState:
 
     # ── 6. Fallback 경고 추가 ─────────────────────────────────
     if fallback_reason:
-        risks.append(f"DB 연결 실패로 데모용 거시경제 추정치를 사용했습니다. ({fallback_reason})")
-        risks.append("현재 거시경제 결과는 fallback 값이므로 실제 투자 판단 전 DB 연결 후 재확인이 필요합니다.")
+        risks.append(
+            "DB 연결 실패 fallback: 일부 거시경제 데이터를 일시적으로 불러오지 못해 "
+            "보수적 대체 지표로 분석을 계속했습니다."
+        )
+        risks.append("실제 투자 판단 전 데이터 연결 상태를 확인해 주세요.")
 
     # ── 7. 사용된 지표값 정리 ─────────────────────────────────
     indicators_out: dict[str, float | None] = {

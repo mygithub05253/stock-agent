@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stock-agent 최종 발표</title>
+<style>
+:root {
+  --bg: #07111f;
+  --panel: #0f1b2e;
+  --panel-2: #16243a;
+  --text: #edf5ff;
+  --muted: #93a4c4;
+  --subtle: #64748b;
+  --line: #263b5e;
+  --blue: #4f8ef7;
+  --cyan: #27d3d0;
+  --green: #34d399;
+  --amber: #f59e0b;
+  --red: #fb7185;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 100%; height: 100%; background: var(--bg); color: var(--text); }
+body { font-family: "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif; overflow: hidden; }
+.deck { width: 100vw; height: 100vh; position: relative; }
+.slide {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  padding: 4.8vh 5.6vw 6vh;
+  display: none;
+  background:
+    linear-gradient(180deg, rgba(79,142,247,.95) 0 1.1vh, transparent 1.1vh),
+    radial-gradient(circle at 88% 10%, rgba(39,211,208,.13), transparent 25vh),
+    var(--bg);
+}
+.slide.active { display: block; }
+.slide-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-bottom: 3.2vh; }
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 16px;
+  border: 1px solid rgba(39,211,208,.75);
+  border-radius: 999px;
+  color: var(--cyan);
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1;
+}
+h1, h2, p { margin: 0; letter-spacing: 0; }
+h2 { margin-top: 14px; font-size: clamp(30px, 3vw, 43px); line-height: 1.08; }
+.page { color: var(--subtle); font-size: 17px; margin-top: 18px; }
+.title-slide { display: none; grid-template-columns: 1fr .95fr; gap: 4vw; align-items: center; }
+.title-slide.active { display: grid; }
+.title-copy h1 { margin: 42px 0 18px; font-size: clamp(64px, 7vw, 96px); line-height: .9; }
+.title-copy > p { max-width: 680px; color: #d8e5f7; font-size: 31px; line-height: 1.34; }
+.title-bullets { list-style: none; padding: 0; margin: 46px 0 0; display: grid; gap: 18px; font-size: 23px; }
+.title-bullets li::before { content: ""; display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: var(--cyan); margin-right: 16px; vertical-align: -1px; }
+.title-image { width: 100%; height: 76vh; object-fit: cover; border-radius: 24px; border: 1px solid rgba(79,142,247,.28); }
+.date { margin-top: 52px; color: var(--muted); font-size: 18px; }
+.metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 8vh; }
+.metric-card, .info-card, .small-card, .agent-card, .flow-step, .problem-row, .team-row, .demo-cue-list article {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.metric-card { min-height: 240px; padding: 28px; border-top-width: 8px; }
+.metric-card span { color: var(--muted); font-weight: 800; font-size: 18px; }
+.metric-card strong { display: block; margin: 30px 0 18px; color: var(--cyan); font-size: 54px; line-height: 1; }
+.metric-card p { color: #bfd0e6; font-size: 19px; line-height: 1.35; }
+.problem-stack, .team-grid { display: grid; gap: 18px; }
+.problem-row { display: grid; grid-template-columns: 58px 1fr; gap: 24px; align-items: center; padding: 24px 28px; }
+.problem-row b { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--cyan); color: var(--bg); font-size: 22px; }
+.problem-row p, .team-row span { font-size: 23px; line-height: 1.36; color: var(--text); }
+.table-wrap { margin-top: 2vh; }
+table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 14px; font-size: 19px; }
+th, td { border: 1px solid rgba(148,163,184,.2); padding: 16px 14px; text-align: left; vertical-align: top; }
+th { background: #10233b; color: var(--cyan); }
+td { background: rgba(15,27,46,.92); }
+tbody tr:last-child td { background: rgba(39,211,208,.12); font-weight: 800; }
+.card-grid { display: grid; gap: 16px; }
+.card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+.card-grid.cols-1 { grid-template-columns: 1fr; }
+.info-card { display: grid; grid-template-columns: 42px 1fr; gap: 18px; align-items: center; min-height: 72px; padding: 16px 24px; }
+.info-card b { color: var(--cyan); font-size: 22px; }
+.info-card p, .small-card, .agent-card span, .flow-step p, .flow-step strong { color: var(--text); font-size: 21px; line-height: 1.3; }
+.team-row { display: grid; grid-template-columns: 190px 1fr; gap: 22px; align-items: center; min-height: 70px; padding: 20px 26px; }
+.team-row strong, .agent-card strong { color: var(--cyan); font-size: 23px; }
+.split-layout { display: grid; grid-template-columns: .72fr 1.18fr; gap: 28px; align-items: start; }
+.text-stack { display: grid; gap: 18px; }
+.small-card { min-height: 82px; padding: 20px 24px; }
+.architecture-image { width: 100%; height: 51vh; object-fit: contain; background: #fff; border-radius: 18px; border: 1px solid var(--line); }
+.pipeline { display: grid; gap: 38px; margin-top: 6vh; }
+.flow-line, .worker-row { display: flex; gap: 14px; justify-content: center; align-items: center; }
+.flow-line span, .worker-row span { min-width: 150px; padding: 20px 22px; text-align: center; border: 1px solid var(--cyan); border-radius: 16px; background: var(--panel); font-weight: 800; font-size: 20px; }
+.flow-line i { color: #5f7f9e; font-style: normal; font-size: 28px; }
+.worker-row span { border-color: rgba(79,142,247,.75); min-width: 190px; }
+.agent-layout, .qual-layout { display: grid; gap: 24px; }
+.summary { color: var(--muted); font-size: 22px; line-height: 1.38; max-width: 1120px; }
+.agent-flow, .qual-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.qual-flow { grid-template-columns: repeat(5, 1fr); }
+.flow-step { min-height: 150px; padding: 20px; border-top-width: 6px; }
+.flow-step b { display: block; color: var(--cyan); font-size: 18px; margin-bottom: 16px; }
+.flow-step strong { display: block; color: var(--cyan); font-weight: 800; margin-bottom: 10px; }
+.flow-step p { font-size: 17px; }
+.agent-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.agent-card { min-height: 116px; padding: 20px 24px; }
+.agent-card strong { display: block; margin-bottom: 14px; }
+.agent-card span { font-size: 18px; color: #dce9fa; }
+.demo-video-layout { display: grid; grid-template-columns: 1.1fr .75fr; gap: 36px; align-items: start; }
+.video-poster { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 24px; min-height: 390px; background: #06172a; border: 1px solid #275078; border-radius: 24px; }
+.video-poster img { width: 100%; height: 300px; object-fit: cover; border-radius: 16px; border: 1px solid rgba(255,255,255,.12); }
+.play-badge { position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); padding: 14px 28px; border: 1px solid var(--cyan); border-radius: 999px; background: #0b2a35; color: var(--cyan); font-weight: 900; }
+.demo-cue-list { display: grid; gap: 16px; }
+.demo-cue-list article { min-height: 72px; padding: 18px 22px; color: var(--text); font-size: 20px; line-height: 1.3; }
+.takeaway { position: absolute; left: 5.6vw; right: 5.6vw; bottom: 5.2vh; min-height: 58px; display: grid; grid-template-columns: 120px 1fr; align-items: center; gap: 18px; padding: 14px 24px; border: 1px solid #234663; border-radius: 16px; background: #0b2034; }
+.takeaway strong { color: var(--cyan); }
+.takeaway span { color: var(--text); font-size: 21px; line-height: 1.25; }
+.accent-0 { border-color: rgba(79,142,247,.58); }
+.accent-1 { border-color: rgba(39,211,208,.58); }
+.accent-2 { border-color: rgba(52,211,153,.58); }
+.accent-3 { border-color: rgba(245,158,11,.58); }
+.accent-4 { border-color: rgba(251,113,133,.58); }
+@page { size: 16in 9in; margin: 0; }
+@media print {
+  html, body { width: 16in; height: 9in; overflow: visible; }
+  .deck { width: 16in; height: auto; }
+  .slide { position: relative; display: block !important; width: 16in; height: 9in; page-break-after: always; padding: .76in .9in .74in; }
+  .title-slide { display: grid !important; }
+  .slide:last-child { page-break-after: auto; }
+}
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <section class="slide title-slide" data-slide="1">
+    <div class="title-copy">
+      <div class="kicker">Final Presentation</div>
+      <h1>stock-agent</h1>
+      <p>개인투자자의 의사결정을 구조화하는 멀티에이전트 분석 보조 시스템</p>
+      <ul class="title-bullets"><li>투자성향과 보유 포트폴리오를 함께 반영</li><li>정량·정성·Peer·거시 데이터를 Agent가 분리 분석</li><li>투자 권유가 아닌 근거 기반 분석 신호 제공</li></ul>
+      <div class="date">2026-06-27 · PoCaT BDAI 12기 1조</div>
+    </div>
+    <img class="title-image" src="../assets/presentation/final-title-thumbnail.png" alt="stock-agent 발표 썸네일">
+  </section>
+
+  <section class="slide" data-slide="2">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Team &amp; Ownership</div>
+        <h2>팀 역할: Agent별 책임을 나눠 실제 구현까지 연결했다</h2>
+      </div>
+      <div class="page">02</div>
+    </header>
+    <main class="team-grid">
+      <article class="team-row accent-0">
+          <strong>이동원</strong>
+          <span>PM·문서/설계·Competitor·평가/CI</span>
+        </article><article class="team-row accent-1">
+          <strong>백형준</strong>
+          <span>UI·투자성향 intake·LangGraph streaming·LLM 연동</span>
+        </article><article class="team-row accent-2">
+          <strong>윤수정</strong>
+          <span>Quant·Qual 공시·Guardrail·출력</span>
+        </article><article class="team-row accent-3">
+          <strong>문수빈</strong>
+          <span>Macro·Supabase·LangGraph fan-out</span>
+        </article><article class="team-row accent-4">
+          <strong>김도예</strong>
+          <span>뉴스 크롤러·RAG 임베딩·Qual Hybrid 검색</span>
+        </article>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>발표는 팀 역할 → 문제 정의 → Agent 구조 → 시연 영상 → 사업성과 한계 순서로 빠르게 전개한다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="3">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Why Now</div>
+        <h2>개인투자 시장은 커졌지만 판단 부담도 커졌다</h2>
+      </div>
+      <div class="page">03</div>
+    </header>
+    <main class="metric-grid">
+      <article class="metric-card accent-0">
+        <span>개인투자자</span>
+        <strong>1,442만 명</strong>
+        <p>2025년 말 개인 기준</p>
+      </article><article class="metric-card accent-1">
+        <span>주식거래 활동계좌</span>
+        <strong>1억 500만 개</strong>
+        <p>2026.04.29 금융투자협회</p>
+      </article><article class="metric-card accent-2">
+        <span>개인 MTS 거래 비중</span>
+        <strong>65.7%</strong>
+        <p>2026년 1~5월 한국거래소</p>
+      </article>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>투자는 대중화되었지만, 판단은 더 빠르고 복잡한 모바일 환경으로 이동했다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="4">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Problem Definition</div>
+        <h2>문제: 정보는 많지만 근거 있는 통합 판단은 어렵다</h2>
+      </div>
+      <div class="page">04</div>
+    </header>
+    <main class="problem-stack">
+      <article class="problem-row accent-0">
+        <b>1</b>
+        <p>1~3종목 집중투자 비중 59.7%: 포트폴리오 리스크가 개인에게 집중</p>
+      </article><article class="problem-row accent-1">
+        <b>2</b>
+        <p>디지털 금융이해력 59.3점: 모바일 금융 사용은 보편화됐지만 이해도는 부족</p>
+      </article><article class="problem-row accent-2">
+        <b>3</b>
+        <p>개인 평균 수익률 부진: 흩어진 정보가 행동 편향을 줄여주지 못함</p>
+      </article>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>핵심 문제는 정보 부족이 아니라, 흩어진 정보를 내 포트폴리오 맥락에서 해석하는 능력의 부족이다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="5">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Market Gap</div>
+        <h2>기존 대안은 한 가지 축만 해결한다</h2>
+      </div>
+      <div class="page">05</div>
+    </header>
+    <main class="table-wrap">
+      <table>
+        <thead><tr><th>대안</th><th>포트폴리오 맥락</th><th>멀티 관점</th><th>안전 검증</th><th>한계</th></tr></thead>
+        <tbody>
+          <tr><td>증권사 MTS</td><td>△</td><td>△</td><td>△</td><td>정보는 많지만 종합 판단은 사용자 몫</td></tr><tr><td>로보어드바이저</td><td>○</td><td>△</td><td>△</td><td>자산배분 중심, 개별 종목 근거 설명 약함</td></tr><tr><td>범용 LLM</td><td>×</td><td>△</td><td>×</td><td>실시간 데이터·출처·환각 통제 한계</td></tr><tr><td>stock-agent</td><td>○</td><td>○</td><td>○</td><td>포트폴리오 맥락에서 Agent별 근거를 합성</td></tr>
+        </tbody>
+      </table>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>시장 공백은 내 보유 종목 기준으로 여러 근거를 검증해주는 분석 보조다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="6">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Why Multi-Agent</div>
+        <h2>왜 멀티 Agent인가</h2>
+      </div>
+      <div class="page">06</div>
+    </header>
+    <main class="card-grid cols-2">
+      <article class="info-card accent-0">
+        <b>1</b>
+        <p>계산과 해석 분리: 정량 수치는 Tool/DB가 만들고 LLM은 설명과 합성에 집중</p>
+      </article><article class="info-card accent-1">
+        <b>2</b>
+        <p>관점 분리: Quant·Qual·Peer·Macro가 서로 다른 실패 범위와 책임을 가짐</p>
+      </article><article class="info-card accent-2">
+        <b>3</b>
+        <p>부분 실패 허용: 한 Agent가 실패해도 fallback과 warning으로 분석 흐름 유지</p>
+      </article><article class="info-card accent-3">
+        <b>4</b>
+        <p>최종 안전 검증: Guardrail이 투자 권유, PII, 근거 부족 표현을 마지막에 점검</p>
+      </article>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>한 모델이 모든 판단을 말하는 구조보다, 역할을 나눠 계산·검색·합성·검증을 분리하는 구조가 더 설명 가능하다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="7">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">System Architecture</div>
+        <h2>시스템 구성: UI, DB/RAG, LangGraph, 안전 검증</h2>
+      </div>
+      <div class="page">07</div>
+    </header>
+    <main class="split-layout">
+      <div class="text-stack"><article class="small-card accent-0">
+        Streamlit UI에서 온보딩과 결과를 제공
+      </article><article class="small-card accent-1">
+        PostgreSQL + pgvector로 정형 데이터와 RAG 검색 통합
+      </article><article class="small-card accent-2">
+        LangGraph StateGraph와 Send API로 worker Agent 동적 fan-out
+      </article><article class="small-card accent-3">
+        LLM은 해석·합성에 사용하고, Guardrail은 규칙 기반으로 검증
+      </article></div>
+      <img class="architecture-image" src="../assets/readme/stock-agent-architecture.png" alt="stock-agent 시스템 구성도">
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>데이터 수집, 검색, 분석, 안전 검증을 한 흐름으로 연결한 것이 시스템의 핵심이다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="8">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">LangGraph Flow</div>
+        <h2>11노드 Agent 파이프라인</h2>
+      </div>
+      <div class="page">08</div>
+    </header>
+    <main class="pipeline">
+      <div class="flow-line top"><span>Curator</span><i>→</i><span>Classifier</span></div>
+      <div class="worker-row"><span>Quant</span><span>Qual</span><span>Competitor</span><span>Macro</span></div>
+      <div class="flow-line bottom"><span>Strategist</span><i>→</i><span>InvestmentAnalyst</span><i>→</i><span>Guardrail</span><i>→</i><span>GuardrailApply</span><i>→</i><span>ResultRenderer</span></div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>Classifier 이후 필요한 worker를 병렬 실행하고, Strategist에서 join한 뒤 Analyst와 Guardrail을 통과한다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="9">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Agent 1</div>
+        <h2>Curator·Classifier: 질문을 실행 계획으로 바꾼다</h2>
+      </div>
+      <div class="page">09</div>
+    </header>
+    <main class="agent-layout">
+      <p class="summary">사용자 자연어와 포트폴리오를 분석 가능한 종목·섹터·worker_plan으로 구조화하는 앞단 Agent입니다.</p>
+      <div class="agent-flow">
+        <article class="flow-step accent-0">
+          <b>01</b>
+          <p>사용자 질의·보유 포트폴리오 수신</p>
+        </article><article class="flow-step accent-1">
+          <b>02</b>
+          <p>분석 대상 종목/후보와 섹터 확정</p>
+        </article><article class="flow-step accent-2">
+          <b>03</b>
+          <p>intent·scope·urgency·depth 분류</p>
+        </article><article class="flow-step accent-3">
+          <b>04</b>
+          <p>필요 Agent worker_plan 생성</p>
+        </article>
+      </div>
+      <div class="agent-cards">
+        <article class="agent-card accent-0">
+          <strong>Input</strong>
+          <span>user_query, portfolio, onboarding profile</span>
+        </article><article class="agent-card accent-1">
+          <strong>Decision</strong>
+          <span>single_stock / sector / portfolio 범위와 macro 실행 여부</span>
+        </article><article class="agent-card accent-2">
+          <strong>Output</strong>
+          <span>CuratorResult, RequestClassification, graph_route</span>
+        </article>
+      </div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>Agent 구조의 출발점은 '무엇을 분석할지'와 '어떤 Agent를 실행할지'를 먼저 고정하는 것이다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="10">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Agent 2</div>
+        <h2>Quant Agent: LLM이 숫자를 만들지 않게 한다</h2>
+      </div>
+      <div class="page">10</div>
+    </header>
+    <main class="agent-layout">
+      <p class="summary">DART 재무와 pykrx 시세를 기반으로 PER/PBR, 성장률, 수익성, 재무 리스크를 계산합니다.</p>
+      <div class="agent-flow">
+        <article class="flow-step accent-0">
+          <b>01</b>
+          <p>Curator가 확정한 stock_code/corp_code 수신</p>
+        </article><article class="flow-step accent-1">
+          <b>02</b>
+          <p>시세와 재무제표 Tool 호출</p>
+        </article><article class="flow-step accent-2">
+          <b>03</b>
+          <p>PER/PBR/성장률/부채비율 등 지표 계산</p>
+        </article><article class="flow-step accent-3">
+          <b>04</b>
+          <p>score, valuation_signal, reasons, risks 반환</p>
+        </article>
+      </div>
+      <div class="agent-cards">
+        <article class="agent-card accent-0">
+          <strong>원칙</strong>
+          <span>수치 생성은 Tool/DB 담당, LLM은 임의 보정 금지</span>
+        </article><article class="agent-card accent-1">
+          <strong>Fallback</strong>
+          <span>DB/API 실패 시 보수적 fallback과 warning 남김</span>
+        </article><article class="agent-card accent-2">
+          <strong>전달값</strong>
+          <span>Strategist가 가중 합성할 정량 score와 핵심 이유</span>
+        </article>
+      </div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>정량 Agent는 설명 가능한 계산 근거를 제공해 LLM 환각 위험을 낮춘다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="11">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Agent 3</div>
+        <h2>Qual Agent: 뉴스 수집에서 evidence/risk까지</h2>
+      </div>
+      <div class="page">11</div>
+    </header>
+    <main class="qual-layout">
+      <p class="summary">뉴스 수집 → RAG 임베딩 → Hybrid/RRF → reranker → evidence/risk 생성 흐름입니다.</p>
+      <div class="qual-flow">
+        <article class="flow-step accent-0">
+            <b>01</b>
+            <strong>뉴스 수집</strong>
+            <p>네이버 금융 종목 뉴스와 공시 문서 적재</p>
+          </article><article class="flow-step accent-1">
+            <b>02</b>
+            <strong>RAG 임베딩</strong>
+            <p>raw_news → docs/chunks, bge-m3 벡터화</p>
+          </article><article class="flow-step accent-2">
+            <b>03</b>
+            <strong>Hybrid/RRF</strong>
+            <p>pgvector 의미 검색 + keyword ts_rank를 RRF로 결합</p>
+          </article><article class="flow-step accent-3">
+            <b>04</b>
+            <strong>Reranker</strong>
+            <p>선택적으로 top-k 후보를 cross-encoder 기준 재정렬</p>
+          </article><article class="flow-step accent-4">
+            <b>05</b>
+            <strong>QualResult</strong>
+            <p>evidence, sentiment, event_type, risk, fallback_reason 생성</p>
+          </article>
+      </div>
+      <div class="agent-cards">
+        <article class="agent-card accent-0">
+          <strong>담당 자료</strong>
+          <span>docs/agents/news_rag_pipeline.html, docs/agents/qual_agent_flow.html 기반</span>
+        </article><article class="agent-card accent-1">
+          <strong>핵심 가치</strong>
+          <span>출처 없는 요약이 아니라 검색 근거를 Qual evidence로 전달</span>
+        </article><article class="agent-card accent-2">
+          <strong>안정성</strong>
+          <span>데모에서 뉴스 fallback이 보이면 DB/임베딩 연결 실패 신호로 보고 연결 상태를 점검</span>
+        </article>
+      </div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>Qual Agent는 '뉴스를 읽어준다'가 아니라, 검색 가능한 근거를 만들어 정성 리스크로 변환한다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="12">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Agent 4</div>
+        <h2>Competitor Agent: 같은 섹터 안에서 상대 위치를 계산한다</h2>
+      </div>
+      <div class="page">12</div>
+    </header>
+    <main class="agent-layout">
+      <p class="summary">대상 종목의 peer를 찾고, 밸류에이션·수익성·성장성·재무 안정성을 비교합니다.</p>
+      <div class="agent-flow">
+        <article class="flow-step accent-0">
+          <b>01</b>
+          <p>Curator가 확정한 sector와 stock_code 수신</p>
+        </article><article class="flow-step accent-1">
+          <b>02</b>
+          <p>company, stock_price, financial_statement에서 peer 후보 조회</p>
+        </article><article class="flow-step accent-2">
+          <b>03</b>
+          <p>시총 band와 복합 유사도로 비교군 선정</p>
+        </article><article class="flow-step accent-3">
+          <b>04</b>
+          <p>상대 위치 score, warnings, peer_summary 반환</p>
+        </article>
+      </div>
+      <div class="agent-cards">
+        <article class="agent-card accent-0">
+          <strong>3단 경로</strong>
+          <span>DB 성공 → MCP 실시간 시세 → 데모 최후 보루 mock</span>
+        </article><article class="agent-card accent-1">
+          <strong>계산 기준</strong>
+          <span>PER/PBR/ROE/성장률/마진/부채비율/데이터 품질</span>
+        </article><article class="agent-card accent-2">
+          <strong>역할</strong>
+          <span>사용자에게 '내 종목이 업종 내 어디쯤인지' 설명</span>
+        </article>
+      </div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>Peer 비교를 분리했기 때문에 단일 종목 분석이 업종 맥락 없이 흐르는 문제를 줄인다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="13">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Agent 5</div>
+        <h2>Macro Agent: 개별 종목을 거시 환경 안에 놓는다</h2>
+      </div>
+      <div class="page">13</div>
+    </header>
+    <main class="agent-layout">
+      <p class="summary">금리, 환율, CPI, GDP, 뉴스심리지수 등 거시 지표를 업종 영향으로 해석합니다.</p>
+      <div class="agent-flow">
+        <article class="flow-step accent-0">
+          <b>01</b>
+          <p>sector와 as_of_date 기준 macro context 조회</p>
+        </article><article class="flow-step accent-1">
+          <b>02</b>
+          <p>금리·물가·성장·환율·심리 지표를 정규화</p>
+        </article><article class="flow-step accent-2">
+          <b>03</b>
+          <p>업종별 민감도에 따라 score와 risks 계산</p>
+        </article><article class="flow-step accent-3">
+          <b>04</b>
+          <p>portfolio/sector 분석 또는 sector가 있는 단일 종목에서 조건부 실행</p>
+        </article>
+      </div>
+      <div class="agent-cards">
+        <article class="agent-card accent-0">
+          <strong>조건부 실행</strong>
+          <span>Classifier worker_plan에 macro가 있을 때만 Send</span>
+        </article><article class="agent-card accent-1">
+          <strong>해석 방향</strong>
+          <span>금리/환율/물가가 업종 수익성에 미치는 압력 설명</span>
+        </article><article class="agent-card accent-2">
+          <strong>Fallback</strong>
+          <span>macro DB/tool 실패 시 보수적 지표와 warning 반환</span>
+        </article>
+      </div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>Macro는 개별 종목 판단이 시장 환경과 분리되어 보이는 문제를 보완한다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="14">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Agent 6</div>
+        <h2>Strategist·Analyst: 근거를 개인 맥락으로 합성한다</h2>
+      </div>
+      <div class="page">14</div>
+    </header>
+    <main class="agent-layout">
+      <p class="summary">Worker 결과를 단순 평균하지 않고, 사용자 보유 비중과 투자성향을 반영해 최종 분석 신호를 만듭니다.</p>
+      <div class="agent-flow">
+        <article class="flow-step accent-0">
+          <b>01</b>
+          <p>Worker Agent 결과 join</p>
+        </article><article class="flow-step accent-1">
+          <b>02</b>
+          <p>Macro 포함 여부에 따라 가중치 재조정</p>
+        </article><article class="flow-step accent-2">
+          <b>03</b>
+          <p>보유 비중·위험성향·투자기간으로 suitability 보정</p>
+        </article><article class="flow-step accent-3">
+          <b>04</b>
+          <p>sLLM/GLM이 thesis와 risk narrative를 보완</p>
+        </article>
+      </div>
+      <div class="agent-cards">
+        <article class="agent-card accent-0">
+          <strong>가중 합성</strong>
+          <span>Quant 40~45%, Qual 25~30%, Competitor 20~25%, Macro 15%</span>
+        </article><article class="agent-card accent-1">
+          <strong>개인화</strong>
+          <span>같은 종목이라도 보유 비중과 위험성향에 따라 suitability가 달라짐</span>
+        </article><article class="agent-card accent-2">
+          <strong>Fallback</strong>
+          <span>LLM 실패 시 rule-based Strategist 결과를 유지</span>
+        </article>
+      </div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>개인화는 중간 근거를 바꾸는 것이 아니라, 최종 해석과 적합도에서 반영한다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="15">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Agent 7</div>
+        <h2>Guardrail·Renderer: 안전하게 보여주는 마지막 단계</h2>
+      </div>
+      <div class="page">15</div>
+    </header>
+    <main class="agent-layout">
+      <p class="summary">최종 출력 전 PII, 욕설, 수익 보장, 투자 권유성 표현, 근거 부족을 점검하고 Tier 결과로 렌더링합니다.</p>
+      <div class="agent-flow">
+        <article class="flow-step accent-0">
+          <b>01</b>
+          <p>Strategist 결과를 Guardrail 7게이트로 검사</p>
+        </article><article class="flow-step accent-1">
+          <b>02</b>
+          <p>PII나 금지 표현 발견 시 보수적 HOLD와 마스킹 적용</p>
+        </article><article class="flow-step accent-2">
+          <b>03</b>
+          <p>근거 부족은 recomposer revision loop로 최대 2회 재합성</p>
+        </article><article class="flow-step accent-3">
+          <b>04</b>
+          <p>ResultRenderer가 Tier 1/2/3와 다운로드 산출물 구조화</p>
+        </article>
+      </div>
+      <div class="agent-cards">
+        <article class="agent-card accent-0">
+          <strong>Safety</strong>
+          <span>투자 권유·수익 보장·민감정보 노출을 최종 차단</span>
+        </article><article class="agent-card accent-1">
+          <strong>Transparency</strong>
+          <span>fallback과 근거 부족은 사용자 경고로 승격</span>
+        </article><article class="agent-card accent-2">
+          <strong>Output</strong>
+          <span>한 줄 신호, 근거 카드, 상세 리포트로 분리</span>
+        </article>
+      </div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>좋은 분석보다 중요한 것은 위험한 표현을 그대로 내보내지 않는 구조다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="16">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Demo Video</div>
+        <h2>시연은 라이브 대신 영상으로 안정적으로 보여준다</h2>
+      </div>
+      <div class="page">16</div>
+    </header>
+    <main class="demo-video-layout">
+      <div class="video-poster">
+        <img src="../assets/readme/current-streamlit-onboarding.png" alt="온보딩 화면">
+        <img src="../assets/readme/current-streamlit-results.png" alt="결과 화면">
+        <div class="play-badge">▶ DEMO VIDEO</div>
+      </div>
+      <div class="demo-cue-list"><article>0:00 온보딩: 투자 목적·기간·손실 감내 등 7단계 입력</article><article>0:25 포트폴리오: 보유 종목, 평단, 현금 비중 입력</article><article>0:45 Agent 진행: Quant·Qual·Competitor·Macro 진행 상태 확인</article><article>1:15 결과: HOLD/신뢰도/포트폴리오 적합도와 근거 카드 확인</article></div>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>발표장 리스크를 줄이기 위해 라이브 조작은 최소화하고, 준비된 시연 영상으로 전체 사용자 흐름을 보여준다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="17">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Differentiation</div>
+        <h2>stock-agent의 차별점</h2>
+      </div>
+      <div class="page">17</div>
+    </header>
+    <main class="card-grid cols-1">
+      <article class="info-card accent-0">
+        <b>1</b>
+        <p>포트폴리오 맥락: 보유 종목·현금 비중·투자성향을 함께 해석</p>
+      </article><article class="info-card accent-1">
+        <b>2</b>
+        <p>도구와 LLM 분리: 숫자 계산은 Tool, 설명과 합성은 LLM</p>
+      </article><article class="info-card accent-2">
+        <b>3</b>
+        <p>Agent별 실패 격리: 부분 실패를 warning과 fallback으로 흡수</p>
+      </article><article class="info-card accent-3">
+        <b>4</b>
+        <p>검색 근거 중심: 뉴스·공시를 RAG evidence로 변환해 출처 없는 요약을 줄임</p>
+      </article><article class="info-card accent-4">
+        <b>5</b>
+        <p>금융 안전장치: Guardrail과 재합성 루프로 위험 표현을 완화</p>
+      </article>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>우리는 추천 엔진을 만든 것이 아니라, 개인투자자의 판단 근거를 구조화하는 분석 보조 시스템을 만들었다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="18">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Business Potential</div>
+        <h2>상업성: 개인투자자용 PB-lite 분석 보조</h2>
+      </div>
+      <div class="page">18</div>
+    </header>
+    <main class="card-grid cols-1">
+      <article class="info-card accent-0">
+        <b>1</b>
+        <p>B2C: 개인투자자의 보유 종목 점검과 정기 리포트 생성</p>
+      </article><article class="info-card accent-1">
+        <b>2</b>
+        <p>B2B: 증권·핀테크 앱에 설명형 AI 분석 모듈로 탑재</p>
+      </article><article class="info-card accent-2">
+        <b>3</b>
+        <p>교육: 투자 판단 과정을 설명하는 실습형 튜터</p>
+      </article><article class="info-card accent-3">
+        <b>4</b>
+        <p>리서치 보조: 뉴스·공시·peer 요약 자동화</p>
+      </article><article class="info-card accent-4">
+        <b>5</b>
+        <p>수익화: 프리미엄 리포트, 포트폴리오 모니터링, API 모듈</p>
+      </article>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>규제 리스크를 줄이기 위해 자동매매나 확정 추천이 아니라 설명 가능한 분석 보조로 포지셔닝한다.</span></footer>
+  </section>
+
+  <section class="slide" data-slide="19">
+    
+    <header class="slide-header">
+      <div>
+        <div class="kicker">Limits &amp; Closing</div>
+        <h2>한계와 결론: 더 정확한 근거 연결이 다음 단계다</h2>
+      </div>
+      <div class="page">19</div>
+    </header>
+    <main class="card-grid cols-2">
+      <article class="info-card accent-0">
+        <b>1</b>
+        <p>근거 품질: RAG 인용 스팬, context gating, reranker 운영 기준 고도화</p>
+      </article><article class="info-card accent-1">
+        <b>2</b>
+        <p>데이터 영속화: users·holdings·analysis_cache 테이블과 이력 관리 필요</p>
+      </article><article class="info-card accent-2">
+        <b>3</b>
+        <p>커버리지: 실데이터 종목 범위와 뉴스/공시 수집 안정성 확대</p>
+      </article><article class="info-card accent-3">
+        <b>4</b>
+        <p>제품화: PB 리포트 PDF/Excel, 알림, 운영 비용 제어 필요</p>
+      </article>
+    </main>
+    <footer class="takeaway"><strong>Takeaway</strong><span>stock-agent는 투자 판단을 자동화한 것이 아니라, 판단에 필요한 근거를 Agent 구조로 분해하고 다시 합성했다.</span></footer>
+  </section>
+</div>
+<script>
+const slides = Array.from(document.querySelectorAll('.slide'));
+let index = 0;
+function show(next) {
+  index = Math.max(0, Math.min(slides.length - 1, next));
+  slides.forEach((slide, i) => slide.classList.toggle('active', i === index));
+}
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowRight' || event.key === ' ') show(index + 1);
+  if (event.key === 'ArrowLeft') show(index - 1);
+  if (event.key === 'Home') show(0);
+  if (event.key === 'End') show(slides.length - 1);
+});
+show(0);
+</script>
+</body>
+</html>
